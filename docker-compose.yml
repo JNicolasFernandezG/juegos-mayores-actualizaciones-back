@@ -1,18 +1,28 @@
+name: cognijuegos_app
+
+# ==============================================================================
+# Servicio CogniJuegos (https://cognijuegos.asistodo.com.ar — Puerto 8087)
+# Arquitectura de 2 contenedores: Caddy (SPA + Reverse Proxy) + Backend FastAPI.
+# Se conecta a la base de datos centralizada mediante la red externa compartida.
+# ==============================================================================
+
 services:
-  # 1. Portero Web y Reverse Proxy (sirve el Frontend y redirige las APIs)
+  # 1. Servidor Web y Reverse Proxy (sirve ./dist en /srv/dist y redirige /api/*)
   caddy:
     image: caddy:2-alpine
-    container_name: mayores-actualizaciones-caddy
+    container_name: cognijuegos-caddy
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
     ports:
-      - "8082:8082"                       # Único puerto expuesto hacia el exterior (Nginx / Firewall)
+      - "${PORT:-8087}:8087"                 # Único puerto expuesto hacia el exterior (8087)
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro  # Reglas de proxy y ruteo (Solo lectura)
-      - ./dist:/srv:ro                       # Archivos estáticos del Frontend compilado (Solo lectura)
+      - ./dist:/srv/dist:ro                  # Archivos estáticos del Frontend compilado (Solo lectura)
+      - caddy_data:/data
+      - caddy_config:/config
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8087/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -27,27 +37,42 @@ services:
         limits:
           cpus: "0.50"
           memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+    # SEGURIDAD: Caddy SOLO está en la red interna del servicio (sin acceso a la red de MongoDB)
     networks:
-      - sipi_net
+      - red-interna-servicio
     depends_on:
       backend:
         condition: service_healthy
 
   # 2. Backend FastAPI (Python)
   backend:
-    build: .
-    container_name: mayores-actualizaciones-backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cognijuegos-backend
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    expose:
+      - "8087"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
-      - .env                              # Carga automática de variables de entorno
+      - .env
     environment:
-      - MONGODB_URL=mongodb://mongodb:27017
-      - PORT=8082
+      - PORT=8087
       - HOST=0.0.0.0
+      - SERVICE_KEY=${SERVICE_KEY:-conmijuegos}
+      - FRONTEND_URL=${FRONTEND_URL:-https://cognijuegos.asistodo.com.ar}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL:-https://autenticacion.asistodo.com.ar}
+      - MONGO_URI=${MONGO_URI:-}
+      - MONGODB_URL=${MONGODB_URL:-mongodb://mongodb-central:27017}
+      - MONGODB_DB_NAME=${MONGODB_DB_NAME:-conmijuegos_db}
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8082/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8087/health')"]
       interval: 20s
       timeout: 5s
       retries: 3
@@ -62,43 +87,27 @@ services:
         limits:
           cpus: "1.50"
           memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    # Conectado a su red interna (para Caddy) y a la red externa compartida (para mongodb-central)
     networks:
-      - sipi_net
-    depends_on:
-      mongodb:
-        condition: service_healthy
-
-  # 3. Base de Datos MongoDB
-  mongodb:
-    image: mongo:7.0
-    container_name: mayores-actualizaciones-mongodb
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    volumes:
-      - mongo_data:/data/db               # Persistencia de datos
-    healthcheck:
-      test: ["CMD-SHELL", "mongosh --eval \"db.adminCommand('ping')\" || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "20m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: "1.00"
-          memory: 1024M
-    networks:
-      - sipi_net
+      - red-interna-servicio
+      - red-mongo-compartida
 
 volumes:
-  mongo_data:
+  caddy_data:
+  caddy_config:
 
 networks:
-  sipi_net:
+  # Red interna propia de este servicio (Caddy <-> Backend)
+  red-interna-servicio:
+    name: red-interna-cognijuegos
     driver: bridge
+
+  # Red externa compartida para conectarse a mongodb-central (separada del Autenticador)
+  red-mongo-compartida:
+    name: red-mongo-compartida
+    external: true
+
+

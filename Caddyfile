@@ -1,8 +1,13 @@
+# ==============================================================================
+# Caddyfile — CogniJuegos (https://cognijuegos.asistodo.com.ar — Puerto :8087)
+# Sirve la SPA compilada desde /srv/dist y redirige las llamadas API al backend
+# ==============================================================================
+
 :8087 {
     # 1. Compresión para máxima velocidad de respuesta
     encode zstd gzip
 
-    # 2. Encabezados globales de seguridad
+    # 2. Encabezados globales de seguridad (Hardening Perimetral)
     header {
         # Ocultar la firma del servidor web
         -Server
@@ -29,16 +34,17 @@
     @hidden path */.*
     respond @hidden 404
 
-    # 5. Enrutar endpoints de la API hacia FastAPI
-    @backend path /api* /usuario* /progreso* /cursos* /payment* /health* /actuator*
+    # 5. Reverse Proxy de /api/* y endpoints del Backend hacia FastAPI (backend:8087)
+    @backend path /api/* /usuario* /progreso* /admin* /assets/narrative* /health* /actuator*
     handle @backend {
-        reverse_proxy backend:8082
+        reverse_proxy backend:8087
     }
 
-    # 6. Servir estáticos de React con fallback SPA
+    # 6. Servir archivos estáticos compilados del Frontend (SPA) desde /srv/dist
     handle {
-        root * /srv
+        root * /srv/dist
         try_files {path} /index.html
         file_server
     }
 }
+

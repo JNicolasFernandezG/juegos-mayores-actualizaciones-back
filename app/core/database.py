@@ -11,16 +11,24 @@ class Database:
 
 db_instance = Database()
 
+def _mask_mongo_uri(uri: str) -> str:
+    if "@" in uri and "://" in uri:
+        scheme, rest = uri.split("://", 1)
+        _, host_part = rest.rsplit("@", 1)
+        return f"{scheme}://***:***@{host_part}"
+    return uri
+
 def get_database() -> AsyncIOMotorDatabase:
     if db_instance.db is None:
-        db_instance.client = AsyncIOMotorClient(settings.MONGODB_URL)
-        db_instance.db = db_instance.client[settings.MONGODB_DB_NAME]
+        db_instance.client = AsyncIOMotorClient(settings.effective_mongo_uri)
+        db_instance.db = db_instance.client[settings.effective_db_name]
     return db_instance.db
 
 async def connect_to_mongo():
-    logger.info(f"Conectando a MongoDB en: {settings.MONGODB_URL} (Base: {settings.MONGODB_DB_NAME})")
-    db_instance.client = AsyncIOMotorClient(settings.MONGODB_URL)
-    db_instance.db = db_instance.client[settings.MONGODB_DB_NAME]
+    masked_uri = _mask_mongo_uri(settings.effective_mongo_uri)
+    logger.info(f"Conectando a MongoDB en: {masked_uri} (Base lógica: {settings.effective_db_name})")
+    db_instance.client = AsyncIOMotorClient(settings.effective_mongo_uri)
+    db_instance.db = db_instance.client[settings.effective_db_name]
     await init_indexes()
     logger.info("Conexión a MongoDB establecida exitosamente.")
 

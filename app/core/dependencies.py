@@ -2,6 +2,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from app.core.config import settings
 from app.core.security import decode_access_token
 from app.core.database import get_database
 
@@ -13,7 +14,7 @@ async def get_current_user(
     """
     Extrae y valida el token JWT del encabezado Authorization Bearer.
     Verifica firma con JWT_SECRET compartido con el Autenticador Central,
-    valida expiración y permisos de servicio para 'mayoresactualizaciones'.
+    valida expiración y permisos de servicio para settings.SERVICE_KEY ('conmijuegos').
     Garantiza que el perfil local exista en MongoDB para asegurar la persistencia
     de progresos y partidas de juegos.
     """
@@ -33,13 +34,13 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-    # Validar permisos específicos para el servicio mayoresactualizaciones
+    # Validar permisos específicos para el servicio configurado (ej. conmijuegos)
     tipo_usuario = int(payload.get("tipo_usuario") or payload.get("tipoUsuario") or 1)
     servicios = payload.get("servicios") or {}
-    if tipo_usuario != 2 and not servicios.get("mayoresactualizaciones", True):
+    if tipo_usuario != 2 and not servicios.get(settings.SERVICE_KEY, True):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado: El usuario no tiene permisos habilitados para el servicio 'mayoresactualizaciones'."
+            detail=f"Acceso denegado: El usuario no tiene permisos habilitados para el servicio '{settings.SERVICE_KEY}'."
         )
 
     user_id = payload.get("id") or payload.get("sub")

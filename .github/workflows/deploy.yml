@@ -1,0 +1,40 @@
+name: CI/CD — Deploy Backend & Caddy (CogniJuegos 8087)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-backend:
+    name: Actualizar y Reconstruir Backend en Servidor Linux
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Desplegar Backend por SSH en Servidor Linux
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set -e
+            DEPLOY_DIR="${{ secrets.SERVER_BACKEND_PATH || '/home/serverportable/Documentos/JuegosAsistodo/juegos-mayores-actualizaciones-back' }}"
+            cd "$DEPLOY_DIR"
+
+            # Garantizar que exista la carpeta dist para el volumen ./dist:/srv/dist de Caddy
+            mkdir -p ./dist
+
+            # Garantizar que exista la red externa compartida de MongoDB antes de levantar el servicio
+            docker network inspect red-mongo-compartida >/dev/null 2>&1 || \
+              docker network create --driver bridge red-mongo-compartida
+
+            # Descargar últimos cambios de la rama main
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Reconstruir y levantar únicamente los contenedores de este servicio (sin tocar MongoDB)
+            docker compose up -d --build --remove-orphans
+            docker image prune -f
+            echo "✅ Backend y Caddy de CogniJuegos (8087) actualizados correctamente."

@@ -86,6 +86,9 @@ origins = [
     "http://127.0.0.1:3000",
     "http://localhost:8082",
     "http://127.0.0.1:8082",
+    "http://localhost:8087",
+    "http://127.0.0.1:8087",
+    "https://cognijuegos.asistodo.com.ar",
     settings.FRONTEND_URL.rstrip("/"),
 ]
 
