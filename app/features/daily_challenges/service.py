@@ -593,7 +593,7 @@ async def ensure_current_and_next_month_generated(game_id: Optional[str] = None)
     para Sudoku, Wordle, Sopa de Letras y Crucigrama. Si falta algún día en el mes actual o en el siguiente,
     dispara automáticamente la generación correspondiente sin bloquear el arranque.
     """
-    games = [game_id] if game_id else ["sudoku", "wordle", "sopa_letras", "crucigrama"]
+    games = [game_id] if game_id else ["sudoku", "wordle", "sopa_letras", "crucigrama", "narrativo"]
 
     now = datetime.now()
     cur_year = now.year
@@ -629,6 +629,12 @@ async def ensure_current_and_next_month_generated(game_id: Optional[str] = None)
                     await generate_and_save_sopa_month(y, m)
                 elif g == "crucigrama":
                     await generate_and_save_crucigrama_month(y, m)
+                elif g == "narrativo":
+                    try:
+                        from app.features.narrative.admin.challenge_service import generar_mes_narrativo
+                        await generar_mes_narrativo(year=y, month=m, universo_id="corte_medieval")
+                    except Exception as e_narr:
+                        logger.warning(f"Error autogenerando mes narrativo {y}-{m:02d}: {e_narr}")
 
 
 

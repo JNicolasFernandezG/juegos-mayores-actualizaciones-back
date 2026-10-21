@@ -45,6 +45,11 @@ async def lifespan(app: FastAPI):
             await seed_wordle_challenges()
             await seed_sopa_letras_challenges()
             await seed_sudoku_challenges()
+            try:
+                from app.scripts.seed_narrative import seed_narrative_game
+                await seed_narrative_game()
+            except Exception as e_seed:
+                logger.warning(f"Aviso durante la siembra de narrativa: {e_seed}")
             await ensure_current_and_next_month_generated()
             from app.features.narrative.admin.challenge_service import sembrar_finalizaciones_default
             await sembrar_finalizaciones_default()
