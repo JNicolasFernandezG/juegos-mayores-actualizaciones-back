@@ -32,24 +32,25 @@ logger = logging.getLogger("AppMain")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Conectar a MongoDB, inicializar índices y sembrar datos
+    # Startup: Conectar a MongoDB e inicializar índices básicos
     logger.info("Iniciando aplicación Mayores Actualizaciones (FastAPI)...")
     await connect_to_mongo()
     await seed_estados_usuario()
     await seed_default_admin()
-    await seed_wordle_challenges()
-    await seed_sopa_letras_challenges()
-    await seed_sudoku_challenges()
-    await ensure_current_and_next_month_generated()
-
-    try:
-        from app.features.narrative.admin.challenge_service import sembrar_finalizaciones_default
-        await sembrar_finalizaciones_default()
-    except Exception as e:
-        logger.warning(f"Aviso al sembrar finalizaciones por defecto: {e}")
 
     import asyncio
     async def _auto_check_loop():
+        # Sembrar desafíos en segundo plano para no bloquear el healthcheck de arranque
+        try:
+            await seed_wordle_challenges()
+            await seed_sopa_letras_challenges()
+            await seed_sudoku_challenges()
+            await ensure_current_and_next_month_generated()
+            from app.features.narrative.admin.challenge_service import sembrar_finalizaciones_default
+            await sembrar_finalizaciones_default()
+        except Exception as e:
+            logger.warning(f"Aviso durante la siembra inicial en segundo plano: {e}")
+
         while True:
             try:
                 await asyncio.sleep(43200)  # Chequear cada 12 horas
