@@ -60,7 +60,7 @@ async def get_challenge_by_date(
     challenge = await db["daily_challenges"].find_one({
         "game_id": game_id,
         "date": date_to_query,
-        "difficulty": difficulty
+        "difficulty": {"$in": [difficulty, "normal", "standard"]} if game_id == "narrativo" else difficulty
     })
 
     if not challenge:
@@ -112,7 +112,7 @@ async def get_month_challenges(
     db = get_database()
     query = {
         "game_id": game_id,
-        "difficulty": difficulty,
+        "difficulty": {"$in": [difficulty, "normal", "standard"]} if game_id == "narrativo" else difficulty,
         "date": {
             "$gte": start_date,
             "$lte": effective_end_date

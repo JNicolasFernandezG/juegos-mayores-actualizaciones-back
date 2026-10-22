@@ -49,3 +49,6 @@ venv/
 ENV/
 *.env
 
+# Frontend build volume
+dist/
+
