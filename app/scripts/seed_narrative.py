@@ -10,6 +10,7 @@ import logging
 from datetime import datetime
 
 from app.core.database import get_database, connect_to_mongo
+from app.features.narrative.constants import COLL_SETTINGS
 from app.features.narrative.admin.crud_service import (
     crear_o_actualizar_universo,
     crear_o_actualizar_personaje,
@@ -53,7 +54,13 @@ logger = logging.getLogger(__name__)
 
 UNIVERSO_ID = "corte_medieval"
 
-async def seed_narrative_game():
+async def seed_narrative_game(force: bool = False):
+    db = get_database()
+    if not force:
+        universo_existente = await db[COLL_SETTINGS].find_one({"_id": UNIVERSO_ID})
+        if universo_existente:
+            logger.info(f"[NARRATIVE SEED] El universo '{UNIVERSO_ID}' ya existe en la base de datos. Omitiendo siembra inicial.")
+            return
     logger.info("[NARRATIVE SEED] Iniciando siembra de contenido narrativo...")
 
     # 1. UNIVERSO: Crónicas de la Corte Real
@@ -1818,7 +1825,9 @@ async def seed_narrative_game():
     logger.info("[NARRATIVE SEED] ¡Siembra de contenido completada exitosamente!")
 
 if __name__ == "__main__":
+    import sys
+    force_run = "--force" in sys.argv
     async def main():
         await connect_to_mongo()
-        await seed_narrative_game()
+        await seed_narrative_game(force=force_run)
     asyncio.run(main())
