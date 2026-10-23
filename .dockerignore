@@ -8,6 +8,8 @@ __pycache__/
 .gitignore
 .dockerignore
 target/
+.env
+.env.*
+!.env.example
 dist/
-.env.example
 contexto_y_estructura_despliegue.md
