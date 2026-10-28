@@ -54,21 +54,10 @@ app = FastAPI(
 # DIRECTIVA DE SEGURIDAD ABSOLUTA — REGLA SUPREMA INQUEBRANTABLE (Middleware perimetral y fail-closed)
 app.add_middleware(AbsoluteSecurityMiddleware)
 
-# Configuración de CORS estricta (Sin allow_origin_regex permisivo)
-origins = [
-    "https://mayoresactualizaciones.asistodo.com.ar",
-    "http://mayoresactualizaciones.asistodo.com.ar:8082",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-if settings.FRONTEND_URL:
-    fe_url = settings.FRONTEND_URL.rstrip("/")
-    if fe_url and fe_url not in origins:
-        origins.append(fe_url)
-
+# Configuración de CORS estricta (Solo orígenes autorizados)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept"],

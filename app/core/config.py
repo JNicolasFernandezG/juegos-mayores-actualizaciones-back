@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from urllib.parse import quote_plus
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -47,6 +47,28 @@ class Settings(BaseSettings):
 
     # Microservicio Autenticador Central (SSOT)
     AUTH_SERVICE_URL: str = "http://localhost:8000"
+
+    # Dominios autorizados para CORS (Sin comodines *)
+    CORS_ORIGINS: str = (
+        "https://cognijuegos.asistodo.com.ar,"
+        "https://autenticacion.asistodo.com.ar,"
+        "https://mayoresactualizaciones.asistodo.com.ar,"
+        "http://localhost:5173,"
+        "http://127.0.0.1:5173"
+    )
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        origins = [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+        if self.FRONTEND_URL:
+            fe_url = self.FRONTEND_URL.rstrip("/")
+            if fe_url and fe_url not in origins:
+                origins.append(fe_url)
+        if self.AUTH_SERVICE_URL:
+            auth_url = self.AUTH_SERVICE_URL.rstrip("/")
+            if auth_url and auth_url not in origins:
+                origins.append(auth_url)
+        return origins
 
     # RAE API (Wordle / Desafíos)
     RAE_API_KEY: Optional[str] = None
