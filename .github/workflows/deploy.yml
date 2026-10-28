@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch: # Habilita el botón manual "Run workflow" en la interfaz web de GitHub
 
 jobs:
   deploy-backend:
@@ -12,8 +13,12 @@ jobs:
 
     steps:
       - name: Desplegar en servidor Linux (serverportable)
+        env:
+          ENV_PROD: ${{ secrets.ENV_PROD }}
         run: |
           set -e
+
+          # 1. Posicionarse en la carpeta correcta del proyecto en el servidor
           if [ -d "/home/serverportable/Documentos/JuegosAsistodo/juegos-mayores-actualizaciones-back/.git" ]; then
             cd /home/serverportable/Documentos/JuegosAsistodo/juegos-mayores-actualizaciones-back
           elif [ -d "/home/serverportable/Documentos/juegos-mayores-actualizaciones-back/.git" ]; then
@@ -22,16 +27,32 @@ jobs:
             cd "${{ secrets.SERVER_BACKEND_PATH || '/home/serverportable/Documentos/JuegosAsistodo/juegos-mayores-actualizaciones-back' }}"
           fi
 
-          # Garantizar que exista la carpeta dist para el volumen ./dist:/srv/dist de Caddy
-          mkdir -p ./dist
+          # 2. Actualizar el código limpio con git
+          git fetch origin main
+          git reset --hard origin/main
 
-          # Garantizar que exista la red externa compartida de MongoDB antes de levantar el servicio
+          # 3. Inyección segura de variables de entorno (.env) desde el Secreto ENV_PROD
+          printf "%s\n" "$ENV_PROD" > .env
+          chmod 600 .env
+          unset ENV_PROD
+
+          # 4. Trampa de seguridad (Fail-safe): garantiza el borrado de .env ante cualquier error o salida
+          trap 'rm -f .env' EXIT
+
+          # 5. Garantizar estructura previa requerida por Caddy y red compartida de MongoDB
+          mkdir -p ./dist
           docker network inspect red-mongo-compartida >/dev/null 2>&1 || \
             docker network create --driver bridge red-mongo-compartida
 
-          git fetch origin main
-          git reset --hard origin/main
+          # 6. Levantar contenedores (base de datos si existe compose dedicado, y servicio principal)
+          if [ -f "docker-compose.db.yml" ]; then
+            docker compose -f docker-compose.db.yml up -d
+          fi
           docker compose up -d --build --remove-orphans
-          docker image prune -f
-          echo "✅ Backend y Caddy de CogniJuegos (8087) actualizados correctamente."
 
+          # 7. Limpieza de imágenes obsoletas
+          docker image prune -f
+
+          # 8. Eliminación física inmediata del archivo .env del disco
+          rm -f .env
+          echo "✅ Backend y Caddy de CogniJuegos (8087) actualizados y desplegados con éxito (secretos retenidos únicamente en RAM)."
