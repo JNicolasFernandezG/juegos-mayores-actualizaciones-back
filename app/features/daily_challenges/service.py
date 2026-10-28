@@ -19,9 +19,11 @@ from app.features.daily_challenges.wordle_generator import (
     generate_wordle_hints
 )
 from app.features.daily_challenges.sopa_generator import generate_sopa_challenge_for_date
-from app.features.daily_challenges.crucigrama_generator import generate_crucigrama_challenge_for_date
+from app.features.daily_challenges.crucigrama import generate_crucigrama_challenge_for_date
 
 logger = logging.getLogger(__name__)
+
+CRUCIGRAMA_DIFFICULTIES = ["facil", "dificil"]
 
 def _serialize_challenge(doc: dict, today_str: Optional[str] = None) -> DailyChallengeResponse:
     if today_str is None:
@@ -60,7 +62,7 @@ async def get_challenge_by_date(
     challenge = await db["daily_challenges"].find_one({
         "game_id": game_id,
         "date": date_to_query,
-        "difficulty": {"$in": [difficulty, "normal", "standard"]} if game_id == "narrativo" else difficulty
+        "difficulty": difficulty
     })
 
     if not challenge:
@@ -112,7 +114,7 @@ async def get_month_challenges(
     db = get_database()
     query = {
         "game_id": game_id,
-        "difficulty": {"$in": [difficulty, "normal", "standard"]} if game_id == "narrativo" else difficulty,
+        "difficulty": difficulty,
         "date": {
             "$gte": start_date,
             "$lte": effective_end_date
@@ -505,9 +507,9 @@ async def generate_and_save_sopa_month(year: int, month: int, force: bool = Fals
 
 async def generate_and_save_crucigrama_month(year: int, month: int, force: bool = False) -> dict:
     """
-    Genera y guarda de forma atómica e idempotente los desafíos diarios de Crucigrama (7x7)
-    para el mes y año especificados, enriqueciendo las pistas con definiciones de la RAE.
-    Si force=False, saltea instantáneamente en 0ms si el mes ya está completo.
+    Genera y guarda de forma atómica e idempotente los desafíos diarios de Crucigrama
+    en sus dos dificultades (facil 7x7 y dificil 11x11) para el mes y año especificados.
+    Si force=False, saltea instantáneamente en 0ms si el mes ya está completo para ambas.
     """
     if not (1 <= month <= 12):
         raise HTTPException(status_code=400, detail="El mes debe estar comprendido entre 1 y 12.")
@@ -520,12 +522,18 @@ async def generate_and_save_crucigrama_month(year: int, month: int, force: bool 
     end_date = f"{year:04d}-{month:02d}-{days_in_month:02d}"
 
     if not force:
-        existing_count = await db["daily_challenges"].count_documents({
-            "game_id": "crucigrama",
-            "date": {"$gte": start_date, "$lte": end_date}
-        })
-        if existing_count >= days_in_month:
-            logger.info(f"[CRUCIGRAMA] Mes {year}-{month:02d} ya está completamente generado ({existing_count}/{days_in_month}). Saltando en 0ms.")
+        complete = True
+        for diff in CRUCIGRAMA_DIFFICULTIES:
+            existing_count = await db["daily_challenges"].count_documents({
+                "game_id": "crucigrama",
+                "difficulty": diff,
+                "date": {"$gte": start_date, "$lte": end_date}
+            })
+            if existing_count < days_in_month:
+                complete = False
+                break
+        if complete:
+            logger.info(f"[CRUCIGRAMA] Mes {year}-{month:02d} ya está completamente generado en {len(CRUCIGRAMA_DIFFICULTIES)} dificultades. Saltando en 0ms.")
             return {
                 "success": True,
                 "game_id": "crucigrama",
@@ -542,38 +550,41 @@ async def generate_and_save_crucigrama_month(year: int, month: int, force: bool 
     for day in range(1, days_in_month + 1):
         date_str = f"{year:04d}-{month:02d}-{day:02d}"
 
-        if not force:
-            existing = await db["daily_challenges"].find_one({
-                "game_id": "crucigrama",
-                "date": date_str
-            })
-            if existing and existing.get("config", {}).get("cells"):
-                continue
+        for diff in CRUCIGRAMA_DIFFICULTIES:
+            if not force:
+                existing = await db["daily_challenges"].find_one({
+                    "game_id": "crucigrama",
+                    "date": date_str,
+                    "difficulty": diff
+                })
+                if existing and existing.get("config", {}).get("cells"):
+                    continue
 
-        crucigrama_data = generate_crucigrama_challenge_for_date(date_str)
+            crucigrama_data = generate_crucigrama_challenge_for_date(date_str, diff)
 
-        doc = {
-            "game_id": "crucigrama",
-            "date": date_str,
-            "difficulty": "standard",
-            "title": f"Crucigrama: {crucigrama_data['theme']} ({date_str})",
-            "config": crucigrama_data,
-            "updated_at": now_utc
-        }
-
-        await db["daily_challenges"].update_one(
-            {
+            doc = {
                 "game_id": "crucigrama",
                 "date": date_str,
-                "difficulty": "standard"
-            },
-            {
-                "$set": doc,
-                "$setOnInsert": {"created_at": now_utc}
-            },
-            upsert=True
-        )
-        generated_count += 1
+                "difficulty": diff,
+                "title": f"Crucigrama ({diff.capitalize()}): {crucigrama_data['theme']} ({date_str})",
+                "config": crucigrama_data,
+                "updated_at": now_utc
+            }
+
+            await db["daily_challenges"].update_one(
+                {
+                    "game_id": "crucigrama",
+                    "date": date_str,
+                    "difficulty": diff
+                },
+                {
+                    "$set": doc,
+                    "$setOnInsert": {"created_at": now_utc}
+                },
+                upsert=True
+            )
+            generated_count += 1
+
         await asyncio.sleep(0.1)
 
     logger.info(f"[CRUCIGRAMA] {generated_count} desafíos de Crucigrama generados para {year}-{month:02d}.")
@@ -614,13 +625,26 @@ async def ensure_current_and_next_month_generated(game_id: Optional[str] = None)
             start_date = f"{y:04d}-{m:02d}-01"
             end_date = f"{y:04d}-{m:02d}-{days_in_month:02d}"
 
-            count = await db["daily_challenges"].count_documents({
-                "game_id": g,
-                "date": {"$gte": start_date, "$lte": end_date}
-            })
+            if g == "crucigrama":
+                incomplete = False
+                for diff in CRUCIGRAMA_DIFFICULTIES:
+                    count = await db["daily_challenges"].count_documents({
+                        "game_id": g,
+                        "difficulty": diff,
+                        "date": {"$gte": start_date, "$lte": end_date}
+                    })
+                    if count < days_in_month:
+                        incomplete = True
+                        break
+            else:
+                count = await db["daily_challenges"].count_documents({
+                    "game_id": g,
+                    "date": {"$gte": start_date, "$lte": end_date}
+                })
+                incomplete = count < days_in_month
 
-            if count < days_in_month:
-                logger.info(f"[AUTOGENERACIÓN] Juego '{g}' mes {y}-{m:02d} tiene {count}/{days_in_month} días. Generando...")
+            if incomplete:
+                logger.info(f"[AUTOGENERACIÓN] Juego '{g}' mes {y}-{m:02d} incompleto. Generando...")
                 if g == "sudoku":
                     await generate_and_save_sudoku_month(y, m)
                 elif g == "wordle":

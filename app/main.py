@@ -1,17 +1,15 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 import logging
 
 from app.core.config import settings
 from app.core.database import connect_to_mongo, close_mongo_connection
 from app.scripts.init_db import seed_default_admin, seed_estados_usuario
-from app.scripts.seed_challenges import seed_wordle_challenges, seed_sopa_letras_challenges
-from app.scripts.seed_sudoku import seed_sudoku_challenges
-from app.features.daily_challenges.service import ensure_current_and_next_month_generated
 from app.features.auth.router import router as auth_router
 from app.features.usuario.router import router as usuario_router
 from app.features.progreso.router import router as progreso_router
@@ -22,7 +20,7 @@ from app.features.narrative.game.router import (
     router_v2 as narrative_v2_router
 )
 from app.features.narrative.admin.router import router as narrative_admin_router
-from app.features.sso import router as sso_router
+from app.features.sso.router import router as sso_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,45 +30,14 @@ logger = logging.getLogger("AppMain")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Conectar a MongoDB e inicializar índices básicos
+    # Startup: Conectar a MongoDB, inicializar índices y sembrar datos esenciales de autenticación/usuarios
     logger.info("Iniciando aplicación Mayores Actualizaciones (FastAPI)...")
     await connect_to_mongo()
     await seed_estados_usuario()
     await seed_default_admin()
-
-    import asyncio
-    async def _auto_check_loop():
-        # Sembrar desafíos en segundo plano para no bloquear el healthcheck de arranque
-        try:
-            await seed_wordle_challenges()
-            await seed_sopa_letras_challenges()
-            await seed_sudoku_challenges()
-            try:
-                from app.scripts.seed_narrative import seed_narrative_game
-                await seed_narrative_game()
-            except Exception as e_seed:
-                logger.warning(f"Aviso durante la siembra de narrativa: {e_seed}")
-            await ensure_current_and_next_month_generated()
-            from app.features.narrative.admin.challenge_service import sembrar_finalizaciones_default
-            await sembrar_finalizaciones_default()
-        except Exception as e:
-            logger.warning(f"Aviso durante la siembra inicial en segundo plano: {e}")
-
-        while True:
-            try:
-                await asyncio.sleep(43200)  # Chequear cada 12 horas
-                await ensure_current_and_next_month_generated()
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.warning(f"Error en auto_check_loop de desafíos: {e}")
-                await asyncio.sleep(3600)
-
-    checker_task = asyncio.create_task(_auto_check_loop())
     logger.info(f"Servidor listo en el puerto {settings.PORT}.")
     yield
-    # Shutdown: Cancelar tareas y cerrar conexiones
-    checker_task.cancel()
+    # Shutdown: Cerrar conexiones limpiamente
     logger.info("Deteniendo aplicación y cerrando conexiones...")
     await close_mongo_connection()
 
@@ -84,33 +51,27 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configuración de CORS amplia para desarrollo y producción
+# Configuración de CORS estricta (Sin allow_origin_regex permisivo)
 origins = [
+    "https://mayoresactualizaciones.asistodo.com.ar",
+    "http://mayoresactualizaciones.asistodo.com.ar:8082",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8082",
-    "http://127.0.0.1:8082",
-    "http://localhost:8087",
-    "http://127.0.0.1:8087",
-    "https://cognijuegos.asistodo.com.ar",
-    settings.FRONTEND_URL.rstrip("/"),
 ]
+if settings.FRONTEND_URL:
+    fe_url = settings.FRONTEND_URL.rstrip("/")
+    if fe_url and fe_url not in origins:
+        origins.append(fe_url)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex=r"^https?://.*$",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
-from fastapi import Request
-from fastapi.responses import JSONResponse
-from starlette.exceptions import HTTPException as StarletteHTTPException
-
+# Manejador de excepciones HTTP estándar
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     msg = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
@@ -123,7 +84,20 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         }
     )
 
-# Inclusión de routers modulares
+# DIRECTIVA DE SEGURIDAD ABSOLUTA (FAIL-CLOSED):
+# Interceptor global para excepciones no controladas. Nunca expone stack traces ni detalles del servidor.
+@app.exception_handler(Exception)
+async def global_fail_closed_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Error interno no controlado en {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "detail": "Solicitud no permitida."
+        }
+    )
+
+# Inclusión de routers esenciales (Auth, Usuarios, Progreso de Cursos, Desafíos, Narrativo, SSO)
 app.include_router(auth_router)
 app.include_router(usuario_router)
 app.include_router(progreso_router)
@@ -151,8 +125,6 @@ async def health_check():
 static_admin_dir = os.path.join(os.path.dirname(__file__), "static", "admin")
 os.makedirs(static_admin_dir, exist_ok=True)
 
-from starlette.exceptions import HTTPException as StarletteHTTPException
-
 class SPAStaticFiles(StaticFiles):
     async def get_response(self, path: str, scope):
         try:
@@ -175,15 +147,13 @@ async def admin_redirect():
 
 app.mount("/admin", SPAStaticFiles(directory=static_admin_dir, html=True), name="admin")
 
+# Montar carpeta de assets estáticos de narrativa (universos, personajes, cartas, eventos, etc.)
 static_narrative_dir = os.path.join(os.path.dirname(__file__), "static", "narrative")
 os.makedirs(static_narrative_dir, exist_ok=True)
-# Alias de retrocompatibilidad para URLs legacy que apuntaban a 'characters'
 static_personajes_dir = os.path.join(static_narrative_dir, "personajes")
 os.makedirs(static_personajes_dir, exist_ok=True)
 app.mount("/assets/narrative/characters", StaticFiles(directory=static_personajes_dir), name="narrative_characters_alias")
-
 app.mount("/assets/narrative", StaticFiles(directory=static_narrative_dir), name="narrative_assets")
-
 
 if __name__ == "__main__":
     import uvicorn

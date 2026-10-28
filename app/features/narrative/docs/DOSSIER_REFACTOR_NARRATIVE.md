@@ -87,7 +87,7 @@ La función `seleccionar_evento_mes` debe preservar su fórmula exacta de selecc
    - `al_obtener`: Se despacha al inicio para la corte y cartas iniciales, y cada vez que se agrega una carta en `/elegir-carta-mes`.
    - `cada_mes`: Se despacha en `/avanzar-mes` para todas las cartas activas en `run.cartas_en_mano`.
 2. **Límites de Recursos:**
-   - Al ejecutar `MODIFICAR_RECURSO`, el nuevo valor numérico debe ajustarse obligatoriamente con el rango `[min, max]` definido en `narrative_universes.recursos_config`:
+   - Al ejecutar `MODIFICAR_RECURSO`, el nuevo valor numérico debe ajustarse obligatoriamente con el rango `[min, max]` definido en `narrative_settings` (campo `recursos`):
      $$\text{nuevo\_valor} = \max(\text{min}, \min(\text{max}, \text{redondear}(\text{valor\_actual} + \text{delta})))$$
 3. **Límites de Afinidad:**
    - La afinidad con personajes de la corte se ajusta siempre en el rango `[0, 100]`.

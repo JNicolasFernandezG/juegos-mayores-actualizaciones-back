@@ -63,6 +63,20 @@ from app.features.narrative.schemas.game_schemas import (
     AvanzarMesV2Response
 )
 
+from app.features.narrative.schemas.v2_graph_schemas import (
+    ImpactoRecursoSchema,
+    ImpactoAfinidadSchema,
+    OpcionNodoSchema,
+    OpcionClienteSchema,
+    NodoNarrativoSchema,
+    NodoClienteSchema,
+    EventoV2GrafoSchema,
+    ConversacionV2GrafoSchema,
+    EventoEspecialV2GrafoSchema,
+    AvanzarNodoV2Request,
+    EstadoGrafoV2Response
+)
+
 __all__ = [
     # Rules
     "CondicionSchema",

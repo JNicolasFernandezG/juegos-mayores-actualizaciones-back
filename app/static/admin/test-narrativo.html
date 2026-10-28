@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Banco de Pruebas — Juego Narrativo (V1 / V2)</title>
+<style>
+  :root {
+    --bg: #14100e; --panel: #1f1814; --panel2: #2a201a; --border: #4a3826;
+    --gold: #d9a441; --gold-dim: #8a6a2a; --text: #e8dcc4; --muted: #a5906b;
+    --green: #7bb661; --red: #d06050; --blue: #6ea8c9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif; font-size: 14px;
+  }
+  header {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 16px; margin: 0 12px 0 0; color: var(--gold); letter-spacing: .5px; }
+  label { color: var(--muted); font-size: 12px; }
+  input, select, button {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 4px; padding: 6px 9px; font-size: 13px;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--gold); }
+  button.primary { background: var(--gold); color: #1a1208; font-weight: 600; border-color: var(--gold); }
+  button.danger { border-color: var(--red); color: var(--red); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .pill { padding: 3px 10px; border-radius: 12px; border: 1px solid var(--gold-dim); color: var(--gold); font-size: 12px; }
+  .pill.v2 { border-color: var(--blue); color: var(--blue); }
+  main { display: grid; grid-template-columns: 1fr 340px; gap: 14px; padding: 14px 16px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px; margin-bottom: 14px;
+  }
+  .panel h2 { margin: 0 0 10px; font-size: 14px; color: var(--gold); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .stage { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+  .speaker { color: var(--gold); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+  .node-text { font-size: 15px; line-height: 1.5; margin: 8px 0 14px; white-space: pre-wrap; }
+  .node-img { max-width: 100%; max-height: 240px; border-radius: 6px; border: 1px solid var(--border); margin: 8px 0; display: block; }
+  .options { display: flex; flex-direction: column; gap: 8px; }
+  .opt {
+    text-align: left; padding: 10px 12px; border-radius: 6px; background: var(--panel);
+    border: 1px solid var(--border); color: var(--text);
+  }
+  .opt:hover { border-color: var(--gold); }
+  .opt:disabled { opacity: .45; }
+  .opt .why { display: block; font-size: 11px; color: var(--red); margin-top: 3px; }
+  .probs { font-size: 11px; color: var(--muted); margin-top: 5px; }
+  .probs div { display: inline-block; margin-right: 8px; }
+  .res { margin-bottom: 8px; }
+  .res .rlabel { display: inline-block; width: 120px; color: var(--muted); }
+  .res .rval { display: inline-block; width: 32px; text-align: right; font-weight: 600; }
+  .res .bar { display: inline-block; width: 120px; height: 10px; background: var(--panel2); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; vertical-align: middle; }
+  .res .bar .fill { height: 100%; background: var(--green); }
+  .res.low .bar .fill { background: var(--red); }
+  .aff { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dotted var(--border); }
+  .aff .aval { color: var(--gold); font-weight: 600; }
+  .cards { display: flex; flex-wrap: wrap; gap: 8px; }
+  .card { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; background: var(--panel2); cursor: pointer; min-width: 130px; }
+  .card.selected { border-color: var(--gold); background: #3a2c18; }
+  .card .nm { font-weight: 600; color: var(--gold); }
+  .card .ds { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .selgrid { display: grid; grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: 8px; }
+  .selitem { border: 1px solid var(--border); border-radius: 6px; padding: 8px; background: var(--panel2); cursor: pointer; }
+  .selitem.selected { border-color: var(--gold); background: #3a2c18; }
+  .selitem .nm { font-weight: 600; color: var(--gold); }
+  .selitem .tt { font-size: 11px; color: var(--muted); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .log {
+    background: #0d0a08; border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px; height: 320px; overflow-y: auto; font-family: Consolas, monospace; font-size: 11px;
+    white-space: pre-wrap; color: var(--muted);
+  }
+  .log .req { color: var(--blue); }
+  .log .err { color: var(--red); }
+  .banner {
+    border: 1px solid var(--gold); background: #3a2c18; border-radius: 8px; padding: 14px; margin-bottom: 12px;
+  }
+  .banner h3 { margin: 0 0 6px; color: var(--gold); }
+  .badge { font-size: 11px; color: var(--muted); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .final-title { font-size: 18px; color: var(--gold); font-weight: 700; }
+  .rank { font-size: 30px; font-weight: 800; color: var(--gold); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Banco de Pruebas — Juego Narrativo</h1>
+  <label>API <input id="apibase" value="http://localhost:8082" style="width:180px"></label>
+  <label>Fecha <input id="date" type="date"></label>
+  <button id="btnMotor" class="pill" title="Cambiar motor v1/v2">motor: —</button>
+  <button id="btnGenMes" class="danger">Generar desafíos del mes</button>
+  <button id="btnReiniciar" class="danger">Reiniciar partida</button>
+  <button id="btnEstado">Refrescar estado</button>
+</header>
+
+<main>
+  <div id="left">
+    <div id="statusbar" class="row"></div>
+    <div id="stage"></div>
+  </div>
+  <div id="right">
+    <div class="panel">
+      <h2>Recursos</h2>
+      <div id="recursos"></div>
+      <h2 style="margin-top:14px">Corte (afinidad)</h2>
+      <div id="afinidad"></div>
+    </div>
+    <div class="panel">
+      <h2>Log de peticiones</h2>
+      <div id="log" class="log"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const API = () => document.getElementById('apibase').value.replace(/\/+$/,'');
+const DATE = () => document.getElementById('date').value;
+
+const REC = {
+  oro:      { label: 'Tesoro Real',     icon: 'coins' },
+  pueblo:   { label: 'Apoyo Popular',   icon: 'users' },
+  ejercito: { label: 'Fuerza Militar',  icon: 'shield' },
+  fe:       { label: 'Fervor Religioso',icon: 'church' },
+};
+const PJ = {
+  'pj_canciller_elena':'Elena de Valoria',
+  'pj_comandante_marcus':'Marcus Garra de Hierro',
+  'pj_obispo_tomas':'Hermano Tomás',
+  'pj_alquimista_vera':'Vera la Erudita',
+  'pj_ladrona_sylvia':'Sylvia Niebla',
+  'narrador':'Narrador',
+};
+const nameOf = id => PJ[id] || id;
+
+const state = { motor: null, setup: null, recursos: null, afinidad: null, mes: 1, fase: '', status: '' };
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function log(title, status, data) {
+  const el = $('log');
+  const line = document.createElement('div');
+  const ok = status >= 200 && status < 300;
+  line.className = ok ? '' : 'err';
+  line.innerHTML = `<span class="req">${esc(title)}</span> [${status}]\n${esc(JSON.stringify(data, null, 2))}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function api(path, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API() + path, opts);
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (e) { data = { raw: text }; }
+  log(`${method} ${path}`, res.status, data);
+  if (!res.ok) {
+    const d = data || {};
+    const msg = d.detail || d.message || text || res.statusText;
+    throw new Error(`${res.status}: ${typeof msg === 'string' ? msg : JSON.stringify(msg)}`);
+  }
+  return data;
+}
+
+function setStatus() {
+  const m = state.motor ? `<span class="pill ${state.motor === 'v2' ? 'v2' : ''}">motor ${state.motor}</span>` : '';
+  $('statusbar').innerHTML = `${m} <span class="badge">mes ${state.mes ?? '—'}</span> <span class="badge">fase ${esc(state.fase || '—')}</span> <span class="badge">estado ${esc(state.status || '—')}</span>`;
+}
+
+function renderResources() {
+  const rec = state.recursos || {};
+  $('recursos').innerHTML = Object.keys(REC).map(k => {
+    const v = rec[k];
+    const val = (v === undefined || v === null) ? '—' : v;
+    const pct = typeof v === 'number' ? Math.max(0, Math.min(100, v)) : 0;
+    const low = typeof v === 'number' && v <= 25;
+    return `<div class="res ${low ? 'low' : ''}"><span class="rlabel">${REC[k].label}</span><div class="bar"><div class="fill" style="width:${pct}%"></div></div><span class="rval">${val}</span></div>`;
+  }).join('');
+}
+
+function renderAffinity() {
+  const aff = state.afinidad;
+  $('afinidad').innerHTML = !aff ? '<div class="hint">Sin corte</div>'
+    : Object.entries(aff).map(([k, v]) => `<div class="aff"><span>${esc(nameOf(k))}</span><span class="aval">${v}</span></div>`).join('');
+}
+
+function stage(html) { $('stage').innerHTML = html; }
+
+function errBox(e) {
+  stage(`<div class="stage" style="border-color:var(--red)"><h3 style="color:var(--red)">Error</h3><div class="node-text">${esc(e.message)}</div></div>`);
+}
+
+function syncFrom(resp) {
+  if (resp && resp.recursos) state.recursos = resp.recursos;
+  if (resp && resp.afinidad) state.afinidad = resp.afinidad;
+  if (resp && resp.motor) state.motor = resp.motor;
+  if (resp && resp.mes_actual !== undefined) state.mes = resp.mes_actual;
+  if (resp && resp.fase_actual !== undefined) state.fase = resp.fase_actual;
+  if (resp && resp.status !== undefined) state.status = resp.status;
+  renderResources(); renderAffinity(); setStatus();
+}
+
+/* ---------- MOTOR TOGGLE ---------- */
+async function loadMotor() {
+  const u = await api('/api/narrative/admin/universos/corte_medieval');
+  state.motor = u.motor || 'v1';
+  renderMotorBtn();
+}
+function renderMotorBtn() {
+  const b = $('btnMotor');
+  b.textContent = `motor: ${state.motor || '—'} (clic para cambiar)`;
+}
+$('btnMotor').addEventListener('click', async () => {
+  try {
+    const u = await api('/api/narrative/admin/universos/corte_medieval');
+    u.motor = (u.motor === 'v2') ? 'v1' : 'v2';
+    await api('/api/narrative/admin/universos', 'POST', u);
+    state.motor = u.motor;
+    renderMotorBtn();
+    setStatus();
+    log('Motor cambiado', 200, { motor: u.motor, nota: 'Afecta a partidas NUEVAS. Reinicia para probar.' });
+  } catch (e) { errBox(e); }
+});
+
+/* ---------- GENERAR MES ---------- */
+$('btnGenMes').addEventListener('click', async () => {
+  try {
+    const [y, m] = DATE().split('-');
+    const r = await api(`/api/narrative/admin/generar-mes?year=${y}&month=${+m}&universo_id=corte_medieval`, 'POST');
+    stage(`<div class="stage">Desafíos generados: ${r.desafios_creados} (${r.creados} nuevos, ${r.actualizados} actualizados).</div>`);
+  } catch (e) { errBox(e); }
+});
+
+/* ---------- REINICIAR ---------- */
+$('btnReiniciar').addEventListener('click', async () => {
+  try {
+    await api('/api/narrative/partida/reiniciar', 'POST', { date: DATE() });
+    state.recursos = null; state.afinidad = null; state.fase = ''; state.mes = 0; state.status = '';
+    renderResources(); renderAffinity(); setStatus();
+    await loadSetup();
+  } catch (e) { errBox(e); }
+});
+
+/* ---------- ESTADO ---------- */
+$('btnEstado').addEventListener('click', async () => {
+  try {
+    const r = await api(`/api/narrative/v2/partida/estado?date=${DATE()}`);
+    await resumeFromEstado(r);
+  } catch (e) { errBox(e); }
+});
+
+async function resumeFromEstado(r) {
+  syncFrom(r);
+  if (r.fase_actual === 'FINALIZADA' || r.finalizacion) { renderFinalizacion(r.finalizacion, r.status); return; }
+  if (state.motor === 'v2') {
+    if (r.grafo_actual) { renderGrafo(r.grafo_actual); return; }
+  } else {
+    if (r.fase_actual === 'TOMA_DECISION_EVENTO' && r.evento_actual) { renderEvento(r.evento_actual); return; }
+    if (r.fase_actual === 'RESOLVER_CONVERSACION' && r.conversacion_actual) { renderConversacion(r.conversacion_actual); return; }
+  }
+  if (r.fase_actual === 'DRAFT_MENSUAL') { renderDraft(r.cartas_draft_actual || []); return; }
+  if (r.fase_actual === 'BALANCE_MES') { renderAvanzarMes(); return; }
+  stage(`<div class="stage"><div class="hint">Fase "${esc(r.fase_actual)}" sin panel conocido. Usá "Refrescar estado" o reiniciá.</div></div>`);
+}
+
+/* ---------- SETUP ---------- */
+async function loadSetup() {
+  try {
+    const s = await api(`/api/narrative/partida/setup?date=${DATE()}`);
+    state.setup = s;
+    syncFrom({ recursos: s.atributos_iniciales });
+    renderSetup(s);
+  } catch (e) {
+    errBox(e);
+    stage($('stage').innerHTML + `<div class="hint">Si no existe el desafío para la fecha, usá "Generar desafíos del mes".</div>`);
+  }
+}
+
+function renderSetup(s) {
+  const pjs = s.personajes_ofrecidos || [];
+  const cards = s.cartas_ofrecidas || [];
+  stage(`
+    <div class="panel">
+      <h2>Fase 0 — Setup (${esc(s.universo_nombre)})</h2>
+      <div class="hint">Elegí exactamente 3 personajes y 3 cartas.</div>
+      <h2 style="margin-top:14px">Personajes (elegir 3)</h2>
+      <div class="selgrid" id="pjs"></div>
+      <h2 style="margin-top:14px">Cartas (elegir 3)</h2>
+      <div class="selgrid" id="cards"></div>
+      <div class="row" style="margin-top:14px">
+        <button id="btnStart" class="primary">Iniciar partida (nueva)</button>
+        <span class="badge" id="selcount">0 personajes · 0 cartas</span>
+      </div>
+    </div>`);
+
+  const pjSel = new Set(); const cardSel = new Set();
+  function paint() {
+    $('selcount').textContent = `${pjSel.size} personajes · ${cardSel.size} cartas`;
+    document.querySelectorAll('#pjs .selitem').forEach(el => el.classList.toggle('selected', pjSel.has(el.dataset.id)));
+    document.querySelectorAll('#cards .selitem').forEach(el => el.classList.toggle('selected', cardSel.has(el.dataset.id)));
+    $('btnStart').disabled = pjSel.size !== 3 || cardSel.size !== 3;
+  }
+  $('pjs').innerHTML = pjs.map(p => `<div class="selitem" role="button" tabindex="0" data-id="${esc(p._id)}"><div class="nm">${esc(p.nombre)}</div><div class="tt">${esc(p.titulo)}</div></div>`).join('');
+  $('cards').innerHTML = cards.map(c => `<div class="selitem" role="button" tabindex="0" data-id="${esc(c._id)}"><div class="nm">${esc(c.nombre)}</div><div class="tt">${esc(c.descripcion)}</div></div>`).join('');
+  document.querySelectorAll('#pjs .selitem').forEach(el => el.addEventListener('click', () => {
+    const id = el.dataset.id;
+    pjSel.has(id) ? pjSel.delete(id) : (pjSel.size < 3 && pjSel.add(id));
+    paint();
+  }));
+  document.querySelectorAll('#cards .selitem').forEach(el => el.addEventListener('click', () => {
+    const id = el.dataset.id;
+    cardSel.has(id) ? cardSel.delete(id) : (cardSel.size < 3 && cardSel.add(id));
+    paint();
+  }));
+  $('btnStart').addEventListener('click', () => startGame([...pjSel], [...cardSel]));
+}
+
+async function startGame(corte, cartas) {
+  try {
+    await api('/api/narrative/partida/reiniciar', 'POST', { date: DATE() });
+    const r = await api('/api/narrative/v2/partida/iniciar', 'POST', {
+      date: DATE(), corte_elegida_ids: corte, cartas_iniciales_ids: cartas
+    });
+    syncFrom(r);
+    if (r.finalizacion) { renderFinalizacion(r.finalizacion, r.status); return; }
+    renderDraft(r.cartas_draft_actual || []);
+  } catch (e) { errBox(e); }
+}
+
+/* ---------- DRAFT ---------- */
+function renderDraft(cards) {
+  stage(`
+    <div class="panel">
+      <h2>Mes ${state.mes} — Elegí una carta</h2>
+      <div class="cards">${cards.map(c => `<div class="card" role="button" tabindex="0" data-id="${esc(c._id)}"><div class="nm">${esc(c.nombre)}</div><div class="ds">${esc(c.descripcion)}</div></div>`).join('')}</div>
+    </div>`);
+  document.querySelectorAll('.card').forEach(el => el.addEventListener('click', () => chooseCard(el.dataset.id)));
+}
+
+async function chooseCard(cartaId) {
+  try {
+    const r = await api('/api/narrative/v2/partida/elegir-carta-mes', 'POST', { date: DATE(), carta_id: cartaId });
+    syncFrom(r);
+    if (r.finalizacion) { renderFinalizacion(r.finalizacion, r.status); return; }
+    if (state.motor === 'v2') {
+      if (r.grafo_actual) { renderGrafo(r.grafo_actual); return; }
+      errBox(new Error('Motor v2 sin grafo_actual en elegir-carta-mes'));
+    } else {
+      if (r.evento_actual) { renderEvento(r.evento_actual); return; }
+      errBox(new Error('Motor v1 sin evento_actual en elegir-carta-mes'));
+    }
+  } catch (e) { errBox(e); }
+}
+
+/* ---------- V1: EVENTO ---------- */
+function renderEvento(ev) {
+  const ops = (ev.opciones || []).map(o => {
+    const probs = (o.probabilidades || []).map(p => `<div>${esc(p.titulo)} ${Math.round(p.porcentaje)}%</div>`).join('');
+    return `<button class="opt" data-id="${esc(o.id)}" ${o.bloqueada ? 'disabled' : ''}>
+      ${esc(o.texto)}${o.bloqueada ? '<span class="why">Bloqueada</span>' : ''}
+      <span class="probs">${probs}</span></button>`;
+  }).join('');
+  stage(`
+    <div class="stage">
+      <div class="speaker">Evento del mes</div>
+      <h2>${esc(ev.titulo)}</h2>
+      <div class="node-text">${esc(ev.descripcion)}</div>
+      <div class="options">${ops || '<div class="hint">Sin opciones</div>'}</div>
+    </div>`);
+  document.querySelectorAll('.opt').forEach(el => el.addEventListener('click', () => decideEvento(el.dataset.id)));
+}
+
+async function decideEvento(opcionId) {
+  try {
+    const r = await api('/api/narrative/v2/partida/decidir-evento', 'POST', { date: DATE(), opcion_id: opcionId });
+    syncFrom(r);
+    if (r.finalizacion) { renderFinalizacion(r.finalizacion, r.status); return; }
+    if (r.fase_actual === 'RESOLVER_CONVERSACION' && r.conversacion_actual) { renderConversacion(r.conversacion_actual); return; }
+    if (r.fase_actual === 'BALANCE_MES') { renderAvanzarMes(); return; }
+    errBox(new Error(`Fase inesperada tras decidir-evento: ${r.fase_actual}`));
+  } catch (e) { errBox(e); }
+}
+
+/* ---------- V1: CONVERSACION ---------- */
+function renderConversacion(conv) {
+  const frases = (conv.frases || []).map(f => `<div><span class="speaker">${esc(nameOf(f.personajeId))}</span><div class="node-text">${esc(f.texto)}</div></div>`).join('');
+  const decs = (conv.decisiones || []).map(d => `<button class="opt" data-n="${d.opcion}">${esc(d.texto)}</button>`).join('');
+  stage(`
+    <div class="stage">
+      <div class="speaker">Conversación de corte</div>
+      <h2>${esc(conv.titulo)}</h2>
+      ${frases}
+      <div class="options">${decs || '<div class="hint">Sin decisiones</div>'}</div>
+    </div>`);
+  document.querySelectorAll('.opt').forEach(el => el.addEventListener('click', () => responderConv(el.dataset.n)));
+}
+
+async function responderConv(num) {
+  try {
+    const r = await api('/api/narrative/v2/partida/responder-conversacion', 'POST', { date: DATE(), opcion_numero: +num });
+    syncFrom(r);
+    renderAvanzarMes();
+  } catch (e) { errBox(e); }
+}
+
+/* ---------- V2: GRAFO ---------- */
+function renderGrafo(est) {
+  const nodo = est.nodo_actual || {};
+  const tipo = est.tipo === 'conversacion' ? 'Conversación' : 'Evento';
+  const final = nodo.es_final;
+  const img = nodo.imagen ? (nodo.imagen.startsWith('http') ? nodo.imagen : API() + nodo.imagen) : null;
+  const impactos = (nodo.impactos_recursos || []).map(i => `${i.recurso} ${i.delta > 0 ? '+' : ''}${i.delta}`).join(', ');
+  const affs = (nodo.impactos_afinidad || []).map(i => `${nameOf(i.personaje_id)} ${i.delta > 0 ? '+' : ''}${i.delta}`).join(', ');
+  let body = '';
+  if (final) {
+    body = `<div class="node-text">${esc(nodo.resultado_texto || nodo.texto)}</div>
+      ${impactos ? `<div class="badge">Recursos: ${esc(impactos)}</div>` : ''}
+      ${affs ? `<div class="badge">Afinidad: ${esc(affs)}</div>` : ''}`;
+    if (est.fase_actual === 'BALANCE_MES') {
+      body += `<div class="row" style="margin-top:12px"><button class="primary" id="btnAvanzar">Avanzar mes</button></div>`;
+    }
+  } else {
+    const ops = (nodo.opciones || []).map(o => `<button class="opt" data-id="${esc(o.id)}" ${o.disponible === false ? 'disabled' : ''}>
+      ${esc(o.texto)}${o.disponible === false && o.motivo_bloqueo ? `<span class="why">${esc(o.motivo_bloqueo)}</span>` : ''}</button>`).join('');
+    body = `<div class="options">${ops || '<div class="hint">Sin opciones</div>'}</div>`;
+  }
+  stage(`
+    <div class="stage">
+      <div class="speaker">${tipo} V2 — ${esc(est.titulo)}</div>
+      <div class="badge">grafo ${esc(est.grafo_id)} · fase ${esc(est.fase_actual)} · ${final ? 'desenlace' : 'decisión'}</div>
+      <div class="speaker" style="margin-top:8px">${esc(nameOf(nodo.hablante_id))}</div>
+      ${img ? `<img class="node-img" src="${esc(img)}" alt="">` : ''}
+      <div class="node-text">${esc(nodo.texto)}</div>
+      ${body}
+    </div>`);
+  const btn = $('btnAvanzar');
+  if (btn) btn.addEventListener('click', avanzarMes);
+  document.querySelectorAll('.opt').forEach(el => el.addEventListener('click', () => avanzarNodo(el.dataset.id)));
+}
+
+async function avanzarNodo(opcionId) {
+  try {
+    const r = await api('/api/narrative/v2/partida/avanzar-nodo', 'POST', { date: DATE(), opcion_id: opcionId });
+    syncFrom(r);
+    if (r.finalizacion) { renderFinalizacion(r.finalizacion, r.status); return; }
+    renderGrafo(r);
+  } catch (e) { errBox(e); }
+}
+
+/* ---------- AVANZAR MES ---------- */
+function renderAvanzarMes() {
+  stage(`
+    <div class="stage">
+      <h2>Balance del mes ${state.mes}</h2>
+      <div class="hint">Los efectos pasivos se aplicarán al avanzar.</div>
+      <div class="row" style="margin-top:12px"><button class="primary" id="btnAvanzar">Avanzar mes</button></div>
+    </div>`);
+  $('btnAvanzar').addEventListener('click', avanzarMes);
+}
+
+async function avanzarMes() {
+  try {
+    const r = await api('/api/narrative/v2/partida/avanzar-mes', 'POST', { date: DATE() });
+    syncFrom(r);
+    if (r.finalizacion) { renderFinalizacion(r.finalizacion, r.status); return; }
+    renderDraft(r.cartas_draft_actual || []);
+  } catch (e) { errBox(e); }
+}
+
+/* ---------- FINALIZACION ---------- */
+function renderFinalizacion(fin, status) {
+  const f = fin || {};
+  const rank = f.rango || '—';
+  const victory = status === 'completed' || (f.tipo && String(f.tipo).toLowerCase().includes('victoria'));
+  stage(`
+    <div class="banner">
+      <div class="rank">${esc(rank)}</div>
+      <div class="final-title">${esc(f.titulo || 'Fin de la partida')}</div>
+      <div class="node-text">${esc(f.texto || '')}</div>
+      <div class="badge">estado: ${esc(status || 'game_over')} · recurso clave: ${esc(f.recurso_clave || '—')} · tipo: ${esc(f.tipo || '—')}</div>
+      <div class="row" style="margin-top:12px"><button class="primary" onclick="loadSetup()">Volver al setup</button></div>
+    </div>`);
+}
+
+/* ---------- INIT ---------- */
+function todayStr() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+(async function init() {
+  $('date').value = todayStr();
+  renderResources(); renderAffinity(); setStatus();
+  try {
+    await loadMotor();
+  } catch (e) { log('Cargar motor', 0, { error: e.message }); }
+  try {
+    await loadSetup();
+  } catch (e) { /* ya mostrado en stage */ }
+})();
+</script>
+</body>
+</html>

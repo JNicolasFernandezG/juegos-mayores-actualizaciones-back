@@ -15,7 +15,10 @@ from app.features.narrative.constants import (
     COLL_RESULTS,
     COLL_EVENTS,
     COLL_CONVERSATIONS,
-    COLL_ENDINGS
+    COLL_ENDINGS,
+    COLL_V2_EVENTS,
+    COLL_V2_CONVERSATIONS,
+    COLL_V2_EVENTOS_ESPECIALES
 )
 from app.features.narrative.schemas.catalog_schemas import (
     UniversoCreateRequest,
@@ -32,6 +35,11 @@ from app.features.narrative.schemas.catalog_schemas import (
     ConversacionResponse,
     FinalizacionCreateRequest,
     FinalizacionResponse
+)
+from app.features.narrative.schemas.v2_graph_schemas import (
+    EventoV2GrafoSchema,
+    ConversacionV2GrafoSchema,
+    EventoEspecialV2GrafoSchema
 )
 
 T = TypeVar("T", bound=BaseModel)
@@ -209,3 +217,47 @@ async def obtener_finalizacion_por_id(finalizacion_id: str) -> Optional[Finaliza
 
 async def eliminar_finalizacion(finalizacion_id: str) -> bool:
     return await eliminar_item_catalogo_por_id(COLL_ENDINGS, finalizacion_id)
+
+# ============================================================================
+# MOTOR NARRATIVO V2: GRAFOS DE EVENTOS Y CONVERSACIONES
+# ============================================================================
+
+# Eventos V2
+async def crear_o_actualizar_evento_v2(req: EventoV2GrafoSchema) -> EventoV2GrafoSchema:
+    return await guardar_item_catalogo(COLL_V2_EVENTS, req.id, req, EventoV2GrafoSchema)
+
+async def obtener_eventos_v2(universo_id: Optional[str] = None, limit: Optional[int] = None, skip: int = 0) -> List[EventoV2GrafoSchema]:
+    return await listar_items_catalogo(COLL_V2_EVENTS, EventoV2GrafoSchema, universo_id, limit, skip)
+
+async def obtener_evento_v2_por_id(evento_id: str) -> Optional[EventoV2GrafoSchema]:
+    return await obtener_item_catalogo_por_id(COLL_V2_EVENTS, evento_id, EventoV2GrafoSchema)
+
+async def eliminar_evento_v2(evento_id: str) -> bool:
+    return await eliminar_item_catalogo_por_id(COLL_V2_EVENTS, evento_id)
+
+# Conversaciones V2
+async def crear_o_actualizar_conversacion_v2(req: ConversacionV2GrafoSchema) -> ConversacionV2GrafoSchema:
+    return await guardar_item_catalogo(COLL_V2_CONVERSATIONS, req.id, req, ConversacionV2GrafoSchema)
+
+async def obtener_conversaciones_v2(universo_id: Optional[str] = None, limit: Optional[int] = None, skip: int = 0) -> List[ConversacionV2GrafoSchema]:
+    return await listar_items_catalogo(COLL_V2_CONVERSATIONS, ConversacionV2GrafoSchema, universo_id, limit, skip)
+
+async def obtener_conversacion_v2_por_id(conversacion_id: str) -> Optional[ConversacionV2GrafoSchema]:
+    return await obtener_item_catalogo_por_id(COLL_V2_CONVERSATIONS, conversacion_id, ConversacionV2GrafoSchema)
+
+async def eliminar_conversacion_v2(conversacion_id: str) -> bool:
+    return await eliminar_item_catalogo_por_id(COLL_V2_CONVERSATIONS, conversacion_id)
+
+# Eventos Especiales V2 (lealtad/traición por umbral de afinidad)
+async def crear_o_actualizar_evento_especial_v2(req: EventoEspecialV2GrafoSchema) -> EventoEspecialV2GrafoSchema:
+    return await guardar_item_catalogo(COLL_V2_EVENTOS_ESPECIALES, req.id, req, EventoEspecialV2GrafoSchema)
+
+async def obtener_eventos_especiales_v2(universo_id: Optional[str] = None, limit: Optional[int] = None, skip: int = 0) -> List[EventoEspecialV2GrafoSchema]:
+    return await listar_items_catalogo(COLL_V2_EVENTOS_ESPECIALES, EventoEspecialV2GrafoSchema, universo_id, limit, skip)
+
+async def obtener_evento_especial_v2_por_id(evento_id: str) -> Optional[EventoEspecialV2GrafoSchema]:
+    return await obtener_item_catalogo_por_id(COLL_V2_EVENTOS_ESPECIALES, evento_id, EventoEspecialV2GrafoSchema)
+
+async def eliminar_evento_especial_v2(evento_id: str) -> bool:
+    return await eliminar_item_catalogo_por_id(COLL_V2_EVENTOS_ESPECIALES, evento_id)
+

@@ -146,6 +146,9 @@ async def iniciar_partida_v2(user_id: int, req: IniciarPartidaRequest) -> Inicia
         cfg = challenge.get("config", {})
         universo_id = cfg.get("universo_id")
 
+        universo_doc = await db[COLL_SETTINGS].find_one({"_id": universo_id})
+        motor = universo_doc.get("motor", "v1") if universo_doc else "v1"
+
         # Validaciones de regla 3 de 5
         if len(req.corte_elegida_ids) != 3:
             raise HTTPException(status_code=400, detail="Debes seleccionar exactamente 3 personajes para la corte.")
@@ -183,6 +186,7 @@ async def iniciar_partida_v2(user_id: int, req: IniciarPartidaRequest) -> Inicia
             "date": req.date,
             "game_id": "narrativo",
             "universo_id": universo_id,
+            "motor": motor,
             "mes_actual": 1,
             "fase_actual": RunPhaseEnum.DRAFT_MENSUAL.value,
             "status": "in_progress",
@@ -225,7 +229,8 @@ async def iniciar_partida_v2(user_id: int, req: IniciarPartidaRequest) -> Inicia
                 recursos=run["recursos"],
                 afinidad=run["afinidad"],
                 cartas_draft_actual=[],
-                finalizacion=fin_resp
+                finalizacion=fin_resp,
+                motor=run.get("motor", "v1")
             )
 
         # Sortear las 3 cartas para el Draft del Mes 1
@@ -246,5 +251,6 @@ async def iniciar_partida_v2(user_id: int, req: IniciarPartidaRequest) -> Inicia
         recursos=run["recursos"],
         afinidad=run["afinidad"],
         cartas_draft_actual=cartas_draft_resp,
-        finalizacion=fin_resp
+        finalizacion=fin_resp,
+        motor=run.get("motor", "v1")
     )

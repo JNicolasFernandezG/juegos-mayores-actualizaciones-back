@@ -76,7 +76,9 @@ async def avanzar_mes_v2(user_id: int, req: AvanzarMesRequest) -> AvanzarMesV2Re
     run["historial_mensual"].append(historial_item)
 
     if turno.get("evento_actual_id"):
-        run["eventos_jugados"].append(turno.get("evento_actual_id"))
+        evento_id = turno.get("evento_actual_id")
+        if evento_id not in run.get("eventos_jugados", []):
+            run["eventos_jugados"].append(evento_id)
 
     # 2. ¿Llegó al Mes 12? Fin de Partida (Victoria Anual)
     if mes_actual >= 12:

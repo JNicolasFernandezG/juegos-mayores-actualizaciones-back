@@ -29,6 +29,7 @@ class UniversoCreateRequest(BaseModel):
     descripcion: str
     icono: str = "crown"
     imagen: str = "/assets/narrative/universos/default.webp"
+    motor: str = Field("v1", description="Motor de resolución del universo: 'v1' (clásico) o 'v2' (grafos)")
     recursos: List[RecursoDefinicionSchema]
 
     model_config = {"populate_by_name": True}
@@ -39,6 +40,7 @@ class UniversoResponse(BaseModel):
     descripcion: str
     icono: str
     imagen: str = "/assets/narrative/universos/default.webp"
+    motor: str = "v1"
     recursos: List[RecursoDefinicionSchema]
 
     model_config = {"populate_by_name": True}

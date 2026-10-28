@@ -56,3 +56,7 @@ class TipoFinalizacionEnum(str, Enum):
     VICTORIA_TIEMPO = "victoria_tiempo"
     DERROTA_GENERAL = "derrota_general"
 
+class DireccionEventoEspecialEnum(str, Enum):
+    LEALTAD = "lealtad"
+    TRAICION = "traicion"
+

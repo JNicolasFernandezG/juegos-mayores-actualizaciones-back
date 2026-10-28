@@ -11,26 +11,36 @@ class Database:
 
 db_instance = Database()
 
-def _mask_mongo_uri(uri: str) -> str:
-    if "@" in uri and "://" in uri:
-        scheme, rest = uri.split("://", 1)
-        _, host_part = rest.rsplit("@", 1)
-        return f"{scheme}://***:***@{host_part}"
-    return uri
-
 def get_database() -> AsyncIOMotorDatabase:
     if db_instance.db is None:
-        db_instance.client = AsyncIOMotorClient(settings.effective_mongo_uri)
-        db_instance.db = db_instance.client[settings.effective_db_name]
+        url = settings.mongodb_connection_url
+        db_name = settings.effective_db_name
+        db_instance.client = AsyncIOMotorClient(url)
+        db_instance.db = db_instance.client[db_name]
     return db_instance.db
 
 async def connect_to_mongo():
-    masked_uri = _mask_mongo_uri(settings.effective_mongo_uri)
-    logger.info(f"Conectando a MongoDB en: {masked_uri} (Base lógica: {settings.effective_db_name})")
-    db_instance.client = AsyncIOMotorClient(settings.effective_mongo_uri)
-    db_instance.db = db_instance.client[settings.effective_db_name]
+    url = settings.mongodb_connection_url
+    db_name = settings.effective_db_name
+    # Log seguro: ocultar contraseñas para evitar fugas en logs
+    safe_log_url = url
+    if "@" in url:
+        pre, post = url.split("@", 1)
+        protocol = pre.split("://")[0]
+        safe_log_url = f"{protocol}://****:****@{post}"
+    logger.info(f"Conectando a MongoDB en: {safe_log_url} (Base: {db_name})")
+    db_instance.client = AsyncIOMotorClient(url, serverSelectionTimeoutMS=5000)
+    db_instance.db = db_instance.client[db_name]
+
+    # Verificación activa e inmediata de credenciales y conectividad
+    try:
+        await db_instance.client.admin.command('ping')
+        logger.info("Conexión y autenticación con MongoDB verificadas exitosamente.")
+    except Exception as e:
+        logger.error(f"Fallo crítico al conectar o autenticar con MongoDB: {e}")
+        raise e
+
     await init_indexes()
-    logger.info("Conexión a MongoDB establecida exitosamente.")
 
 async def close_mongo_connection():
     if db_instance.client:
@@ -41,8 +51,21 @@ async def get_next_sequence_value(sequence_name: str) -> int:
     """
     Genera un ID secuencial numérico atómico (1, 2, 3...)
     equivalente a AUTO_INCREMENT de MySQL usando la colección 'counters'.
+    Auto-sincroniza preventivamente contra el ID máximo existente para evitar DuplicateKeyError.
     """
     db = get_database()
+    if sequence_name == "usuario_id":
+        max_user = await db["usuarios"].find_one(sort=[("id", -1)])
+        max_id = max_user["id"] if (max_user and isinstance(max_user.get("id"), int)) else 0
+        counter_doc = await db["counters"].find_one({"_id": sequence_name})
+        current_seq = counter_doc.get("seq", 0) if counter_doc else 0
+        if max_id >= current_seq:
+            await db["counters"].update_one(
+                {"_id": sequence_name},
+                {"$set": {"seq": max_id}},
+                upsert=True
+            )
+
     counter = await db["counters"].find_one_and_update(
         {"_id": sequence_name},
         {"$inc": {"seq": 1}},

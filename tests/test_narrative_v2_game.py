@@ -46,6 +46,9 @@ async def _ejecutar_ciclo_v2():
         cartas_elegidas = cfg["setup_cartas_ofrecidas_ids"][:3]
 
         # 1. Iniciar Partida V2
+        # Asegurar que el universo para este test de endpoints clásicos esté en modo motor 'v1'
+        await db["narrative_settings"].update_one({"_id": "corte_medieval"}, {"$set": {"motor": "v1"}})
+
         resp = await client.post(
             "/api/narrative/v2/partida/iniciar",
             json={

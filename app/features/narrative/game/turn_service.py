@@ -50,6 +50,7 @@ from app.features.narrative.engine.event_director import (
     sortear_resultado_opcion,
     calcular_opciones_evento
 )
+from app.features.narrative.engine.graph_engine import graph_engine
 from app.features.narrative.game.endings_service import (
     verificar_colapso_recursos,
     sincronizar_intento_usuario
@@ -105,6 +106,35 @@ async def elegir_carta_mes_v2(user_id: int, req: ElegirCartaMesRequest) -> Elegi
             recursos=run["recursos"],
             evento_actual=None,
             finalizacion=fin_resp
+        )
+
+    # Si el universo usa el motor V2 de grafos, sortea e inicia un grafo de evento
+    if run.get("motor") == "v2":
+        evento_v2 = await graph_engine.sortear_evento_v2(
+            run=run,
+            pool_ids=None,
+            universo_id=run.get("universo_id", "corte_medieval")
+        )
+        if not evento_v2:
+            raise HTTPException(status_code=500, detail="No hay eventos V2 disponibles o elegibles en el universo.")
+
+        turno["evento_actual_id"] = evento_v2["_id"]
+        run["fase_actual"] = RunPhaseEnum.TOMA_DECISION_EVENTO.value
+        estado = await graph_engine.iniciar_grafo_en_partida(
+            run=run,
+            grafo=evento_v2,
+            tipo="evento",
+            fase=RunPhaseEnum.TOMA_DECISION_EVENTO.value
+        )
+        run["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db[COLL_RUNS].replace_one({"_id": run["_id"]}, run)
+
+        return ElegirCartaMesV2Response(
+            fase_actual=run["fase_actual"],
+            recursos=run["recursos"],
+            evento_actual=None,
+            grafo_actual=estado,
+            finalizacion=None
         )
 
     # 2. Sortear el Evento del Mes con el Director Narrativo

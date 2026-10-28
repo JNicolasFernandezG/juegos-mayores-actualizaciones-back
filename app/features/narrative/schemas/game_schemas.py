@@ -11,6 +11,7 @@ from app.features.narrative.schemas.catalog_schemas import (
     ConversacionResponse,
     FinalizacionResponse
 )
+from app.features.narrative.schemas.v2_graph_schemas import EstadoGrafoV2Response
 
 # ============================================================================
 # 1. CONFIGURACIÓN DEL DESAFÍO DIARIO (Extensión a daily_challenges)
@@ -191,6 +192,7 @@ class EstadoTurnoResponse(BaseModel):
     resultado_actual: Optional[ResultadoResponse] = None
     conversacion_actual: Optional[ConversacionResponse] = None
     finalizacion: Optional[FinalizacionResponse] = None
+    grafo_actual: Optional[EstadoGrafoV2Response] = None
 
 # ============================================================================
 # 7. DTOs DEL MOTOR V2 LIGERO (DELTAS POR FASE)
@@ -203,12 +205,14 @@ class IniciarPartidaV2Response(BaseModel):
     afinidad: Dict[str, int]
     cartas_draft_actual: List[CartaResponse]
     finalizacion: Optional[FinalizacionResponse] = None
+    motor: Optional[str] = "v1"
 
 class ElegirCartaMesV2Response(BaseModel):
     fase_actual: str = "TOMA_DECISION_EVENTO"
     recursos: Dict[str, int]
     evento_actual: Optional[EventoTurnoResponse] = None
     finalizacion: Optional[FinalizacionResponse] = None
+    grafo_actual: Optional[EstadoGrafoV2Response] = None
 
 class DecidirEventoV2Response(BaseModel):
     fase_actual: str

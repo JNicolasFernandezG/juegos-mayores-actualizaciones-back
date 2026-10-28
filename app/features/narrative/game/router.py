@@ -35,6 +35,16 @@ from app.features.narrative.schemas.catalog_schemas import (
     ResultadoResponse,
     CartaResponse
 )
+from app.features.narrative.schemas.v2_graph_schemas import (
+    AvanzarNodoV2Request,
+    EstadoGrafoV2Response
+)
+from app.features.narrative.game.v2_graph_service import (
+    avanzar_nodo_v2,
+    obtener_grafo_actual_v2,
+    iniciar_evento_mes_v2,
+    iniciar_conversacion_mes_v2
+)
 from app.features.narrative.game.setup_service import (
     obtener_setup_desafio,
     reiniciar_partida,
@@ -152,6 +162,58 @@ async def endpoint_v2_obtener_estado_turno(
 ):
     """Permite al frontend restaurar el estado exacto del turno tras recargar la página."""
     return await obtener_turno_actual(user_id=user_id, date=date)
+
+@router_v2.post(
+    "/avanzar-nodo",
+    response_model=EstadoGrafoV2Response,
+    summary="[V2 Grafos] Avanzar un paso en el grafo activo (evento o conversación) sin spoilers"
+)
+async def endpoint_v2_avanzar_nodo(
+    req: AvanzarNodoV2Request,
+    user_id: int = Depends(_get_current_user_id)
+):
+    """
+    Avanza un paso en el árbol narrativo activo.
+    Si el siguiente nodo es intermedio, retorna el nuevo nodo a mostrar.
+    Si es final, aplica impactos en recursos y afinidad y avanza la fase de la partida.
+    """
+    return await avanzar_nodo_v2(user_id=user_id, req=req)
+
+@router_v2.get(
+    "/grafo-actual",
+    response_model=Optional[EstadoGrafoV2Response],
+    summary="[V2 Grafos] Consultar el estado del grafo activo (evento o conversación) para recargas/F5"
+)
+async def endpoint_v2_obtener_grafo_actual(
+    date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Fecha YYYY-MM-DD"),
+    user_id: int = Depends(_get_current_user_id)
+):
+    """Permite restaurar el nodo activo tras recargar la página."""
+    return await obtener_grafo_actual_v2(user_id=user_id, date=date)
+
+@router_v2.post(
+    "/iniciar-evento-grafo",
+    response_model=EstadoGrafoV2Response,
+    summary="[V2 Grafos] Iniciar un evento basado en grafos para el mes actual"
+)
+async def endpoint_v2_iniciar_evento_grafo(
+    date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Fecha YYYY-MM-DD"),
+    user_id: int = Depends(_get_current_user_id)
+):
+    """Inicia un evento V2 del pool respetando arcos narrativos y requisitos previos."""
+    return await iniciar_evento_mes_v2(user_id=user_id, date=date)
+
+@router_v2.post(
+    "/iniciar-conversacion-grafo",
+    response_model=Optional[EstadoGrafoV2Response],
+    summary="[V2 Grafos] Iniciar una conversación basada en grafos para el mes actual"
+)
+async def endpoint_v2_iniciar_conversacion_grafo(
+    date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Fecha YYYY-MM-DD"),
+    user_id: int = Depends(_get_current_user_id)
+):
+    """Inicia una conversación V2 si los requisitos de consejeros activos se cumplen."""
+    return await iniciar_conversacion_mes_v2(user_id=user_id, date=date)
 
 # ============================================================================
 # ROUTER CONSULTAS: MODALES Y SETUP (/api/narrative/partida)

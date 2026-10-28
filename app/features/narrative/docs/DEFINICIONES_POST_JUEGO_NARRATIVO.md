@@ -196,7 +196,7 @@ Varios objetos (`personajes`, `cartas`, `resultados`, `eventos`) utilizan este b
 - **Descripción:** Crea o actualiza cartas de inventario que el jugador elige en la preparación o en los drafts mensuales.
 
 #### Campos Requeridos:
-- `_id` *(string, requerido)*: ID único (ej: `"carta_sello_real"`).
+- `_id` *(string, requerido)*: ID único (ej: `"card_sello_real"`).
 - `universo_id` *(string, requerido)*: ID del universo.
 - `categoria` *(string, requerido)*: `"item"`, `"bonus"` o `"personaje"`.
 - `nombre` *(string, requerido)*: Título de la carta.
@@ -208,7 +208,7 @@ Varios objetos (`personajes`, `cartas`, `resultados`, `eventos`) utilizan este b
 #### Payload JSON:
 ```json
 {
-  "_id": "carta_sello_real",
+  "_id": "card_sello_real",
   "universo_id": "corte_medieval",
   "categoria": "item",
   "nombre": "Sello Real de Cera",
@@ -495,17 +495,19 @@ Los endpoints del ciclo de juego responden siempre con el **`EstadoPartidaActiva
 
 ### 2.1. Iniciar Partida (Fase 0 - Setup)
 - **Endpoint:** `POST /api/narrative/partida/iniciar`
-- **Descripción:** El alumno elige 2 personajes de los 5 ofrecidos y 2 cartas de las 5 ofrecidas para arrancar el año.
+- **Descripción:** El alumno elige 3 personajes de los 5 ofrecidos y 3 cartas de las 5 ofrecidas para arrancar el año.
 ```json
 {
   "date": "2026-10-15",
   "corte_elegida_ids": [
     "pj_canciller_elena",
-    "pj_comandante_marcus"
+    "pj_comandante_marcus",
+    "pj_alquimista_vera"
   ],
   "cartas_iniciales_ids": [
-    "carta_sello_real",
-    "carta_veteranos"
+    "card_sello_real",
+    "card_reserva_trigo",
+    "card_escudo_hierro"
   ]
 }
 ```
@@ -518,7 +520,7 @@ Los endpoints del ciclo de juego responden siempre con el **`EstadoPartidaActiva
 ```json
 {
   "date": "2026-10-15",
-  "carta_id": "carta_veteranos"
+  "carta_id": "card_reserva_trigo"
 }
 ```
 

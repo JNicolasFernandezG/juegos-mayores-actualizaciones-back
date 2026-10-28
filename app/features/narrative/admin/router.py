@@ -24,6 +24,11 @@ from app.features.narrative.schemas import (
     FinalizacionCreateRequest,
     FinalizacionResponse
 )
+from app.features.narrative.schemas.v2_graph_schemas import (
+    EventoV2GrafoSchema,
+    ConversacionV2GrafoSchema,
+    EventoEspecialV2GrafoSchema
+)
 from app.features.narrative.admin.rules_catalog import obtener_catalogo_reglas_dict
 from app.features.narrative.admin.image_service import procesar_y_guardar_imagen_narrativa
 from app.features.narrative.admin.crud_service import (
@@ -54,7 +59,19 @@ from app.features.narrative.admin.crud_service import (
     crear_o_actualizar_finalizacion,
     obtener_finalizaciones,
     obtener_finalizacion_por_id,
-    eliminar_finalizacion
+    eliminar_finalizacion,
+    crear_o_actualizar_evento_v2,
+    obtener_eventos_v2,
+    obtener_evento_v2_por_id,
+    eliminar_evento_v2,
+    crear_o_actualizar_conversacion_v2,
+    obtener_conversaciones_v2,
+    obtener_conversacion_v2_por_id,
+    eliminar_conversacion_v2,
+    crear_o_actualizar_evento_especial_v2,
+    obtener_eventos_especiales_v2,
+    obtener_evento_especial_v2_por_id,
+    eliminar_evento_especial_v2
 )
 from app.features.narrative.admin.challenge_service import (
     sembrar_finalizaciones_para_universo,
@@ -318,3 +335,86 @@ async def endpoint_generar_mes_narrativo(
     universo_id: str = Query(..., description="ID del universo (ej: corte_medieval)")
 ):
     return await generar_mes_narrativo(year=year, month=month, universo_id=universo_id)
+
+# ============================================================================
+# 11. MOTOR NARRATIVO V2: CRUD DE GRAFOS (EVENTOS Y CONVERSACIONES)
+# ============================================================================
+
+@router.get("/v2/eventos", response_model=List[EventoV2GrafoSchema], summary="Listar eventos de grafos V2")
+async def endpoint_listar_eventos_v2(
+    universo_id: Optional[str] = Query(None, description="Filtrar por universo"),
+    limit: Optional[int] = Query(None, description="Límite de resultados"),
+    skip: int = Query(0, description="Offset de paginación")
+):
+    return await obtener_eventos_v2(universo_id=universo_id, limit=limit, skip=skip)
+
+@router.get("/v2/eventos/{evento_id}", response_model=EventoV2GrafoSchema, summary="Obtener evento V2 por ID")
+async def endpoint_obtener_evento_v2(evento_id: str = Path(...)):
+    e = await obtener_evento_v2_por_id(evento_id)
+    if not e:
+        raise HTTPException(status_code=404, detail="Evento V2 no encontrado.")
+    return e
+
+@router.post("/v2/eventos", response_model=EventoV2GrafoSchema, summary="Crear o actualizar evento V2")
+async def endpoint_guardar_evento_v2(req: EventoV2GrafoSchema):
+    return await crear_o_actualizar_evento_v2(req)
+
+@router.delete("/v2/eventos/{evento_id}", summary="Eliminar evento V2")
+async def endpoint_eliminar_evento_v2(evento_id: str = Path(...)):
+    exito = await eliminar_evento_v2(evento_id)
+    if not exito:
+        raise HTTPException(status_code=404, detail="Evento V2 no encontrado.")
+    return {"message": "Evento V2 eliminado correctamente."}
+
+@router.get("/v2/conversaciones", response_model=List[ConversacionV2GrafoSchema], summary="Listar conversaciones de grafos V2")
+async def endpoint_listar_conversaciones_v2(
+    universo_id: Optional[str] = Query(None, description="Filtrar por universo"),
+    limit: Optional[int] = Query(None, description="Límite de resultados"),
+    skip: int = Query(0, description="Offset de paginación")
+):
+    return await obtener_conversaciones_v2(universo_id=universo_id, limit=limit, skip=skip)
+
+@router.get("/v2/conversaciones/{conversacion_id}", response_model=ConversacionV2GrafoSchema, summary="Obtener conversación V2 por ID")
+async def endpoint_obtener_conversacion_v2(conversacion_id: str = Path(...)):
+    c = await obtener_conversacion_v2_por_id(conversacion_id)
+    if not c:
+        raise HTTPException(status_code=404, detail="Conversación V2 no encontrada.")
+    return c
+
+@router.post("/v2/conversaciones", response_model=ConversacionV2GrafoSchema, summary="Crear o actualizar conversación V2")
+async def endpoint_guardar_conversacion_v2(req: ConversacionV2GrafoSchema):
+    return await crear_o_actualizar_conversacion_v2(req)
+
+@router.delete("/v2/conversaciones/{conversacion_id}", summary="Eliminar conversación V2")
+async def endpoint_eliminar_conversacion_v2(conversacion_id: str = Path(...)):
+    exito = await eliminar_conversacion_v2(conversacion_id)
+    if not exito:
+        raise HTTPException(status_code=404, detail="Conversación V2 no encontrada.")
+    return {"message": "Conversación V2 eliminada correctamente."}
+
+@router.get("/v2/eventos-especiales", response_model=List[EventoEspecialV2GrafoSchema], summary="Listar eventos especiales de afinidad (lealtad/traición)")
+async def endpoint_listar_eventos_especiales_v2(
+    universo_id: Optional[str] = Query(None, description="Filtrar por universo"),
+    limit: Optional[int] = Query(None, description="Límite de resultados"),
+    skip: int = Query(0, description="Offset de paginación")
+):
+    return await obtener_eventos_especiales_v2(universo_id=universo_id, limit=limit, skip=skip)
+
+@router.get("/v2/eventos-especiales/{evento_id}", response_model=EventoEspecialV2GrafoSchema, summary="Obtener evento especial V2 por ID")
+async def endpoint_obtener_evento_especial_v2(evento_id: str = Path(...)):
+    e = await obtener_evento_especial_v2_por_id(evento_id)
+    if not e:
+        raise HTTPException(status_code=404, detail="Evento especial V2 no encontrado.")
+    return e
+
+@router.post("/v2/eventos-especiales", response_model=EventoEspecialV2GrafoSchema, summary="Crear o actualizar evento especial V2")
+async def endpoint_guardar_evento_especial_v2(req: EventoEspecialV2GrafoSchema):
+    return await crear_o_actualizar_evento_especial_v2(req)
+
+@router.delete("/v2/eventos-especiales/{evento_id}", summary="Eliminar evento especial V2")
+async def endpoint_eliminar_evento_especial_v2(evento_id: str = Path(...)):
+    exito = await eliminar_evento_especial_v2(evento_id)
+    if not exito:
+        raise HTTPException(status_code=404, detail="Evento especial V2 no encontrado.")
+    return {"message": "Evento especial V2 eliminado correctamente."}
+

@@ -16,6 +16,7 @@ import re
 import time
 import json
 import logging
+import threading
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -33,6 +34,7 @@ ACENTOS_PATH = os.path.join(DATA_DIR, "acentos_todas_palabras.json")
 
 _DEFINICIONES_CACHE: Dict[str, str] = {}
 _ACENTOS_MAP: Dict[str, str] = {}
+_CACHE_LOCK = threading.RLock()
 
 def _load_definitions_cache() -> Dict[str, str]:
     """Carga la caché local de definiciones desde el archivo JSON en disco."""
@@ -40,13 +42,16 @@ def _load_definitions_cache() -> Dict[str, str]:
     if _DEFINICIONES_CACHE:
         return _DEFINICIONES_CACHE
 
-    if os.path.exists(CACHE_PATH):
-        try:
-            with open(CACHE_PATH, "r", encoding="utf-8") as f:
-                _DEFINICIONES_CACHE = json.load(f)
-        except Exception as e:
-            logger.warning(f"[RAE] Error al leer caché de definiciones: {e}")
-            _DEFINICIONES_CACHE = {}
+    with _CACHE_LOCK:
+        if _DEFINICIONES_CACHE:
+            return _DEFINICIONES_CACHE
+        if os.path.exists(CACHE_PATH):
+            try:
+                with open(CACHE_PATH, "r", encoding="utf-8") as f:
+                    _DEFINICIONES_CACHE = json.load(f)
+            except Exception as e:
+                logger.warning(f"[RAE] Error al leer caché de definiciones: {e}")
+                _DEFINICIONES_CACHE = {}
 
     return _DEFINICIONES_CACHE
 
@@ -54,8 +59,9 @@ def _save_definitions_cache():
     """Persiste en disco la caché local de definiciones en formato JSON."""
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
-        with open(CACHE_PATH, "w", encoding="utf-8") as f:
-            json.dump(_DEFINICIONES_CACHE, f, ensure_ascii=False, indent=2)
+        with _CACHE_LOCK:
+            with open(CACHE_PATH, "w", encoding="utf-8") as f:
+                json.dump(_DEFINICIONES_CACHE, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.warning(f"[RAE] Error al persistir caché de definiciones: {e}")
 
@@ -173,8 +179,9 @@ def fetch_rae_definition(word: str, mask_spoiler: bool = True) -> Optional[str]:
 
                     if best_cleaned:
                         if mask_spoiler:
-                            cache[word_upper] = best_cleaned
-                            _save_definitions_cache()
+                            with _CACHE_LOCK:
+                                cache[word_upper] = best_cleaned
+                                _save_definitions_cache()
                         return best_cleaned
                 break
             except urllib.error.HTTPError as he:

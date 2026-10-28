@@ -110,7 +110,7 @@ async def login_sistemas(req: LoginSistemasRequest):
     payload = {
         "email": req.email.lower().strip(),
         "password": req.password,
-        "servicio": settings.SERVICE_KEY
+        "servicio": "mayoresactualizaciones"
     }
 
     try:
@@ -170,7 +170,7 @@ async def login_codigo(req: LoginCodigoRequest):
     auth_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/auth/validar-acceso"
     payload = {
         "codigoAcceso": code,
-        "servicio": settings.SERVICE_KEY
+        "servicio": "mayoresactualizaciones"
     }
 
     try:
@@ -222,7 +222,7 @@ async def verificar_token(req: VerificarTokenRequest):
     auth_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/auth/validar-acceso"
     payload = {
         "token": req.token,
-        "servicio": settings.SERVICE_KEY
+        "servicio": "mayoresactualizaciones"
     }
 
     try:
@@ -272,11 +272,11 @@ async def register_usuario(req: RegisterRequest, is_admin_creation: bool = False
         "email": req.email.lower().strip(),
         "password": req.password,
         "codigoAcceso": req.codigoAcceso,
-        "servicioOrigen": settings.SERVICE_KEY,
+        "servicioOrigen": "mayoresactualizaciones",
         "tipoUsuario": tipo_usuario,
         "black": black,
         "activo": activo,
-        "servicios": {settings.SERVICE_KEY: True}
+        "servicios": {"mayoresactualizaciones": True}
     }
 
     try:
