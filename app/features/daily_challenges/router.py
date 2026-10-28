@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Query, Path
+from fastapi import APIRouter, Depends, Query, Path
+from app.core.dependencies import get_current_admin
 from typing import Optional
 from app.features.daily_challenges.schemas import (
     DailyChallengeCreateRequest,
@@ -88,7 +89,8 @@ async def endpoint_upsert_challenge(req: DailyChallengeCreateRequest):
 )
 async def endpoint_admin_challenges_status(
     year: int = Query(2026, description="Año a auditar"),
-    game_id: str = Query("sudoku", description="Juego a consultar (sudoku, wordle, sopa_letras, crucigrama)")
+    game_id: str = Query("sudoku", description="Juego a consultar (sudoku, wordle, sopa_letras, crucigrama)"),
+    admin: dict = Depends(get_current_admin)
 ):
     return await get_challenges_monthly_status(year=year, game_id=game_id)
 
@@ -100,7 +102,8 @@ async def endpoint_admin_generate_month(
     year: int = Query(..., ge=2020, le=2050, description="Año a generar"),
     month: int = Query(..., ge=1, le=12, description="Mes a generar (1-12)"),
     game_id: str = Query("sudoku", description="Juego a generar (sudoku, wordle, sopa_letras, crucigrama)"),
-    force: bool = Query(True, description="Forzar regeneración si ya existe")
+    force: bool = Query(True, description="Forzar regeneración si ya existe"),
+    admin: dict = Depends(get_current_admin)
 ):
     if game_id == "sudoku":
         return await generate_and_save_sudoku_month(year=year, month=month, force=force)

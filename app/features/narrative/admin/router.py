@@ -78,7 +78,14 @@ from app.features.narrative.admin.challenge_service import (
     generar_mes_narrativo
 )
 
-router = APIRouter(prefix="/api/narrative/admin", tags=["Juego Narrativo - Torre de Control"])
+from fastapi import Depends
+from app.core.dependencies import get_current_admin
+
+router = APIRouter(
+    prefix="/api/narrative/admin",
+    tags=["Juego Narrativo - Torre de Control"],
+    dependencies=[Depends(get_current_admin)]
+)
 
 # ============================================================================
 # 1. CATÁLOGO OFICIAL DE REGLAS (Para desplegables del Admin)
