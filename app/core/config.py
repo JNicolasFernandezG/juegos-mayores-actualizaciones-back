@@ -8,11 +8,7 @@ class Settings(BaseSettings):
     PORT: int = 8087
     HOST: str = "0.0.0.0"
 
-    # Base de datos MongoDB (Directa o Desglosada)
-    MONGO_URI: Optional[str] = None
-    MONGODB_URL: Optional[str] = None
-    MONGODB_DB_NAME: str = "conmijuegos_db"
-
+    # Base de datos MongoDB (Desglosada o Directa)
     MONGO_HOST: Optional[str] = None
     MONGO_PORT: Optional[int] = 27017
     MONGO_ROOT_USER: Optional[str] = None
@@ -20,25 +16,28 @@ class Settings(BaseSettings):
     MONGO_AUTH_SOURCE: str = "admin"
     MONGO_DB_NAME: Optional[str] = None
 
+    MONGO_URI: Optional[str] = None
+    MONGODB_URL: Optional[str] = None
+    MONGODB_DB_NAME: str = "conmijuegos_db"
+
     @property
     def mongodb_connection_url(self) -> str:
         """
-        Construye la URL autenticada priorizando:
-        1. MONGO_URI (cadena completa provista en producción)
-        2. Variables desglosadas (MONGO_HOST, MONGO_ROOT_USER, etc.)
-        3. MONGODB_URL
-        4. Fallback local por defecto.
+        Construye la URL autenticada de conexión a MongoDB.
+        Prioriza la configuración desglosada explícita (MONGO_HOST, MONGO_ROOT_USER, etc.),
+        seguida de MONGO_URI o MONGODB_URL.
         """
-        if self.MONGO_URI:
-            return self.MONGO_URI
         if self.MONGO_HOST:
             port = self.MONGO_PORT or 27017
             auth_source = self.MONGO_AUTH_SOURCE or "admin"
+            db_name = self.effective_db_name
             if self.MONGO_ROOT_USER and self.MONGO_ROOT_PASSWORD:
                 user_esc = quote_plus(self.MONGO_ROOT_USER)
                 pass_esc = quote_plus(self.MONGO_ROOT_PASSWORD)
-                return f"mongodb://{user_esc}:{pass_esc}@{self.MONGO_HOST}:{port}/?authSource={auth_source}"
-            return f"mongodb://{self.MONGO_HOST}:{port}"
+                return f"mongodb://{user_esc}:{pass_esc}@{self.MONGO_HOST}:{port}/{db_name}?authSource={auth_source}"
+            return f"mongodb://{self.MONGO_HOST}:{port}/{db_name}"
+        if self.MONGO_URI:
+            return self.MONGO_URI
         if self.MONGODB_URL:
             return self.MONGODB_URL
         return "mongodb://localhost:27017"
