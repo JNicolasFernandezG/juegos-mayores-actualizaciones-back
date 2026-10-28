@@ -5,12 +5,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # Servidor
-    PORT: int = 8082
+    PORT: int = 8087
     HOST: str = "0.0.0.0"
 
     # Base de datos MongoDB (Directa o Desglosada)
+    MONGO_URI: Optional[str] = None
     MONGODB_URL: Optional[str] = None
-    MONGODB_DB_NAME: str = "mayores_actualizaciones"
+    MONGODB_DB_NAME: str = "conmijuegos_db"
 
     MONGO_HOST: Optional[str] = None
     MONGO_PORT: Optional[int] = 27017
@@ -22,9 +23,14 @@ class Settings(BaseSettings):
     @property
     def mongodb_connection_url(self) -> str:
         """
-        Construye la URL autenticada si se definen las variables desglosadas
-        (MONGO_HOST, MONGO_ROOT_USER, etc.), o utiliza MONGODB_URL si está presente.
+        Construye la URL autenticada priorizando:
+        1. MONGO_URI (cadena completa provista en producción)
+        2. Variables desglosadas (MONGO_HOST, MONGO_ROOT_USER, etc.)
+        3. MONGODB_URL
+        4. Fallback local por defecto.
         """
+        if self.MONGO_URI:
+            return self.MONGO_URI
         if self.MONGO_HOST:
             port = self.MONGO_PORT or 27017
             auth_source = self.MONGO_AUTH_SOURCE or "admin"
@@ -33,14 +39,16 @@ class Settings(BaseSettings):
                 pass_esc = quote_plus(self.MONGO_ROOT_PASSWORD)
                 return f"mongodb://{user_esc}:{pass_esc}@{self.MONGO_HOST}:{port}/?authSource={auth_source}"
             return f"mongodb://{self.MONGO_HOST}:{port}"
-        return self.MONGODB_URL or "mongodb://localhost:27017"
+        if self.MONGODB_URL:
+            return self.MONGODB_URL
+        return "mongodb://localhost:27017"
 
     @property
     def effective_db_name(self) -> str:
-        return self.MONGO_DB_NAME or self.MONGODB_DB_NAME
+        return self.MONGO_DB_NAME or self.MONGODB_DB_NAME or "conmijuegos_db"
 
     # JWT & Seguridad (Obligatorio desde .env, debe coincidir con Autenticador)
-    JWT_SECRET: str
+    JWT_SECRET: str = ""
     JWT_SECRET_FALLBACK: Optional[str] = None
     JWT_EXPIRATION_DAYS: int = 180
     FRONTEND_URL: str = "http://localhost:5173"

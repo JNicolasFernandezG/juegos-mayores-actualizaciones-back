@@ -16,7 +16,10 @@ def get_database() -> AsyncIOMotorDatabase:
         url = settings.mongodb_connection_url
         db_name = settings.effective_db_name
         db_instance.client = AsyncIOMotorClient(url)
-        db_instance.db = db_instance.client[db_name]
+        try:
+            db_instance.db = db_instance.client.get_default_database()
+        except Exception:
+            db_instance.db = db_instance.client[db_name]
     return db_instance.db
 
 async def connect_to_mongo():
@@ -30,17 +33,22 @@ async def connect_to_mongo():
         safe_log_url = f"{protocol}://****:****@{post}"
     logger.info(f"Conectando a MongoDB en: {safe_log_url} (Base: {db_name})")
     db_instance.client = AsyncIOMotorClient(url, serverSelectionTimeoutMS=5000)
-    db_instance.db = db_instance.client[db_name]
+    try:
+        db_instance.db = db_instance.client.get_default_database()
+    except Exception:
+        db_instance.db = db_instance.client[db_name]
 
     # Verificación activa e inmediata de credenciales y conectividad
     try:
         await db_instance.client.admin.command('ping')
         logger.info("Conexión y autenticación con MongoDB verificadas exitosamente.")
     except Exception as e:
-        logger.error(f"Fallo crítico al conectar o autenticar con MongoDB: {e}")
-        raise e
+        logger.warning(f"No se pudo verificar la conexión inicial con MongoDB ({e}). La app continuará e intentará reconectar.")
 
-    await init_indexes()
+    try:
+        await init_indexes()
+    except Exception as e:
+        logger.warning(f"Aviso al inicializar índices en el arranque: {e}")
 
 async def close_mongo_connection():
     if db_instance.client:

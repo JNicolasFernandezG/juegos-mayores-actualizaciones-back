@@ -69,8 +69,24 @@ services:
       - FRONTEND_URL=${FRONTEND_URL:-https://cognijuegos.asistodo.com.ar}
       - AUTH_SERVICE_URL=${AUTH_SERVICE_URL:-https://autenticacion.asistodo.com.ar}
       - MONGO_URI=${MONGO_URI:-}
-      - MONGODB_URL=${MONGODB_URL:-mongodb://mongodb-central:27017}
+      - MONGODB_URL=${MONGODB_URL:-}
       - MONGODB_DB_NAME=${MONGODB_DB_NAME:-conmijuegos_db}
+      - MONGO_HOST=${MONGO_HOST:-}
+      - MONGO_PORT=${MONGO_PORT:-27017}
+      - MONGO_ROOT_USER=${MONGO_ROOT_USER:-}
+      - MONGO_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-}
+      - MONGO_AUTH_SOURCE=${MONGO_AUTH_SOURCE:-admin}
+      - MONGO_DB_NAME=${MONGO_DB_NAME:-}
+      - JWT_SECRET=${JWT_SECRET:-}
+      - JWT_SECRET_FALLBACK=${JWT_SECRET_FALLBACK:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - RAE_API_KEY=${RAE_API_KEY:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - MAIL_FROM=${MAIL_FROM:-}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8087/health')"]
       interval: 15s
@@ -109,5 +125,3 @@ networks:
   red-mongo-compartida:
     name: red-mongo-compartida
     external: true
-
-

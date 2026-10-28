@@ -34,7 +34,10 @@ async def lifespan(app: FastAPI):
     # Startup: Conectar a MongoDB, inicializar índices y catálogo esencial de estados de usuario
     logger.info("Iniciando aplicación Mayores Actualizaciones (FastAPI)...")
     await connect_to_mongo()
-    await seed_estados_usuario()
+    try:
+        await seed_estados_usuario()
+    except Exception as e:
+        logger.warning(f"Aviso al verificar catálogo de estados de usuario ({e}). Se continuará con el inicio del servicio.")
     logger.info(f"Servidor listo en el puerto {settings.PORT}.")
     yield
     # Shutdown: Cerrar conexiones limpiamente
