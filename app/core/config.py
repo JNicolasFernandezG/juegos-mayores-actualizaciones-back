@@ -59,11 +59,6 @@ class Settings(BaseSettings):
     MAIL_FROM: Optional[str] = None
     MAIL_FROM_NAME: str = "Mayores Actualizaciones"
 
-    # Administrador por defecto para seed inicial
-    ADMIN_DEFAULT_EMAIL: str = "admin@sistemas.com"
-    ADMIN_DEFAULT_PASSWORD: str = "admin123"
-    ADMIN_DEFAULT_NAME: str = "Operador Sistemas"
-
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

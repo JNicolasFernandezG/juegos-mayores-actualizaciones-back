@@ -9,8 +9,9 @@
 
     # 2. Encabezados globales de seguridad (Hardening Perimetral)
     header {
-        # Ocultar la firma del servidor web
+        # Ocultar la firma del servidor web y frameworks
         -Server
+        -X-Powered-By
 
         # Prevención de ataques MIME-sniffing
         X-Content-Type-Options "nosniff"
@@ -30,9 +31,12 @@
         max_size 10MB
     }
 
-    # 4. Bloquear acceso a archivos ocultos (.env, .git, etc.)
+    # 4. Bloquear acceso a archivos ocultos (.env, .git, etc.) y sondas maliciosas
     @hidden path */.*
     respond @hidden 404
+
+    @probes path *..* *.env* *.git* *.bak* *.sql* *.conf* *.ini* /admin/config* /etc/* /proc/* /windows/*
+    respond @probes 404
 
     # 5. Reverse Proxy de /api/* y endpoints del Backend hacia FastAPI (backend:8087)
     @backend path /api/* /usuario* /progreso* /admin* /assets/narrative* /health* /actuator*
@@ -47,4 +51,3 @@
         file_server
     }
 }
-

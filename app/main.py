@@ -9,7 +9,8 @@ import logging
 
 from app.core.config import settings
 from app.core.database import connect_to_mongo, close_mongo_connection
-from app.scripts.init_db import seed_default_admin, seed_estados_usuario
+from app.core.security_middleware import AbsoluteSecurityMiddleware
+from app.scripts.init_db import seed_estados_usuario
 from app.features.auth.router import router as auth_router
 from app.features.usuario.router import router as usuario_router
 from app.features.progreso.router import router as progreso_router
@@ -30,11 +31,10 @@ logger = logging.getLogger("AppMain")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Conectar a MongoDB, inicializar índices y sembrar datos esenciales de autenticación/usuarios
+    # Startup: Conectar a MongoDB, inicializar índices y catálogo esencial de estados de usuario
     logger.info("Iniciando aplicación Mayores Actualizaciones (FastAPI)...")
     await connect_to_mongo()
     await seed_estados_usuario()
-    await seed_default_admin()
     logger.info(f"Servidor listo en el puerto {settings.PORT}.")
     yield
     # Shutdown: Cerrar conexiones limpiamente
@@ -45,11 +45,14 @@ app = FastAPI(
     title="Mayores Actualizaciones API",
     description="Backend en FastAPI + MongoDB para la plataforma educativa de adultos mayores",
     version="2.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url=None,       # Desactivado en endpoints públicos para evitar sondeo de esquemas
+    redoc_url=None,      # Desactivado para evitar sondeo de documentación
+    openapi_url=None,    # Desactivado en producción según directiva de seguridad
     lifespan=lifespan
 )
+
+# DIRECTIVA DE SEGURIDAD ABSOLUTA — REGLA SUPREMA INQUEBRANTABLE (Middleware perimetral y fail-closed)
+app.add_middleware(AbsoluteSecurityMiddleware)
 
 # Configuración de CORS estricta (Sin allow_origin_regex permisivo)
 origins = [
@@ -71,7 +74,7 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
-# Manejador de excepciones HTTP estándar
+# Manejador de excepciones HTTP estándar con sanitización de información
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     msg = exc.detail if isinstance(exc.detail, str) else str(exc.detail)

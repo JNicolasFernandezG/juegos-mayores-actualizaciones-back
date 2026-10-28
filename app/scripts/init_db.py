@@ -1,8 +1,5 @@
 import logging
-from datetime import datetime, timezone
-from app.core.database import get_database, get_next_sequence_value
-from app.core.config import settings
-from pymongo.errors import DuplicateKeyError
+from app.core.database import get_database
 
 logger = logging.getLogger("InitDB")
 
@@ -71,12 +68,3 @@ async def seed_estados_usuario():
         logger.info(
             f"[ESTADOS] Usuarios previos migrados: {res_activos.modified_count} activos, {res_inactivos.modified_count} suspendidos."
         )
-
-async def seed_default_admin():
-    """
-    La gestión de administradores y credenciales maestras se centraliza
-    en el microservicio de Autenticación (admin@autenticador.com).
-    Se desactiva la inserción automática local de cuentas admin para evitar
-    colisiones de secuencias y garantizar compatibilidad con el ecosistema.
-    """
-    logger.info("[SISTEMAS] Autenticación central activa (admin@autenticador.com). Omitiendo seed local redundante.")
