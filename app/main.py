@@ -121,31 +121,11 @@ async def root():
 async def health_check():
     return {"status": "UP"}
 
-# Montar Torre de Control (Panel de Administración SPA)
-static_admin_dir = os.path.join(os.path.dirname(__file__), "static", "admin")
-os.makedirs(static_admin_dir, exist_ok=True)
-
-class SPAStaticFiles(StaticFiles):
-    async def get_response(self, path: str, scope):
-        try:
-            response = await super().get_response(path, scope)
-            if response.status_code == 404:
-                index_path = os.path.join(self.directory, "index.html")
-                if os.path.exists(index_path):
-                    return FileResponse(index_path)
-            return response
-        except StarletteHTTPException as ex:
-            if ex.status_code == 404:
-                index_path = os.path.join(self.directory, "index.html")
-                if os.path.exists(index_path):
-                    return FileResponse(index_path)
-            raise ex
-
+# Redirección de administración hacia el Autenticador Central (Única fuente de verdad de usuarios)
 @app.get("/admin", include_in_schema=False)
-async def admin_redirect():
-    return RedirectResponse(url="/admin/")
-
-app.mount("/admin", SPAStaticFiles(directory=static_admin_dir, html=True), name="admin")
+@app.get("/admin/{path:path}", include_in_schema=False)
+async def admin_redirect(path: str = ""):
+    return RedirectResponse(url=f"{settings.AUTH_SERVICE_URL.rstrip('/')}/")
 
 # Montar carpeta de assets estáticos de narrativa (universos, personajes, cartas, eventos, etc.)
 static_narrative_dir = os.path.join(os.path.dirname(__file__), "static", "narrative")

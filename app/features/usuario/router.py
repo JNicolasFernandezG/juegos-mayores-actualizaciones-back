@@ -20,29 +20,11 @@ from app.features.auth.service import register_usuario
 
 router = APIRouter(prefix="/usuario", tags=["Usuarios y Torre de Control"])
 
-@router.get("", response_model=PaginatedUsuariosResponse, summary="Listar usuarios paginados con filtros dinámicos (Solo Admin)")
-async def endpoint_listar_usuarios(
-    limit: int = Query(10, ge=1, le=100, description="Cantidad de registros por página"),
-    skip: int = Query(0, ge=0, description="Cantidad de registros a saltear (offset)"),
-    nombre: Optional[str] = Query(None, description="Búsqueda parcial en nombre o email"),
-    fechaDesde: Optional[date] = Query(None, description="Fecha de inicio (YYYY-MM-DD)"),
-    fechaHasta: Optional[date] = Query(None, description="Fecha fin (YYYY-MM-DD)"),
-    tipoUsuario: Optional[int] = Query(None, description="1: Alumno, 2: Administrador"),
-    black: Optional[bool] = Query(None, description="Filtro por suscripción Black"),
-    activo: Optional[bool] = Query(None, description="Filtro por cuenta activa/inactiva"),
-    orden: str = Query("desc", pattern="^(asc|desc)$", description="Orden por fecha de alta"),
-    admin: Dict[str, Any] = Depends(get_current_admin)
-):
-    return await get_usuarios_paginados(
-        limit=limit,
-        skip=skip,
-        nombre=nombre,
-        fecha_desde=fechaDesde,
-        fecha_hasta=fechaHasta,
-        tipo_usuario=tipoUsuario,
-        black=black,
-        activo=activo,
-        orden=orden
+@router.get("", summary="Listar usuarios centralizados")
+async def endpoint_listar_usuarios():
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="La tabla administrativa de usuarios se gestiona exclusivamente desde el panel central de Autenticador."
     )
 
 @router.get("/estados", response_model=ListEstadosResponse, summary="Listar catálogo de estados de usuario")
@@ -69,13 +51,12 @@ async def endpoint_toggle_habilitado_estado(
 ):
     return await toggle_habilitado_estado(estado_id)
 
-@router.put("/{user_id}/cambiar-estado", response_model=CambiarEstadoUsuarioResponse, summary="Cambiar estado del usuario en el catálogo (Solo Admin)")
-async def endpoint_cambiar_estado_usuario(
-    user_id: int,
-    req: CambiarEstadoUsuarioRequest,
-    admin: Dict[str, Any] = Depends(get_current_admin)
-):
-    return await cambiar_estado_usuario(user_id, req.estado_id)
+@router.put("/{user_id}/cambiar-estado", summary="Cambiar estado del usuario")
+async def endpoint_cambiar_estado_usuario(user_id: int):
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Acción no permitida: la activación, suspensión y baja de usuarios se gestiona exclusivamente desde el Autenticador Central."
+    )
 
 @router.get("/{user_id}", response_model=UsuarioResponse, summary="Obtener usuario por ID")
 async def endpoint_obtener_usuario(
@@ -90,12 +71,12 @@ async def endpoint_obtener_usuario(
         )
     return await get_usuario_by_id(user_id)
 
-@router.put("/{user_id}/toggle-activo", response_model=EstadoActivoResponse, summary="Activar o desactivar cuenta de usuario (Solo Admin)")
-async def endpoint_toggle_activo(
-    user_id: int,
-    admin: Dict[str, Any] = Depends(get_current_admin)
-):
-    return await toggle_activo(user_id)
+@router.put("/{user_id}/toggle-activo", summary="Activar o desactivar cuenta de usuario")
+async def endpoint_toggle_activo(user_id: int):
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Acción no permitida: la activación y baja de usuarios se gestiona exclusivamente desde el Autenticador Central."
+    )
 
 @router.put("/{user_id}/toggle-black", response_model=SuscripcionResponse, summary="Activar o desactivar suscripción Black (Solo Admin)")
 @router.put("/{user_id}/suscribirse", response_model=SuscripcionResponse, summary="Alias para alternar suscripción Black (Solo Admin)")

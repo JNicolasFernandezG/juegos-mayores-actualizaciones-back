@@ -253,6 +253,7 @@ async def verificar_token(req: VerificarTokenRequest):
     return {
         "success": True,
         "valid": True,
+        "token": data.get("token") or req.token,
         "message": "Token verificado con éxito",
         "user": format_user_response(local_user)
     }

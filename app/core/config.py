@@ -39,8 +39,9 @@ class Settings(BaseSettings):
     def effective_db_name(self) -> str:
         return self.MONGO_DB_NAME or self.MONGODB_DB_NAME
 
-    # JWT & Seguridad (Debe coincidir con Autenticador)
-    JWT_SECRET: str = "super_secret_autenticador_key_2026"
+    # JWT & Seguridad (Obligatorio desde .env, debe coincidir con Autenticador)
+    JWT_SECRET: str
+    JWT_SECRET_FALLBACK: Optional[str] = None
     JWT_EXPIRATION_DAYS: int = 180
     FRONTEND_URL: str = "http://localhost:5173"
 

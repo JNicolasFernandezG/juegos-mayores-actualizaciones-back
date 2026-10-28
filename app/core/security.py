@@ -54,9 +54,22 @@ def create_access_token(user: Dict[str, Any], expires_delta: Optional[timedelta]
     return token
 
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
-    """Decodifica y valida la firma y expiración de un token JWT."""
-    try:
-        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
-        return payload
-    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+    """Decodifica y valida la firma y expiración de un token JWT estrictamente desde variables de entorno."""
+    if not token or not isinstance(token, str):
         return None
+    token_clean = token.strip()
+    keys_to_try = [settings.JWT_SECRET]
+    if getattr(settings, "JWT_SECRET_FALLBACK", None):
+        keys_to_try.append(settings.JWT_SECRET_FALLBACK)
+
+    for secret in keys_to_try:
+        if not secret:
+            continue
+        try:
+            payload = jwt.decode(token_clean, secret, algorithms=["HS256"])
+            return payload
+        except jwt.ExpiredSignatureError:
+            return None
+        except jwt.InvalidTokenError:
+            continue
+    return None
