@@ -4,6 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.core.security import decode_access_token
 from app.core.database import get_database
+from app.core.config import settings
 
 security_bearer = HTTPBearer(auto_error=False)
 
@@ -35,12 +36,17 @@ async def get_current_user(
 
     # Validar permisos específicos para el servicio cognijuegos
     tipo_usuario = int(payload.get("tipo_usuario") or payload.get("tipoUsuario") or 1)
-    servicios = payload.get("servicios") or {}
-    tiene_permiso = bool(
-        tipo_usuario == 2
-        or servicios.get(settings.SERVICE_KEY, False)
-        or servicios.get("cognijuegos", False)
+    servicios = payload.get("servicios")
+    if servicios is not None and isinstance(servicios, dict):
+        tiene_permiso = bool(
+            tipo_usuario == 2
+            or servicios.get(settings.SERVICE_KEY, False)
+            or servicios.get("cognijuegos", False)
+            or servicios.get("conmijuegos", False)
         )
+    else:
+        tiene_permiso = True
+
     if not tiene_permiso:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
