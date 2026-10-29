@@ -18,7 +18,7 @@ ordenados antes de barajar para no depender del orden de hashing de Python.
 """
 
 import random
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, FrozenSet, Iterable, List, Optional, Set, Tuple
 
 from app.features.daily_challenges.crucigrama import solver as _solver
 
@@ -130,13 +130,15 @@ def _place(
     used.add(word)
 
 
-def _pick_word(length: int, used: Set[str], rng: random.Random) -> Optional[str]:
+def _pick_word(
+    length: int, used: Set[str], rng: random.Random, banned: FrozenSet[str] = frozenset()
+) -> Optional[str]:
     pool = _solver._WORDS_BY_LEN.get(length, [])
     if not pool:
         return None
     for _ in range(100):
         w = pool[rng.randrange(len(pool))]
-        if w not in used:
+        if w not in used and w not in banned:
             return w
     return None
 
@@ -216,6 +218,7 @@ def _find_word_through(
     used: Set[str],
     rng: random.Random,
     allow_three: bool = True,
+    banned: FrozenSet[str] = frozenset(),
 ) -> Optional[Tuple[str, int, int, str]]:
     """
     Busca una palabra perpendicular a la celda (r, c) que cruce por esa letra.
@@ -267,7 +270,7 @@ def _find_word_through(
             if not cands:
                 continue
 
-            avail = sorted(cands - used)
+            avail = sorted(cands - used - banned)
             rng.shuffle(avail)
             if avail:
                 return (new_dir, start, fixed, avail[0])
@@ -282,6 +285,7 @@ def _try_grow(
     used: Set[str],
     rng: random.Random,
     max_three: int = MAX_THREE_LETTER,
+    banned: FrozenSet[str] = frozenset(),
 ) -> bool:
     three_count = sum(1 for w in words if len(w["word"]) == 3)
     allow_three = three_count < max_three
@@ -295,7 +299,9 @@ def _try_grow(
     for wi, ci in attempts:
         r, c = words[wi]["coords"][ci]
         new_dir = DIR_V if words[wi]["dir"] == DIR_H else DIR_H
-        res = _find_word_through(grid, n, new_dir, r, c, used, rng, allow_three)
+        res = _find_word_through(
+            grid, n, new_dir, r, c, used, rng, allow_three, banned=banned
+        )
         if res:
             direction, start, fixed, word = res
             _place(grid, direction, start, fixed, word, words, used)
@@ -308,17 +314,22 @@ def generate_growth_board(
     rng: random.Random,
     min_words: int = 15,
     max_words: int = 28,
+    banned_words: Optional[Iterable[str]] = None,
 ) -> Optional[Tuple[List[str], List[Dict]]]:
     """
     Genera un tablero n x n por crecimiento.
 
     Devuelve (filas_con_bloques, palabras) de la primera tentativa que alcanza
     `min_words`; si ninguna lo logra, devuelve la mejor tentativa encontrada.
+    `banned_words` excluye palabras del pool en todas las tentativas.
     """
     _solver._init_word_index()
     if not _solver._WORDS_BY_LEN:
         return None
 
+    banned: FrozenSet[str] = frozenset(
+        _solver.normalize_word(word) for word in (banned_words or ()) if _solver.normalize_word(word)
+    )
     seed_lengths = [6, 7, 8, 9]
     best: Optional[Tuple[List[str], List[Dict]]] = None
 
@@ -328,7 +339,7 @@ def generate_growth_board(
         used: Set[str] = set()
 
         sl = seed_lengths[rng.randrange(len(seed_lengths))]
-        seed_word = _pick_word(sl, used, rng)
+        seed_word = _pick_word(sl, used, rng, banned=banned)
         if not seed_word:
             continue
         row = n // 2
@@ -340,7 +351,7 @@ def generate_growth_board(
         for _step in range(max_words * 3):
             if len(words) >= max_words:
                 break
-            if not _try_grow(grid, n, words, used, rng):
+            if not _try_grow(grid, n, words, used, rng, banned=banned):
                 break
 
         rows = ["".join(ch if ch else "#" for ch in grid[r]) for r in range(n)]

@@ -138,6 +138,31 @@ async def init_indexes():
         for col_name in ["narrative_characters", "narrative_cards", "narrative_events", "narrative_results", "narrative_conversations"]:
             await db[col_name].create_index([("universo_id", ASCENDING)])
 
+        # Índices de Plantillas de Crucigrama (diseñador administrativo)
+        crucigrama_templates = db["crucigrama_templates"]
+        await crucigrama_templates.create_index([("id", ASCENDING)], unique=True)
+        await crucigrama_templates.create_index(
+            [("status", ASCENDING), ("scheduled_date", ASCENDING), ("difficulty", ASCENDING)]
+        )
+        await crucigrama_templates.create_index(
+            [("scheduled_date", ASCENDING), ("difficulty", ASCENDING)],
+            unique=True,
+            partialFilterExpression={
+                "status": "published",
+                "scheduled_date": {"$type": "string"},
+            },
+            name="uniq_published_schedule",
+        )
+        await crucigrama_templates.create_index(
+            [("monthly_day", ASCENDING), ("difficulty", ASCENDING)],
+            unique=True,
+            partialFilterExpression={
+                "status": "published",
+                "monthly_day": {"$type": "number"},
+            },
+            name="uniq_published_monthly_day",
+        )
+
         logger.info("Índices de MongoDB inicializados correctamente.")
     except Exception as e:
         logger.warning(f"Aviso al inicializar índices: {e}")

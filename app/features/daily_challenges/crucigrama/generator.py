@@ -16,7 +16,7 @@ import concurrent.futures
 import logging
 import random
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from app.core.rae_client import fetch_rae_definition
 from app.features.daily_challenges.crucigrama.clues import CURATED_CLUES
@@ -24,6 +24,7 @@ from app.features.daily_challenges.crucigrama.growth import generate_growth_boar
 from app.features.daily_challenges.crucigrama.solver import (
     _parse_template_slots,
     _solve_crucigrama_backtracking,
+    normalize_word,
 )
 from app.features.daily_challenges.crucigrama.templates_facil import CRUCIGRAMA_TEMPLATES
 
@@ -38,6 +39,7 @@ def _parse_and_build_challenge(
     theme: str,
     grid_raw: List[str],
     prefer_curated: bool = True,
+    clue_overrides: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
     Analiza una grilla resuelta, asigna números en orden occidental, construye
@@ -45,6 +47,7 @@ def _parse_and_build_challenge(
 
     prefer_curated=True (facil): pistas curadas primero, RAE como respaldo.
     prefer_curated=False (dificil): definiciones formales de la RAE.
+    clue_overrides permite fijar pistas propias por palabra (palabra -> pista).
     """
     R = len(grid_raw)
     C = len(grid_raw[0]) if R else 0
@@ -120,9 +123,16 @@ def _parse_and_build_challenge(
     # Las consultas RAE son independientes por palabra: se paralelizan para no
     # demorar la generación (cada palabra suele tardar ~0.8s en red).
     all_words = across_words + down_words
+    overrides = {
+        str(k).strip().upper(): str(v).strip()
+        for k, v in (clue_overrides or {}).items()
+        if str(v or "").strip()
+    }
 
     def _resolve_clue(item: Dict[str, Any]) -> str:
         w = item["word"]
+        if w in overrides:
+            return overrides[w]
         if prefer_curated and w in CURATED_CLUES:
             return CURATED_CLUES[w]
         rae_def = fetch_rae_definition(w)
@@ -164,14 +174,36 @@ def _parse_and_build_challenge(
     }
 
 
-def _generate_facil(date_str: str, rng: random.Random) -> Tuple[str, List[str]]:
+def build_challenge_from_solution(
+    theme: str,
+    solution_grid: List[str],
+    prefer_curated: bool = False,
+    clue_overrides: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
+    """
+    Construye el contrato completo del desafío a partir de una grilla resuelta
+    (por ejemplo, la solución de una máscara diseñada en el panel admin).
+    """
+    return _parse_and_build_challenge(
+        theme,
+        solution_grid,
+        prefer_curated=prefer_curated,
+        clue_overrides=clue_overrides,
+    )
+
+
+def _generate_facil(
+    date_str: str, rng: random.Random, banned: Set[str] = frozenset()
+) -> Tuple[str, List[str]]:
     seed_val = int(date_str.replace("-", ""))
     tmpl_data = CRUCIGRAMA_TEMPLATES[seed_val % len(CRUCIGRAMA_TEMPLATES)]
     theme = tmpl_data.get("theme", "Palabras Cruzadas")
     pattern = tmpl_data["pattern"]
 
     slots, intersections = _parse_template_slots(pattern)
-    solution = _solve_crucigrama_backtracking(slots, intersections, rng, prefer_curated=True)
+    solution = _solve_crucigrama_backtracking(
+        slots, intersections, rng, prefer_curated=True, banned_words=banned
+    )
 
     if solution:
         R = len(pattern)
@@ -189,8 +221,12 @@ def _generate_facil(date_str: str, rng: random.Random) -> Tuple[str, List[str]]:
     return theme, final_grid
 
 
-def _generate_dificil(date_str: str, rng: random.Random) -> Tuple[str, List[str]]:
-    result = generate_growth_board(DIFICIL_SIZE, rng, min_words=15, max_words=28)
+def _generate_dificil(
+    date_str: str, rng: random.Random, banned: Set[str] = frozenset()
+) -> Tuple[str, List[str]]:
+    result = generate_growth_board(
+        DIFICIL_SIZE, rng, min_words=15, max_words=28, banned_words=banned
+    )
     if result is None:
         raise RuntimeError("No se pudo generar el crucigrama difícil (índice de palabras vacío).")
     final_grid, words = result
@@ -199,22 +235,35 @@ def _generate_dificil(date_str: str, rng: random.Random) -> Tuple[str, List[str]
     return "Palabras Cruzadas", final_grid
 
 
-def generate_crucigrama_challenge_for_date(date_str: str, difficulty: str = DIFF_FACIL) -> Dict[str, Any]:
+def generate_crucigrama_challenge_for_date(
+    date_str: str, difficulty: str = DIFF_FACIL, banned_words: Optional[Iterable[str]] = None
+) -> Dict[str, Any]:
     """
     Genera la configuración completa del desafío de Crucigrama para una fecha.
 
     Determinista: misma fecha + dificultad produce el mismo tablero en cualquier
     servidor (todo el azar sale de un `random.Random` sembrado por fecha y nivel).
+    `banned_words` (vetos globales) se excluye del pool de candidatos.
     """
     diff = (difficulty or DIFF_FACIL).lower().strip()
     rng = random.Random(f"crucigrama_{date_str}_{diff}")
+    banned: Set[str] = {
+        normalize_word(word) for word in (banned_words or ()) if normalize_word(word)
+    }
 
     if diff == DIFF_DIFICIL:
-        theme, final_grid = _generate_dificil(date_str, rng)
+        theme, final_grid = _generate_dificil(date_str, rng, banned)
         challenge = _parse_and_build_challenge(theme, final_grid, prefer_curated=False)
     else:
-        theme, final_grid = _generate_facil(date_str, rng)
+        theme, final_grid = _generate_facil(date_str, rng, banned)
         challenge = _parse_and_build_challenge(theme, final_grid, prefer_curated=True)
+
+    infractoras = sorted({w["word"] for w in challenge.get("words", [])} & banned)
+    if infractoras:
+        logger.warning(
+            f"[CRUCIGRAMA] {date_str} ({diff}): tablero de respaldo con palabras vetadas: "
+            f"{', '.join(infractoras)}."
+        )
 
     challenge["date"] = date_str
     return challenge

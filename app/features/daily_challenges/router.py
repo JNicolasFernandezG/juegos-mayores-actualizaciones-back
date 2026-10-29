@@ -87,6 +87,10 @@ async def endpoint_upsert_challenge(req: DailyChallengeCreateRequest):
     "/admin/status",
     summary="Obtener el estado de cobertura de desafíos por mes para administración"
 )
+@router.get(
+    "/admin/status-year",
+    summary="Obtener el estado de cobertura de desafíos por mes para administración (alias)"
+)
 async def endpoint_admin_challenges_status(
     year: int = Query(2026, description="Año a auditar"),
     game_id: str = Query("sudoku", description="Juego a consultar (sudoku, wordle, sopa_letras, crucigrama)"),

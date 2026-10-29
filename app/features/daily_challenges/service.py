@@ -20,6 +20,11 @@ from app.features.daily_challenges.wordle_generator import (
 )
 from app.features.daily_challenges.sopa_generator import generate_sopa_challenge_for_date
 from app.features.daily_challenges.crucigrama import generate_crucigrama_challenge_for_date
+from app.features.daily_challenges.crucigrama.bans import get_global_banned_words
+from app.features.daily_challenges.crucigrama_admin.service import (
+    get_recurring_published_config,
+    get_scheduled_published_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -546,6 +551,7 @@ async def generate_and_save_crucigrama_month(year: int, month: int, force: bool 
             }
 
     generated_count = 0
+    global_bans = await get_global_banned_words()
 
     for day in range(1, days_in_month + 1):
         date_str = f"{year:04d}-{month:02d}-{day:02d}"
@@ -560,7 +566,18 @@ async def generate_and_save_crucigrama_month(year: int, month: int, force: bool 
                 if existing and existing.get("config", {}).get("cells"):
                     continue
 
-            crucigrama_data = generate_crucigrama_challenge_for_date(date_str, diff)
+            crucigrama_data = await get_scheduled_published_config(date_str, diff)
+            if not crucigrama_data:
+                crucigrama_data = await get_recurring_published_config(
+                    date_str, diff, global_bans
+                )
+            if crucigrama_data:
+                crucigrama_data = dict(crucigrama_data)
+                crucigrama_data["date"] = date_str
+            else:
+                crucigrama_data = generate_crucigrama_challenge_for_date(
+                    date_str, diff, banned_words=global_bans
+                )
 
             doc = {
                 "game_id": "crucigrama",

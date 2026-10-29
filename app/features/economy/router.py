@@ -16,6 +16,8 @@ from app.features.economy.schemas import (
     UnlockDayRequest,
     UnlockDayResponse,
     CambiarSuscripcionRequest,
+    UseHintRequest,
+    UseHintResponse,
 )
 from app.features.economy.service import (
     get_economy_config,
@@ -27,6 +29,7 @@ from app.features.economy.service import (
     adjust_user_economy,
     unlock_historical_day,
     change_user_subscription,
+    use_hint,
 )
 
 router = APIRouter(tags=["Economía, Vidas y Mini-Tienda"])
@@ -96,6 +99,19 @@ async def endpoint_unlock_day(
 
 
 # ==============================================================================
+@router.post(
+    "/api/economy/use-hint",
+    response_model=UseHintResponse,
+    summary="Solicitar una pista en un juego a cambio de 1 vida (Básica y Premium)",
+)
+async def endpoint_use_hint(
+    req: UseHintRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    user_id = int(current_user["id"])
+    return await use_hint(user_id=user_id, req=req)
+
+
 # Endpoints de Administración (Torre de Control)
 # ==============================================================================
 

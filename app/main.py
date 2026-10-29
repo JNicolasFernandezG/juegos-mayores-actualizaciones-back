@@ -15,6 +15,7 @@ from app.features.auth.router import router as auth_router
 from app.features.usuario.router import router as usuario_router
 from app.features.progreso.router import router as progreso_router
 from app.features.daily_challenges.router import router as daily_challenges_router
+from app.features.daily_challenges.crucigrama_admin.router import router as crucigrama_admin_router
 from app.features.user_attempts.router import router as user_attempts_router
 from app.features.narrative.game.router import (
     router as narrative_router,
@@ -133,6 +134,7 @@ app.include_router(auth_router)
 app.include_router(usuario_router)
 app.include_router(progreso_router)
 app.include_router(daily_challenges_router)
+app.include_router(crucigrama_admin_router)
 app.include_router(user_attempts_router)
 app.include_router(economy_router)
 app.include_router(narrative_router)

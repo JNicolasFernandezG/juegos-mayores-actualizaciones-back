@@ -152,3 +152,24 @@ class AdjustUserEconomyResponse(BaseModel):
     puntos: int
     suscripcion: str
     message: str
+
+class UseHintRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    game_id: str = Field(..., description="ID del juego: wordle, sudoku, sopa_letras, crucigrama")
+    date: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$", description="Fecha YYYY-MM-DD del desafío")
+    hint_index: Optional[int] = Field(0, description="Índice de la pista a consultar (para Wordle o Sopa de Letras)")
+    row: Optional[int] = Field(None, description="Fila de la casilla a revelar (Sudoku / Crucigrama)")
+    col: Optional[int] = Field(None, description="Columna de la casilla a revelar (Sudoku / Crucigrama)")
+
+
+class UseHintResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    success: bool
+    vidas_restantes: int
+    vidas_descontadas: int = 1
+    pista: Optional[str] = Field(None, description="Texto de la pista generada o definición RAE")
+    valor_revelado: Optional[Any] = Field(None, description="Número o letra revelada si aplica (ej: celda de Sudoku o letra de Crucigrama)")
+    message: str
+

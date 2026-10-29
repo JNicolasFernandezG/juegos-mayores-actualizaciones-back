@@ -489,3 +489,108 @@ async def change_user_subscription(usuario_id: int, nueva_suscripcion: str) -> D
         "suscripcion": sub,
         "message": f"Suscripción de {updated.get('name', 'usuario')} actualizada a '{sub}'.",
     }
+
+async def use_hint(user_id: int, req: Any) -> Any:
+    """
+    Descuenta 1 vida al usuario de forma atómica tanto para suscripción básica como premium.
+    Opcionalmente consulta el desafío del día para devolver el texto de la pista o celda revelada.
+    """
+    from app.features.economy.schemas import UseHintResponse
+    db = get_database()
+    config = await get_economy_config()
+
+    # 1. Asegurar existencia de vidas
+    await db["usuarios"].update_one(
+        {"id": user_id, "vidas": {"$exists": False}},
+        {"$set": {"vidas": config.vidas_iniciales}},
+    )
+
+    # 2. Descuento atómico de 1 vida (aplica a todos los usuarios, tanto básica como premium)
+    result = await db["usuarios"].find_one_and_update(
+        {"id": user_id, "vidas": {"$gt": 0}},
+        {
+            "$inc": {"vidas": -1},
+            "$set": {"updated_at": datetime.now(timezone.utc)},
+        },
+        return_document=ReturnDocument.AFTER,
+    )
+
+    if not result:
+        user_actual = await db["usuarios"].find_one({"id": user_id})
+        vidas_actuales = user_actual.get("vidas", 0) if user_actual else 0
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No tienes vidas restantes para pedir una pista. Podés recargar vidas en la tienda usando tus puntos.",
+        )
+
+    nuevas_vidas = int(result.get("vidas", 0))
+    logger.info(f"[ECONOMIA] Usuario {user_id} consumió 1 vida por pista en {req.game_id}. Restan: {nuevas_vidas}")
+
+    # 3. Intentar resolver el contenido de la pista desde el backend
+    target_date = req.date or datetime.now().strftime("%Y-%m-%d")
+    pista_texto = None
+    valor_revelado = None
+
+    try:
+        challenge = await db["daily_challenges"].find_one({
+            "game_id": req.game_id.lower().strip(),
+            "date": target_date
+        })
+        if challenge and "config" in challenge:
+            c = challenge["config"]
+            game = req.game_id.lower().strip()
+
+            if game == "wordle":
+                hints = c.get("hints", [])
+                idx = req.hint_index or 0
+                if hints and 0 <= idx < len(hints):
+                    pista_texto = hints[idx]
+                elif hints:
+                    pista_texto = hints[0]
+                elif c.get("solution"):
+                    pista_texto = f"Empieza con la letra '{c['solution'][0]}'"
+
+            elif game == "sudoku":
+                sol = c.get("solution")
+                if sol and req.row is not None and req.col is not None:
+                    if 0 <= req.row < 9 and 0 <= req.col < 9:
+                        valor_revelado = sol[req.row][req.col]
+                        pista_texto = f"El número en la fila {req.row + 1}, columna {req.col + 1} es {valor_revelado}"
+
+            elif game == "sopa_letras":
+                hints = c.get("hints", [])
+                idx = req.hint_index or 0
+                if hints and 0 <= idx < len(hints):
+                    pista_texto = hints[idx]
+                elif c.get("words") and 0 <= idx < len(c["words"]):
+                    pista_texto = f"Palabra a buscar: {c['words'][idx]}"
+
+            elif game == "crucigrama":
+                words = c.get("words", [])
+                if req.row is not None and req.col is not None:
+                    for w in words:
+                        coords = w.get("coords", [])
+                        word_str = w.get("word", "")
+                        for i, (r, cl) in enumerate(coords):
+                            if r == req.row and cl == req.col and i < len(word_str):
+                                valor_revelado = word_str[i]
+                                pista_texto = f"La letra en ({req.row + 1}, {req.col + 1}) es '{valor_revelado}'"
+                                break
+                        if valor_revelado:
+                            break
+                elif words:
+                    idx = req.hint_index or 0
+                    if 0 <= idx < len(words):
+                        pista_texto = f"{words[idx].get('direction', 'Horiz.')} {words[idx].get('number', '')}: {words[idx].get('clue', '')}"
+    except Exception as e:
+        logger.warning(f"[ECONOMIA] No se pudo obtener contenido de pista para {req.game_id}: {e}")
+
+    return UseHintResponse(
+        success=True,
+        vidas_restantes=nuevas_vidas,
+        vidas_descontadas=1,
+        pista=pista_texto,
+        valor_revelado=valor_revelado,
+        message="Pista desbloqueada exitosamente (-1 vida)."
+    )
+
