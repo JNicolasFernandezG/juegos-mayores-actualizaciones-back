@@ -120,6 +120,11 @@ async def endpoint_use_hint(
     response_model=EconomyConfigResponse,
     summary="Consultar catálogo de economía y vidas para el panel administrador (Solo Admin)",
 )
+@router.get(
+    "/api/economy/admin/config",
+    response_model=EconomyConfigResponse,
+    include_in_schema=False,
+)
 async def endpoint_admin_get_economy_config(admin: Dict[str, Any] = Depends(get_current_admin)):
     return await get_economy_config()
 
@@ -128,6 +133,11 @@ async def endpoint_admin_get_economy_config(admin: Dict[str, Any] = Depends(get_
     "/api/admin/economy/config",
     response_model=EconomyConfigResponse,
     summary="Actualizar valores iniciales, costos de vidas y puntos por juego (Solo Admin)",
+)
+@router.put(
+    "/api/economy/admin/config",
+    response_model=EconomyConfigResponse,
+    include_in_schema=False,
 )
 async def endpoint_admin_update_economy_config(
     req: EconomyConfigUpdateRequest,

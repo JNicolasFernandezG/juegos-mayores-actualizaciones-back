@@ -13,11 +13,12 @@ class UserAttemptCreateRequest(BaseModel):
     status: str = Field("completed", description="'in_progress', 'completed' o 'failed'")
     word: Optional[str] = Field(None, description="Palabra de la partida")
     attempts: int = Field(1, description="Número de intentos utilizados")
-    stars: int = Field(1, description="Estrellas obtenidas (1 a 3)")
-    score: int = Field(100, description="Puntaje obtenido")
+    stars: Optional[int] = Field(None, description="Estrellas obtenidas (1 a 3). Si se omite se calcula automáticamente")
+    score: Optional[int] = Field(None, description="Puntaje obtenido. Si se omite se calcula según calificación")
+    grade: Optional[str] = Field(None, description="Calificación obtenida por desempeño: 'S', 'A', 'B', 'C', 'F'")
     guesses: Optional[List[Any]] = Field(default_factory=list, description="Lista de intentos realizados (palabras, objetos o números)")
     game_data: Optional[Dict[str, Any]] = Field(None, description="Datos adicionales específicos del juego")
-    remaining_attempts: Optional[int] = Field(0, description="Intentos restantes")
+    remaining_attempts: Optional[int] = Field(0, description="Vidas/intentos restantes del juego")
 
 class UserAttemptResponse(BaseModel):
     id: str
@@ -30,6 +31,10 @@ class UserAttemptResponse(BaseModel):
     attempts: int
     stars: int
     score: int
+    grade: Optional[str] = None
+    remaining_attempts: int = 0
+    puntos_ganados: int = 0
+    puntos_totales_usuario: Optional[int] = None
     guesses: List[Any] = []
     game_data: Optional[Dict[str, Any]] = None
     updated_at: Optional[str] = None

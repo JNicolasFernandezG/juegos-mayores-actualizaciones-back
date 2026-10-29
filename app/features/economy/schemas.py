@@ -16,9 +16,20 @@ class TiendaPaquete(BaseModel):
 class EconomyConfigResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    vidas_iniciales: int = Field(5, ge=1, description="Vidas con las que arranca cada cuenta nueva")
+    vidas_iniciales: int = Field(5, ge=1, description="Vidas con las que arranca cada cuenta nueva (deprecado/local)")
     costo_vida_puntos: int = Field(50, ge=1, description="Costo base de 1 vida en puntos")
     costo_desbloqueo_dia_puntos: int = Field(100, ge=0, description="Costo en puntos para desbloquear un día histórico")
+    costo_pista_puntos: int = Field(20, ge=0, description="Costo en puntos para solicitar una pista")
+    puntos_por_calificacion: Dict[str, int] = Field(
+        default_factory=lambda: {
+            "S": 100,
+            "A": 90,
+            "B": 75,
+            "C": 50,
+            "F": 0,
+        },
+        description="Puntos otorgados según calificación S, A, B, C, F",
+    )
     paquetes_tienda: List[TiendaPaquete] = Field(default_factory=list, description="Opciones de canje en la mini-tienda")
     puntos_por_juego: Dict[str, int] = Field(
         default_factory=lambda: {
@@ -40,6 +51,8 @@ class EconomyConfigUpdateRequest(BaseModel):
     vidas_iniciales: Optional[int] = Field(None, ge=1, description="Vidas iniciales para cuentas nuevas")
     costo_vida_puntos: Optional[int] = Field(None, ge=1, description="Costo base de 1 vida en puntos")
     costo_desbloqueo_dia_puntos: Optional[int] = Field(None, ge=0, description="Costo en puntos para desbloquear un día histórico")
+    costo_pista_puntos: Optional[int] = Field(None, ge=0, description="Costo en puntos para solicitar una pista")
+    puntos_por_calificacion: Optional[Dict[str, int]] = Field(None, description="Puntos otorgados según calificación S, A, B, C, F")
     paquetes_tienda: Optional[List[TiendaPaquete]] = None
     puntos_por_juego: Optional[Dict[str, int]] = None
     vidas_maximas: Optional[int] = None
@@ -49,11 +62,12 @@ class UserEconomyResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     user_id: int
-    vidas: int
+    vidas: Optional[int] = Field(5, description="Deprecado: vidas globales informativas")
     puntos: int
     racha: int = 1
     suscripcion: str = Field("basica", description="'basica' | 'premium'")
     dias_desbloqueados: List[str] = Field(default_factory=list, description="Días históricos desbloqueados ej: ['crucigrama:2026-10-15']")
+    costo_pista_puntos: int = Field(20, description="Costo en puntos para solicitar una pista")
     updated_at: Optional[str] = None
 
 
@@ -153,6 +167,7 @@ class AdjustUserEconomyResponse(BaseModel):
     suscripcion: str
     message: str
 
+
 class UseHintRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -167,9 +182,10 @@ class UseHintResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     success: bool
-    vidas_restantes: int
-    vidas_descontadas: int = 1
+    puntos_restantes: int = Field(..., description="Saldo actualizado de puntos del usuario")
+    puntos_descontados: int = Field(20, description="Puntos descontados por solicitar la pista")
+    vidas_restantes: Optional[int] = Field(None, description="Deprecado / informativo")
+    vidas_descontadas: Optional[int] = Field(0, description="Deprecado / informativo")
     pista: Optional[str] = Field(None, description="Texto de la pista generada o definición RAE")
     valor_revelado: Optional[Any] = Field(None, description="Número o letra revelada si aplica (ej: celda de Sudoku o letra de Crucigrama)")
     message: str
-

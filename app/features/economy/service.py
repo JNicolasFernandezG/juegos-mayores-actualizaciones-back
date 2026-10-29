@@ -25,6 +25,14 @@ DEFAULT_ECONOMY_CONFIG: Dict[str, Any] = {
     "vidas_iniciales": 5,
     "costo_vida_puntos": 50,
     "costo_desbloqueo_dia_puntos": 100,
+    "costo_pista_puntos": 20,
+    "puntos_por_calificacion": {
+        "S": 100,
+        "A": 90,
+        "B": 75,
+        "C": 50,
+        "F": 0,
+    },
     "vidas_maximas": None,
     "paquetes_tienda": [
         {"id": "pack_1", "vidas": 1, "puntos": 50, "popular": False, "badge": None, "descuento": None},
@@ -65,6 +73,8 @@ async def get_economy_config() -> EconomyConfigResponse:
         vidas_iniciales=int(doc.get("vidas_iniciales", 5)),
         costo_vida_puntos=int(doc.get("costo_vida_puntos", 50)),
         costo_desbloqueo_dia_puntos=int(doc.get("costo_desbloqueo_dia_puntos", 100)),
+        costo_pista_puntos=int(doc.get("costo_pista_puntos", 20)),
+        puntos_por_calificacion=doc.get("puntos_por_calificacion", DEFAULT_ECONOMY_CONFIG["puntos_por_calificacion"]),
         paquetes_tienda=paquetes,
         puntos_por_juego=doc.get("puntos_por_juego", DEFAULT_ECONOMY_CONFIG["puntos_por_juego"]),
         vidas_maximas=doc.get("vidas_maximas"),
@@ -87,6 +97,10 @@ async def update_economy_config(req: EconomyConfigUpdateRequest) -> EconomyConfi
         update_fields["costo_desbloqueo_dia_puntos"] = max(0, req.costo_desbloqueo_dia_puntos)
     if req.paquetes_tienda is not None:
         update_fields["paquetes_tienda"] = [p.model_dump() for p in req.paquetes_tienda]
+    if req.costo_pista_puntos is not None:
+        update_fields["costo_pista_puntos"] = max(0, req.costo_pista_puntos)
+    if req.puntos_por_calificacion is not None:
+        update_fields["puntos_por_calificacion"] = req.puntos_por_calificacion
     if req.puntos_por_juego is not None:
         update_fields["puntos_por_juego"] = req.puntos_por_juego
     if req.vidas_maximas is not None:
@@ -143,6 +157,7 @@ async def get_user_economy(user_id: int) -> UserEconomyResponse:
         racha=racha,
         suscripcion=suscripcion,
         dias_desbloqueados=dias_desbloqueados,
+        costo_pista_puntos=int(config.costo_pista_puntos or 20),
     )
 
 
@@ -256,6 +271,13 @@ async def get_points_for_game(game_id: str) -> int:
     config = await get_economy_config()
     clave = game_id.lower().strip()
     return config.puntos_por_juego.get(clave, 50)
+
+
+async def get_points_for_grade(grade: str) -> int:
+    """Devuelve la cantidad de puntos configurados en el catálogo para una calificación (S, A, B, C, F)."""
+    config = await get_economy_config()
+    clave = grade.upper().strip() if grade else "C"
+    return config.puntos_por_calificacion.get(clave, 50)
 
 
 async def find_user_by_identifier(identificador: str) -> Dict[str, Any]:
@@ -492,24 +514,24 @@ async def change_user_subscription(usuario_id: int, nueva_suscripcion: str) -> D
 
 async def use_hint(user_id: int, req: Any) -> Any:
     """
-    Descuenta 1 vida al usuario de forma atómica tanto para suscripción básica como premium.
-    Opcionalmente consulta el desafío del día para devolver el texto de la pista o celda revelada.
+    Descuenta puntos al usuario de forma atómica (costo_pista_puntos) y devuelve la pista o celda revelada.
     """
     from app.features.economy.schemas import UseHintResponse
     db = get_database()
     config = await get_economy_config()
+    costo = int(config.costo_pista_puntos or 20)
 
-    # 1. Asegurar existencia de vidas
+    # 1. Asegurar existencia de puntos
     await db["usuarios"].update_one(
-        {"id": user_id, "vidas": {"$exists": False}},
-        {"$set": {"vidas": config.vidas_iniciales}},
+        {"id": user_id, "puntos": {"$exists": False}},
+        {"$set": {"puntos": 0}},
     )
 
-    # 2. Descuento atómico de 1 vida (aplica a todos los usuarios, tanto básica como premium)
+    # 2. Descuento atómico de puntos (requiere saldo >= costo)
     result = await db["usuarios"].find_one_and_update(
-        {"id": user_id, "vidas": {"$gt": 0}},
+        {"id": user_id, "puntos": {"$gte": costo}},
         {
-            "$inc": {"vidas": -1},
+            "$inc": {"puntos": -costo},
             "$set": {"updated_at": datetime.now(timezone.utc)},
         },
         return_document=ReturnDocument.AFTER,
@@ -517,14 +539,14 @@ async def use_hint(user_id: int, req: Any) -> Any:
 
     if not result:
         user_actual = await db["usuarios"].find_one({"id": user_id})
-        vidas_actuales = user_actual.get("vidas", 0) if user_actual else 0
+        puntos_actuales = int(user_actual.get("puntos", 0)) if user_actual else 0
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No tienes vidas restantes para pedir una pista. Podés recargar vidas en la tienda usando tus puntos.",
+            detail=f"Puntos insuficientes para pedir una pista. Cuesta {costo} pts y tenés {puntos_actuales} pts.",
         )
 
-    nuevas_vidas = int(result.get("vidas", 0))
-    logger.info(f"[ECONOMIA] Usuario {user_id} consumió 1 vida por pista en {req.game_id}. Restan: {nuevas_vidas}")
+    nuevos_puntos = int(result.get("puntos", 0))
+    logger.info(f"[ECONOMIA] Usuario {user_id} consumió {costo} pts por pista en {req.game_id}. Restan: {nuevos_puntos} pts")
 
     # 3. Intentar resolver el contenido de la pista desde el backend
     target_date = req.date or datetime.now().strftime("%Y-%m-%d")
@@ -587,10 +609,11 @@ async def use_hint(user_id: int, req: Any) -> Any:
 
     return UseHintResponse(
         success=True,
-        vidas_restantes=nuevas_vidas,
-        vidas_descontadas=1,
+        puntos_restantes=nuevos_puntos,
+        puntos_descontados=costo,
+        vidas_restantes=int(result.get("vidas", 5)),
+        vidas_descontadas=0,
         pista=pista_texto,
         valor_revelado=valor_revelado,
-        message="Pista desbloqueada exitosamente (-1 vida)."
+        message=f"Pista desbloqueada exitosamente (-{costo} puntos)."
     )
-

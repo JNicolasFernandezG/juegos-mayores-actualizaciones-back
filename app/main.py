@@ -85,9 +85,9 @@ app = FastAPI(
     title="Mayores Actualizaciones API",
     description="Backend en FastAPI + MongoDB para la plataforma educativa de adultos mayores",
     version="2.0.0",
-    docs_url=None,       # Desactivado en endpoints públicos para evitar sondeo de esquemas
-    redoc_url=None,      # Desactivado para evitar sondeo de documentación
-    openapi_url=None,    # Desactivado en producción según directiva de seguridad
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
     lifespan=lifespan
 )
 
