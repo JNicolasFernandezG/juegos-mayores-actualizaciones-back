@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     MONGO_URI: Optional[str] = None
     MONGODB_URL: Optional[str] = None
-    MONGODB_DB_NAME: str = "conmijuegos_db"
+    MONGODB_DB_NAME: str = "cognijuegos_db"
 
     @property
     def mongodb_connection_url(self) -> str:
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
 
     @property
     def effective_db_name(self) -> str:
-        return self.MONGO_DB_NAME or self.MONGODB_DB_NAME or "conmijuegos_db"
+        return self.MONGO_DB_NAME or self.MONGODB_DB_NAME or "cognijuegos_db"
 
     # JWT & Seguridad (Obligatorio desde .env, debe coincidir con Autenticador)
     JWT_SECRET: str = ""

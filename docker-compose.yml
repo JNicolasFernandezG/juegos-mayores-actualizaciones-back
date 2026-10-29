@@ -70,7 +70,7 @@ services:
       - AUTH_SERVICE_URL=${AUTH_SERVICE_URL:-https://autenticacion.asistodo.com.ar}
       - MONGO_URI=${MONGO_URI:-}
       - MONGODB_URL=${MONGODB_URL:-}
-      - MONGODB_DB_NAME=${MONGODB_DB_NAME:-conmijuegos_db}
+      - MONGODB_DB_NAME=${MONGODB_DB_NAME:-cognijuegos_db}
       - MONGO_HOST=${MONGO_HOST:-}
       - MONGO_PORT=${MONGO_PORT:-27017}
       - MONGO_ROOT_USER=${MONGO_ROOT_USER:-}
