@@ -42,7 +42,6 @@ async def get_current_user(
             tipo_usuario == 2
             or servicios.get(settings.SERVICE_KEY, False)
             or servicios.get("cognijuegos", False)
-            or servicios.get("conmijuegos", False)
         )
     else:
         tiene_permiso = True

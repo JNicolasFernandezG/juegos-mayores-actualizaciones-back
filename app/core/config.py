@@ -1,6 +1,5 @@
 from typing import Optional, List
 from urllib.parse import quote_plus
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -56,13 +55,6 @@ class Settings(BaseSettings):
     # Microservicio Autenticador Central (SSOT)
     AUTH_SERVICE_URL: str = "http://localhost:8000"
     SERVICE_KEY: str = "cognijuegos"
-
-    @field_validator("SERVICE_KEY", mode="before")
-    @classmethod
-    def sanitize_service_key(cls, v):
-        if not v or str(v).strip().lower() in ("conmijuegos", "conmijuego"):
-            return "cognijuegos"
-        return str(v).strip().lower()
 
     # Dominios autorizados para CORS (Sin comodines *)
     CORS_ORIGINS: str = (
