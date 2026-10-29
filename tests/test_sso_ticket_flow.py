@@ -29,10 +29,10 @@ async def test_sso_ticket_complete_lifecycle():
         assert ticket_code.startswith("sso_tk_")
         assert ticket_data["expiresInSeconds"] == 30
 
-        # 3. Intentar canjear el ticket para un servicio no autorizado (conmijuegos) -> 403
+        # 3. Intentar canjear el ticket para un servicio no autorizado (servicio_invalido) -> 403
         res_wrong_service = await auth_client.post(
             "/auth/sso/consume-ticket",
-            json={"ticket": ticket_code, "servicio": "conmijuegos"}
+            json={"ticket": ticket_code, "servicio": "servicio_invalido"}
         )
         assert res_wrong_service.status_code == 403
         assert "Restricción de destino" in res_wrong_service.json()["detail"]

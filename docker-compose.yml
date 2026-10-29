@@ -65,7 +65,7 @@ services:
     environment:
       - PORT=8087
       - HOST=0.0.0.0
-      - SERVICE_KEY=${SERVICE_KEY:-conmijuegos}
+      - SERVICE_KEY=${SERVICE_KEY:-cognijuegos}
       - FRONTEND_URL=${FRONTEND_URL:-https://cognijuegos.asistodo.com.ar}
       - AUTH_SERVICE_URL=${AUTH_SERVICE_URL:-https://autenticacion.asistodo.com.ar}
       - MONGO_URI=${MONGO_URI:-}

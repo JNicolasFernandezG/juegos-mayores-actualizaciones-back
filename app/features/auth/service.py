@@ -110,7 +110,7 @@ async def login_sistemas(req: LoginSistemasRequest):
     payload = {
         "email": req.email.lower().strip(),
         "password": req.password,
-        "servicio": "mayoresactualizaciones"
+        "servicio": settings.SERVICE_KEY
     }
 
     try:
@@ -157,20 +157,27 @@ async def login_sistemas(req: LoginSistemasRequest):
 
 async def login_codigo(req: LoginCodigoRequest):
     """
-    Autentica a los alumnos mediante su PIN/Código de acceso delegando
-    la validación al microservicio central de Autenticación.
+    Autentica a los alumnos mediante su correo electrónico y PIN de 6 dígitos
+    delegando la validación al microservicio central de Autenticación.
     """
+    email_clean = str(req.email).strip().lower()
     code = req.get_codigo()
+    if not email_clean:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El correo electrónico es obligatorio"
+        )
     if not code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El código es obligatorio"
+            detail="La clave de 6 dígitos es obligatoria"
         )
 
     auth_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/auth/validar-acceso"
     payload = {
+        "email": email_clean,
         "codigoAcceso": code,
-        "servicio": "mayoresactualizaciones"
+        "servicio": settings.SERVICE_KEY
     }
 
     try:
@@ -183,7 +190,7 @@ async def login_codigo(req: LoginCodigoRequest):
         )
 
     if resp.status_code != 200:
-        error_detail = "Código de acceso incorrecto"
+        error_detail = "Correo o clave de 6 dígitos incorrecta"
         try:
             err_data = resp.json()
             if "detail" in err_data:
@@ -197,7 +204,7 @@ async def login_codigo(req: LoginCodigoRequest):
 
     data = resp.json()
     if not data.get("allowed"):
-        message = data.get("message") or "Acceso denegado al servicio."
+        message = data.get("message") or "Acceso denegado: correo o clave incorrecta."
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN if data.get("success") else status.HTTP_401_UNAUTHORIZED,
             detail=message
@@ -222,7 +229,7 @@ async def verificar_token(req: VerificarTokenRequest):
     auth_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/auth/validar-acceso"
     payload = {
         "token": req.token,
-        "servicio": "mayoresactualizaciones"
+        "servicio": settings.SERVICE_KEY
     }
 
     try:
@@ -273,11 +280,11 @@ async def register_usuario(req: RegisterRequest, is_admin_creation: bool = False
         "email": req.email.lower().strip(),
         "password": req.password,
         "codigoAcceso": req.codigoAcceso,
-        "servicioOrigen": "mayoresactualizaciones",
+        "servicioOrigen": settings.SERVICE_KEY,
         "tipoUsuario": tipo_usuario,
         "black": black,
         "activo": activo,
-        "servicios": {"mayoresactualizaciones": True}
+        "servicios": {settings.SERVICE_KEY: True, "cognijuegos": True}
     }
 
     try:

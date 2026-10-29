@@ -20,7 +20,7 @@ async def canjear_ticket_en_autenticador(ticket: str) -> Dict[str, Any]:
     auth_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/auth/sso/consume-ticket"
     payload = {
         "ticket": ticket.strip(),
-        "servicio": "mayoresactualizaciones",
+        "servicio": settings.SERVICE_KEY,
     }
 
     try:

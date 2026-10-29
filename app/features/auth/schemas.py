@@ -10,6 +10,7 @@ class LoginSistemasRequest(BaseModel):
 class LoginCodigoRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
+    email: EmailStr = Field(..., description="Correo electrónico registrado del usuario")
     codigo: Optional[str] = Field(None, min_length=4, max_length=10)
     codigoAcceso: Optional[str] = Field(None, alias="codigoAcceso", min_length=4, max_length=10)
 

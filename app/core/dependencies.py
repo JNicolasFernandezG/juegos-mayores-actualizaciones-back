@@ -33,13 +33,18 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-    # Validar permisos específicos para el servicio mayoresactualizaciones
+    # Validar permisos específicos para el servicio cognijuegos
     tipo_usuario = int(payload.get("tipo_usuario") or payload.get("tipoUsuario") or 1)
     servicios = payload.get("servicios") or {}
-    if tipo_usuario != 2 and not servicios.get("mayoresactualizaciones", True):
+    tiene_permiso = bool(
+        tipo_usuario == 2
+        or servicios.get(settings.SERVICE_KEY, False)
+        or servicios.get("cognijuegos", False)
+        )
+    if not tiene_permiso:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado: El usuario no tiene permisos habilitados para el servicio 'mayoresactualizaciones'."
+            detail=f"Acceso denegado: El usuario no tiene permisos habilitados para el servicio '{settings.SERVICE_KEY}'."
         )
 
     user_id = payload.get("id") or payload.get("sub")

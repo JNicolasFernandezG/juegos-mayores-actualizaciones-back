@@ -15,7 +15,7 @@ async def test_auth_microservice_flow():
         assert res_health.json()["status"] == "UP"
 
         # 2. Login con PIN válido y con permisos activos (Marta González)
-        res_marta = await client.post("/api/auth/ingresar-codigo", json={"codigoAcceso": "123456"})
+        res_marta = await client.post("/api/auth/ingresar-codigo", json={"email": "marta.gonzalez@ejemplo.com", "codigoAcceso": "123456"})
         assert res_marta.status_code == 200
         data_marta = res_marta.json()
         assert data_marta["success"] is True
@@ -29,13 +29,13 @@ async def test_auth_microservice_flow():
         assert res_verif.status_code == 200
         assert res_verif.json()["valid"] is True
 
-        # 4. Login con usuario sin permiso para mayoresactualizaciones (Roberto Méndez)
-        res_roberto = await client.post("/api/auth/ingresar-codigo", json={"codigoAcceso": "654321"})
-        assert res_roberto.status_code == 403
-        assert "no tiene habilitado el servicio" in res_roberto.json()["detail"]
+        # 4. Login con usuario Roberto Méndez (habilitado en cognijuegos)
+        res_roberto = await client.post("/api/auth/ingresar-codigo", json={"email": "roberto.mendez@ejemplo.com", "codigoAcceso": "654321"})
+        assert res_roberto.status_code == 200
+        assert res_roberto.json()["success"] is True
 
         # 5. Login con cuenta suspendida (Elena Gómez)
-        res_elena = await client.post("/api/auth/ingresar-codigo", json={"codigoAcceso": "112233"})
+        res_elena = await client.post("/api/auth/ingresar-codigo", json={"email": "elena.gomez@ejemplo.com", "codigoAcceso": "112233"})
         assert res_elena.status_code == 403
         assert "inactiva" in res_elena.json()["detail"].lower()
 

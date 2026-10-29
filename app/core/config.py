@@ -54,6 +54,7 @@ class Settings(BaseSettings):
 
     # Microservicio Autenticador Central (SSOT)
     AUTH_SERVICE_URL: str = "http://localhost:8000"
+    SERVICE_KEY: str = "cognijuegos"
 
     # Dominios autorizados para CORS (Sin comodines *)
     CORS_ORIGINS: str = (
