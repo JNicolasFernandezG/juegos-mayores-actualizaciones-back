@@ -204,6 +204,10 @@ def _solve_crucigrama_backtracking(
         else:
             cand_list = [w for w in _WORDS_BY_LEN.get(s_len, []) if w not in used]
 
+        # Los candidatos pueden venir de sets del índice: ordenar antes de
+        # barajar evita depender del orden de hashing entre procesos.
+        cand_list.sort()
+
         if not cand_list:
             return None
 

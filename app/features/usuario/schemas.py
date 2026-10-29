@@ -44,6 +44,10 @@ class UsuarioResponse(BaseModel):
     estado: Optional[EstadoUsuarioSchema] = None
     dateStart: Optional[str] = None
     dateEnd: Optional[str] = None
+    vidas: Optional[int] = 5
+    puntos: Optional[int] = 0
+    suscripcion: Optional[str] = "basica"
+    diasDesbloqueados: Optional[List[str]] = None
 
 class ListEstadosResponse(BaseModel):
     success: bool

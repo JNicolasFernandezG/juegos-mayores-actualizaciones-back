@@ -81,16 +81,20 @@ async def save_user_attempt(
         return_document=True
     )
 
-    # Si es una victoria nueva y válida, sumar puntos al usuario
-    if req.status.lower().strip() == "completed" and not was_already_completed and req.score > 0:
+    # Si es una victoria nueva y válida, sumar puntos al usuario desde el catálogo de economía
+    if req.status.lower().strip() == "completed" and not was_already_completed:
         try:
-            await db["usuarios"].update_one(
-                {"id": effective_user_id},
-                {
-                    "$inc": {"puntos": req.score},
-                    "$set": {"updated_at": now_utc}
-                }
-            )
+            from app.features.economy.service import get_points_for_game
+            puntos_ganados = await get_points_for_game(req.game_id)
+            if puntos_ganados > 0:
+                await db["usuarios"].update_one(
+                    {"id": effective_user_id},
+                    {
+                        "$inc": {"puntos": puntos_ganados},
+                        "$set": {"updated_at": now_utc}
+                    }
+                )
+                logger.info(f"[PUNTOS] Usuario {effective_user_id} ganó {puntos_ganados} pts en {req.game_id}")
         except Exception as e:
             logger.warning(f"No se pudieron actualizar los puntos del usuario {effective_user_id}: {e}")
 
@@ -98,46 +102,40 @@ async def save_user_attempt(
 
 async def get_user_attempt_by_date(
     user_id: int,
-    game_id: str = "wordle",
-    date: str = "2026-10-09"
+    game_id: str,
+    date: Optional[str] = None,
+    date_str: Optional[str] = None
 ) -> Optional[UserAttemptResponse]:
-    """Retorna el progreso o intento de un usuario para una fecha determinada si existe."""
+    """Obtiene el intento de un usuario para un juego y fecha específicos."""
+    target_date = (date or date_str or "").strip()
     db = get_database()
     doc = await db["user_attempts"].find_one({
         "user_id": user_id,
         "game_id": game_id.lower().strip(),
-        "date": date.strip()
+        "date": target_date
     })
-    if not doc:
-        return None
-    return _serialize_attempt(doc)
+    return _serialize_attempt(doc) if doc else None
 
 async def get_user_attempts_by_month(
     user_id: int,
-    game_id: str = "wordle",
-    year: int = 2026,
-    month: int = 10
+    game_id: str,
+    year: int,
+    month: int
 ) -> UserAttemptsListResponse:
-    """Retorna los intentos registrados de un usuario en un mes determinado."""
-    if not (1 <= month <= 12):
-        raise HTTPException(status_code=400, detail="Mes inválido (1-12).")
-
-    _, days_in_month = calendar.monthrange(year, month)
+    """Obtiene todos los intentos de un usuario para un mes calendario."""
+    db = get_database()
+    days_in_month = calendar.monthrange(year, month)[1]
     start_date = f"{year:04d}-{month:02d}-01"
     end_date = f"{year:04d}-{month:02d}-{days_in_month:02d}"
 
-    db = get_database()
-    query = {
+    cursor = db["user_attempts"].find({
         "user_id": user_id,
         "game_id": game_id.lower().strip(),
         "date": {"$gte": start_date, "$lte": end_date}
-    }
+    }).sort("date", ASCENDING)
 
-    cursor = db["user_attempts"].find(query).sort("date", ASCENDING)
-    results = await cursor.to_list(length=days_in_month)
-
-    items = [_serialize_attempt(doc) for doc in results]
-
+    docs = await cursor.to_list(length=31)
+    items = [_serialize_attempt(d) for d in docs]
     return UserAttemptsListResponse(
         user_id=user_id,
         game_id=game_id,

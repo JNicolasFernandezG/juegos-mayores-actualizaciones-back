@@ -86,6 +86,7 @@ CURATED_CLUES: Dict[str, str] = {
   "HELECHO": "Planta de hojas verdes muy apreciada para colgar en el patio.",
   "CARTAS": "Juego de naipes o correspondencia escrita con cariño.",
   "ALBANIL": "Oficial de la construcción que levanta paredes con esmero.",
+  "ALBAÑIL": "Oficial de la construcción que levanta paredes con esmero.",
   "OFICIO": "Trabajo manual o artesanal aprendido con dedicación.",
   "MEDICO": "Profesional de la salud que cuida y cura a los enfermos.",
   "DORADO": "Pez rey de escamas brillantes en el río Paraná.",

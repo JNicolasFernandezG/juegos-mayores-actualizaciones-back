@@ -22,6 +22,13 @@ from app.features.narrative.game.router import (
 )
 from app.features.narrative.admin.router import router as narrative_admin_router
 from app.features.sso.router import router as sso_router
+from app.features.economy.router import router as economy_router
+from app.scripts.seed_challenges import (
+    seed_wordle_challenges,
+    seed_sopa_letras_challenges,
+)
+from app.scripts.seed_sudoku import seed_sudoku_challenges
+from app.features.daily_challenges.service import ensure_current_and_next_month_generated
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,6 +45,35 @@ async def lifespan(app: FastAPI):
         await seed_estados_usuario()
     except Exception as e:
         logger.warning(f"Aviso al verificar catálogo de estados de usuario ({e}). Se continuará con el inicio del servicio.")
+    import asyncio
+    async def _background_seeds():
+        try:
+            await seed_wordle_challenges()
+            await seed_sopa_letras_challenges()
+            await seed_sudoku_challenges()
+            await ensure_current_and_next_month_generated()
+            try:
+                from app.scripts.seed_narrative import seed_narrative_game
+                await seed_narrative_game()
+            except Exception as e_seed:
+                logger.warning(f"Aviso durante la siembra de narrativa: {e_seed}")
+            try:
+                from app.features.narrative.admin.challenge_service import sembrar_finalizaciones_default
+                await sembrar_finalizaciones_default()
+            except Exception as e_fin:
+                logger.warning(f"Aviso al sembrar finalizaciones por defecto: {e_fin}")
+        except Exception as e:
+            logger.warning(f"Aviso durante la siembra inicial en segundo plano: {e}")
+
+        while True:
+            try:
+                await asyncio.sleep(43200)
+                await ensure_current_and_next_month_generated()
+            except Exception as e_loop:
+                logger.warning(f"Error en ciclo periódico de desafíos: {e_loop}")
+
+    asyncio.create_task(_background_seeds())
+
     logger.info(f"Servidor listo en el puerto {settings.PORT}.")
     yield
     # Shutdown: Cerrar conexiones limpiamente
@@ -98,6 +134,7 @@ app.include_router(usuario_router)
 app.include_router(progreso_router)
 app.include_router(daily_challenges_router)
 app.include_router(user_attempts_router)
+app.include_router(economy_router)
 app.include_router(narrative_router)
 app.include_router(narrative_v2_router)
 app.include_router(narrative_admin_router)
