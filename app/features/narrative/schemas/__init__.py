@@ -65,7 +65,6 @@ from app.features.narrative.schemas.game_schemas import (
 
 from app.features.narrative.schemas.v2_graph_schemas import (
     ImpactoRecursoSchema,
-    ImpactoAfinidadSchema,
     OpcionNodoSchema,
     OpcionClienteSchema,
     NodoNarrativoSchema,

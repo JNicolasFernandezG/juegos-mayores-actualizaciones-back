@@ -96,8 +96,8 @@ class CartaResponse(CartaCreateRequest):
 # ============================================================================
 
 class ImpactoAfinidadSchema(BaseModel):
-    personaje_id: str
-    delta: int
+    personaje_id: str = Field(..., description="ID del personaje de corte afectado (ej: pj_canciller_elena)")
+    delta: int = Field(..., description="Variación entera de afinidad (+15, -10)")
 
 class ResultadoCreateRequest(BaseModel):
     id: str = Field(..., alias="_id")

@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 
 from app.features.narrative.schemas.rules_schemas import CondicionSchema
+from app.features.narrative.schemas.catalog_schemas import ImpactoAfinidadSchema
 from app.features.narrative.enums import TipoCondicionEnum, DireccionEventoEspecialEnum
 
 # ============================================================================
@@ -11,10 +12,6 @@ from app.features.narrative.enums import TipoCondicionEnum, DireccionEventoEspec
 class ImpactoRecursoSchema(BaseModel):
     recurso: str = Field(..., description="Clave del recurso modificado (oro, pueblo, ejercito, fe)")
     delta: int = Field(..., description="Variación entera positiva o negativa")
-
-class ImpactoAfinidadSchema(BaseModel):
-    personaje_id: str = Field(..., description="ID del personaje de corte afectado (ej: pj_canciller_elena)")
-    delta: int = Field(..., description="Variación entera de afinidad (+15, -10)")
 
 class DesenlaceNodoSchema(BaseModel):
     nodo: str = Field(..., description="ID del nodo destino posible de la opción")
