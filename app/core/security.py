@@ -46,6 +46,7 @@ def create_access_token(user: Dict[str, Any], expires_delta: Optional[timedelta]
         "tipoUsuario": int(user.get("tipo_usuario", 1)),
         "rol": int(user.get("tipo_usuario", 1)),
         "activo": bool(user.get("activo", True)),
+        "servicios": user.get("servicios", {"cognijuegos": True}),
         "iat": int(now.timestamp()),
         "exp": int(expire.timestamp())
     }
