@@ -4,10 +4,17 @@ import pytest
 
 from app.features.narrative.constants import COLL_SETTINGS, COLL_V2_EVENTS
 from app.features.narrative.schemas import RecursoDefinicionSchema, UniversoCreateRequest
-from app.scripts.seed_narrative import _insertar_si_no_existe
+from app.scripts.seed_narrative import _insertar_si_no_existe, _universo_seed
 from app.scripts.seed_narrative_v2_graphs import seed_v2_graphs
 
 pytestmark = pytest.mark.contract
+
+
+def test_universo_seed_usa_motor_v2_y_reciclaje():
+    universo = _universo_seed()
+
+    assert universo.motor == "v2"
+    assert universo.reciclaje_eventos_v2 is True
 
 
 def _universo(universo_id: str, nombre: str) -> UniversoCreateRequest:
@@ -52,7 +59,7 @@ async def test_insertar_si_no_existe_crea_documento_ausente(test_db, cleanup):
 
     assert guardado is not None
     assert guardado["nombre"] == "Creado por el seed"
-    assert guardado["motor"] == "v1"
+    assert guardado["motor"] == "v2"
 
 
 @pytest.mark.asyncio

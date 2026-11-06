@@ -85,11 +85,8 @@ class Settings(BaseSettings):
     GRADING_ENFORCE_SUDOKU: bool = False
     GRADING_ENFORCE_CRUCIGRAMA: bool = False
 
-    # Siembra del contenido V2 al arrancar. Opt-in hasta completar el dry-run de readiness.
+    # Fuerza la siembra V2 en cada arranque. Sin el flag, se siembra solo si no hay eventos V2.
     SEED_NARRATIVE_V2: bool = False
-
-    # Siembra del contenido base narrativo al arrancar. Por defecto False para no re-sembrar en cada deploy si ya existe.
-    SEED_NARRATIVE_DEFAULT: bool = False
 
     # Seeds estáticos de desafíos (Wordle/Sopa/Sudoku de calendario fijo). Opt-in y nunca pisan datos.
     SEED_STATIC_CHALLENGES: bool = False

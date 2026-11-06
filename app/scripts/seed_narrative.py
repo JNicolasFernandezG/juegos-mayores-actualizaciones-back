@@ -1,8 +1,8 @@
 """
 seed_narrative.py
-Script de siembra inicial de contenido para el juego narrativo (Crónicas de la Corte Real).
-Carga el universo, personajes, cartas, resultados, eventos y conversaciones iniciales,
-y opcionalmente genera los desafíos diarios para el mes actual.
+Bootstrap manual de contenido para el juego narrativo (Crónicas de la Corte Real).
+Carga universo, personajes, cartas, resultados, eventos y conversaciones en una base vacía.
+El arranque de la app solo asegura el universo: personajes y cartas los opera el admin.
 """
 
 import asyncio
@@ -64,15 +64,14 @@ async def _insertar_si_no_existe(collection_name: str, item) -> None:
     )
 
 
-async def seed_narrative_game():
-    logger.info("[NARRATIVE SEED] Iniciando siembra de contenido narrativo...")
-
-    # 1. UNIVERSO: Crónicas de la Corte Real
-    universo = UniversoCreateRequest(
+def _universo_seed() -> UniversoCreateRequest:
+    return UniversoCreateRequest(
         _id=UNIVERSO_ID,
         nombre="Crónicas de la Corte Real",
         descripcion="Gobierna un reino feudal equilibrando las arcas, la fe, el ejército y el apoyo popular.",
         icono="crown",
+        motor="v2",
+        reciclaje_eventos_v2=True,
         recursos=[
             RecursoDefinicionSchema(clave="oro", nombre="Tesoro Real", icono="coins", min=0, max=100, inicial=50),
             RecursoDefinicionSchema(clave="pueblo", nombre="Apoyo Popular", icono="users", min=0, max=100, inicial=50),
@@ -80,9 +79,24 @@ async def seed_narrative_game():
             RecursoDefinicionSchema(clave="fe", nombre="Fervor Religioso", icono="church", min=0, max=100, inicial=50)
         ]
     )
-    await _insertar_si_no_existe(COLL_SETTINGS, universo)
 
-    # 2. PERSONAJES (5 iniciales)
+
+async def seed_universo_narrativo():
+    """Asegura el universo base sin tocar personajes, cartas ni contenido del admin."""
+    await _insertar_si_no_existe(COLL_SETTINGS, _universo_seed())
+
+
+async def seed_narrative_game():
+    """Bootstrap manual de una base vacía: universo, personajes, cartas y contenido legado.
+
+    El arranque no ejecuta esta función; solo llama a ``seed_universo_narrativo``.
+    """
+    logger.info("[NARRATIVE SEED] Iniciando siembra de contenido narrativo...")
+
+    # 1. UNIVERSO: Crónicas de la Corte Real
+    await seed_universo_narrativo()
+
+    # 2. PERSONAJES (5 iniciales) — solo bootstrap manual, nunca desde el arranque
     personajes = [
         PersonajeCreateRequest(
             _id="pj_canciller_elena",
@@ -204,7 +218,7 @@ async def seed_narrative_game():
     for p in personajes:
         await _insertar_si_no_existe(COLL_CHARACTERS, p)
 
-    # 3. CARTAS (10 cartas variadas)
+    # 3. CARTAS (10 cartas variadas) — solo bootstrap manual, nunca desde el arranque
     cartas = [
         CartaCreateRequest(
             _id="card_sello_real",

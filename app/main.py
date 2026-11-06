@@ -59,22 +59,48 @@ async def lifespan(app: FastAPI):
                     logger.warning(f"Aviso durante la siembra estática de desafíos: {e_static}")
             await _generar_desafios_si_falta()
             try:
-                from app.features.narrative.constants import COLL_SETTINGS
+                from app.features.narrative.constants import (
+                    COLL_CARDS,
+                    COLL_CHARACTERS,
+                    COLL_SETTINGS,
+                )
                 db = get_database()
-                debe_sembrar = settings.SEED_NARRATIVE_DEFAULT
-                if not debe_sembrar and await db[COLL_SETTINGS].count_documents({"_id": "corte_medieval"}) == 0:
-                    debe_sembrar = True
-                if debe_sembrar:
-                    from app.scripts.seed_narrative import seed_narrative_game
-                    await seed_narrative_game()
+                # El arranque solo asegura el universo base. Personajes y cartas los
+                # opera el admin: sembrarlos en cada deploy pisaba la carga real.
+                if await db[COLL_SETTINGS].count_documents({"_id": "corte_medieval"}) == 0:
+                    from app.scripts.seed_narrative import seed_universo_narrativo
+                    await seed_universo_narrativo()
+                faltantes = []
+                for nombre, coleccion in (("personajes", COLL_CHARACTERS), ("cartas", COLL_CARDS)):
+                    if await db[coleccion].count_documents({}) == 0:
+                        faltantes.append(nombre)
+                if faltantes:
+                    logger.warning(
+                        "[NARRATIVE SEED] Catálogo sin %s. Cargalo desde /admin o corré "
+                        "python -m app.scripts.seed_narrative en una base vacía.",
+                        " ni ".join(faltantes),
+                    )
             except Exception as e_seed:
-                logger.warning(f"Aviso durante la siembra de narrativa: {e_seed}")
-            if settings.SEED_NARRATIVE_V2:
-                try:
+                logger.warning(f"Aviso durante la siembra del universo narrativo: {e_seed}")
+            try:
+                from app.features.narrative.constants import COLL_V2_EVENTS
+                db = get_database()
+                # Sin flag explícito sembramos solo cuando el motor quedó sin eventos.
+                # El seed es insert-only, así que repetirlo no pisa ediciones del admin.
+                sembrar_v2 = (
+                    settings.SEED_NARRATIVE_V2
+                    or await db[COLL_V2_EVENTS].count_documents({}) == 0
+                )
+                if sembrar_v2:
                     from app.scripts.seed_narrative_v2_graphs import seed_v2_graphs
                     await seed_v2_graphs()
-                except Exception as e_seed_v2:
-                    logger.warning(f"Aviso durante la siembra de grafos V2: {e_seed_v2}")
+                    total_eventos_v2 = await db[COLL_V2_EVENTS].count_documents({})
+                    if total_eventos_v2 == 0:
+                        logger.warning("[NARRATIVE V2 SEED] La base quedó sin eventos V2 tras la siembra.")
+                    else:
+                        logger.info(f"[NARRATIVE V2 SEED] Eventos V2 disponibles: {total_eventos_v2}")
+            except Exception as e_seed_v2:
+                logger.warning(f"Aviso durante la siembra de grafos V2: {e_seed_v2}")
             try:
                 from app.scripts.seed_narrative_tags import seed_narrative_catalogs
                 resumen_catalogos = await seed_narrative_catalogs()

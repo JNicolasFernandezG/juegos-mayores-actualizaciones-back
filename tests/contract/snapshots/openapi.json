@@ -11215,8 +11215,8 @@
           "motor": {
             "type": "string",
             "title": "Motor",
-            "description": "Motor de resolución del universo: 'v1' (clásico) o 'v2' (grafos)",
-            "default": "v1"
+            "description": "Motor de resolución del universo: 'v2' (grafos); V1 fue retirado",
+            "default": "v2"
           },
           "reciclaje_eventos_v2": {
             "type": "boolean",
@@ -11267,7 +11267,7 @@
           "motor": {
             "type": "string",
             "title": "Motor",
-            "default": "v1"
+            "default": "v2"
           },
           "reciclaje_eventos_v2": {
             "type": "boolean",
