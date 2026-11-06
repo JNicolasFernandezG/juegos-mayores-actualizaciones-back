@@ -1,7 +1,7 @@
 """
 crud_service.py
-Capa CRUD genérica reutilizable y servicios de administración para las 7 colecciones
-del catálogo narrativo (Universos, Personajes, Cartas, Resultados, Eventos, Conversaciones y Finalizaciones).
+Capa CRUD genérica reutilizable y servicios de administración para las colecciones
+del catálogo narrativo V2 (Universos, Personajes, Cartas, Finalizaciones y Grafos V2).
 """
 
 from typing import TypeVar, Type, Optional, List
@@ -14,13 +14,10 @@ from app.features.narrative.constants import (
     COLL_SETTINGS,
     COLL_CHARACTERS,
     COLL_CARDS,
-    COLL_RESULTS,
-    COLL_EVENTS,
-    COLL_CONVERSATIONS,
     COLL_ENDINGS,
     COLL_V2_EVENTS,
     COLL_V2_CONVERSATIONS,
-    COLL_V2_EVENTOS_ESPECIALES
+    COLL_V2_EVENTOS_ESPECIALES,
 )
 from app.features.narrative.schemas.catalog_schemas import (
     UniversoCreateRequest,
@@ -29,19 +26,13 @@ from app.features.narrative.schemas.catalog_schemas import (
     PersonajeResponse,
     CartaCreateRequest,
     CartaResponse,
-    ResultadoCreateRequest,
-    ResultadoResponse,
-    EventoCreateRequest,
-    EventoResponse,
-    ConversacionCreateRequest,
-    ConversacionResponse,
     FinalizacionCreateRequest,
-    FinalizacionResponse
+    FinalizacionResponse,
 )
 from app.features.narrative.schemas.v2_graph_schemas import (
     EventoV2GrafoSchema,
     ConversacionV2GrafoSchema,
-    EventoEspecialV2GrafoSchema
+    EventoEspecialV2GrafoSchema,
 )
 
 T = TypeVar("T", bound=BaseModel)
@@ -185,67 +176,6 @@ async def obtener_carta_por_id(carta_id: str) -> Optional[CartaResponse]:
 async def eliminar_carta(carta_id: str) -> bool:
     return await eliminar_item_catalogo_por_id(COLL_CARDS, carta_id)
 
-# Resultados
-async def crear_o_actualizar_resultado(req: ResultadoCreateRequest) -> ResultadoResponse:
-    return await guardar_item_catalogo(COLL_RESULTS, req.id, req, ResultadoResponse)
-
-async def obtener_resultados(universo_id: Optional[str] = None, limit: Optional[int] = None, skip: int = 0) -> List[ResultadoResponse]:
-    return await listar_items_catalogo(COLL_RESULTS, ResultadoResponse, universo_id, limit, skip)
-
-async def obtener_resultado_por_id(resultado_id: str) -> Optional[ResultadoResponse]:
-    return await obtener_item_catalogo_por_id(COLL_RESULTS, resultado_id, ResultadoResponse)
-
-async def eliminar_resultado(resultado_id: str) -> bool:
-    return await eliminar_item_catalogo_por_id(COLL_RESULTS, resultado_id)
-
-# Eventos
-async def crear_o_actualizar_evento(req: EventoCreateRequest) -> EventoResponse:
-    return await guardar_item_catalogo(COLL_EVENTS, req.id, req, EventoResponse)
-
-async def obtener_eventos(universo_id: Optional[str] = None, limit: Optional[int] = None, skip: int = 0) -> List[EventoResponse]:
-    return await listar_items_catalogo(COLL_EVENTS, EventoResponse, universo_id, limit, skip)
-
-async def obtener_evento_por_id(evento_id: str) -> Optional[EventoResponse]:
-    return await obtener_item_catalogo_por_id(COLL_EVENTS, evento_id, EventoResponse)
-
-async def eliminar_evento(evento_id: str) -> bool:
-    return await eliminar_item_catalogo_por_id(COLL_EVENTS, evento_id)
-
-# Conversaciones
-async def crear_o_actualizar_conversacion(req: ConversacionCreateRequest) -> ConversacionResponse:
-    return await guardar_item_catalogo(COLL_CONVERSATIONS, req.id, req, ConversacionResponse)
-
-async def obtener_conversaciones(universo_id: Optional[str] = None, limit: Optional[int] = None, skip: int = 0) -> List[ConversacionResponse]:
-    return await listar_items_catalogo(COLL_CONVERSATIONS, ConversacionResponse, universo_id, limit, skip)
-
-async def obtener_conversacion_por_id(conversacion_id: str) -> Optional[ConversacionResponse]:
-    return await obtener_item_catalogo_por_id(COLL_CONVERSATIONS, conversacion_id, ConversacionResponse)
-
-async def eliminar_conversacion(conversacion_id: str) -> bool:
-    return await eliminar_item_catalogo_por_id(COLL_CONVERSATIONS, conversacion_id)
-
-async def obtener_conversaciones_posibles_por_personajes(
-    personajes_ids: List[str],
-    universo_id: Optional[str] = None
-) -> List[ConversacionResponse]:
-    """Retorna las conversaciones cuyos requisitos de personajes están contenidos en la mano provista."""
-    db = get_database()
-    filtro = {}
-    if universo_id:
-        filtro["universo_id"] = universo_id
-
-    cursor = db[COLL_CONVERSATIONS].find(filtro)
-    docs = await cursor.to_list(length=200)
-
-    disponibles_set = set(personajes_ids)
-    validas = []
-    for d in docs:
-        reqs = [r.get("personajeId") for r in d.get("requisitos", [])]
-        if reqs and all(r in disponibles_set for r in reqs):
-            validas.append(ConversacionResponse(**d))
-
-    return validas
-
 # Finalizaciones
 async def crear_o_actualizar_finalizacion(req: FinalizacionCreateRequest) -> FinalizacionResponse:
     return await guardar_item_catalogo(COLL_ENDINGS, req.id, req, FinalizacionResponse)
@@ -301,4 +231,3 @@ async def obtener_evento_especial_v2_por_id(evento_id: str) -> Optional[EventoEs
 
 async def eliminar_evento_especial_v2(evento_id: str) -> bool:
     return await eliminar_item_catalogo_por_id(COLL_V2_EVENTOS_ESPECIALES, evento_id)
-

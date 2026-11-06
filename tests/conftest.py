@@ -11,6 +11,7 @@ TEST_DB_NAME = "mayores_actualizaciones_test"
 os.environ["MONGODB_DB_NAME"] = TEST_DB_NAME
 os.environ.pop("MONGO_DB_NAME", None)
 os.environ.setdefault("TZ", "America/Argentina/Buenos_Aires")
+os.environ.setdefault("JWT_SECRET", "super_secret_jwt_key_for_testing_123456")
 
 import pytest
 import pytest_asyncio

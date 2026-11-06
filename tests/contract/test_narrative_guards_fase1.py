@@ -357,33 +357,3 @@ async def test_avanzar_nodo_rechaza_nodo_actual_inexistente(client, test_db, cle
     )
     assert response.status_code == 409
 
-
-@pytest.mark.asyncio
-async def test_endpoints_v1_rechazan_partida_v2(client, test_db, cleanup, make_token):
-    user_id = 810010
-    await _seed_run(
-        test_db,
-        cleanup,
-        user_id=user_id,
-        universo_id="universo_guard_v1_endpoints",
-        fase="TOMA_DECISION_EVENTO",
-    )
-    headers = _auth(make_token(user_id))
-
-    decidir = await client.post(
-        "/api/narrative/v2/partida/decidir-evento",
-        json={"date": DATE, "opcion_id": "op_a"},
-        headers=headers,
-    )
-    assert decidir.status_code == 409
-
-    await test_db[COLL_RUNS].update_one(
-        {"user_id": user_id, "date": DATE},
-        {"$set": {"fase_actual": "RESOLVER_CONVERSACION"}},
-    )
-    responder = await client.post(
-        "/api/narrative/v2/partida/responder-conversacion",
-        json={"date": DATE, "opcion_numero": 1},
-        headers=headers,
-    )
-    assert responder.status_code == 409

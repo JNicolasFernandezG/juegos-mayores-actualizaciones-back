@@ -35,7 +35,6 @@ from app.features.narrative.game.endings_service import (
 from app.features.narrative.game.universe_resources import obtener_mapa_recursos_universo
 from app.features.narrative.game.run_repository import persistir_run
 from app.features.narrative.game.identity import filtro_run
-from app.features.narrative.game.motor_v1.turn_service import sortear_evento_plano
 from app.features.narrative.game.motor_v2.turn_service import iniciar_evento_grafo_mes
 
 logger = logging.getLogger(__name__)
@@ -97,10 +96,7 @@ async def elegir_carta_mes(user_id: int, req: ElegirCartaMesRequest) -> ElegirCa
             evento_actual=None,
             finalizacion=fin_resp,
             puntos_ganados=puntos_ganados,
-            motor=run.get("motor", "v1"),
+            motor=run.get("motor", "v2"),
         )
 
-    if run.get("motor") == "v2":
-        return await iniciar_evento_grafo_mes(run, turno)
-
-    return await sortear_evento_plano(run, req, turno)
+    return await iniciar_evento_grafo_mes(run, turno)

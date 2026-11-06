@@ -163,44 +163,6 @@ async def _seed_run(db, cleanup, run: dict) -> None:
     cleanup.add(COLL_RUNS, {"_id": run["_id"]})
 
 
-@pytest.mark.asyncio
-async def test_motor_v1_resuelve_ciclo_plano(client, test_db, cleanup, make_token):
-    user_id = 820001
-    await _seed_escenario(test_db, cleanup)
-    await _seed_run(test_db, cleanup, _run(user_id, "v1"))
-    headers = _auth(make_token(user_id))
-
-    elegir = await client.post(
-        "/api/narrative/v2/partida/elegir-carta-mes",
-        json={"date": DATE, "carta_id": CARD_DRAFT},
-        headers=headers,
-    )
-    assert elegir.status_code == 200, elegir.text
-    data = elegir.json()
-    assert data["motor"] == "v1"
-    assert data["evento_actual"]["id"] == EVENTO_V1
-    assert data["grafo_actual"] is None
-
-    estado = await client.get(f"/api/narrative/v2/partida/estado?date={DATE}", headers=headers)
-    assert estado.status_code == 200
-    assert estado.json()["motor"] == "v1"
-
-    decidir = await client.post(
-        "/api/narrative/v2/partida/decidir-evento",
-        json={"date": DATE, "opcion_id": "op_a"},
-        headers=headers,
-    )
-    assert decidir.status_code == 200, decidir.text
-    assert decidir.json()["resultado_actual"]["_id"] == RESULTADO_V1
-    assert decidir.json()["fase_actual"] == "BALANCE_MES"
-
-    avanzar = await client.post(
-        "/api/narrative/v2/partida/avanzar-mes",
-        json={"date": DATE},
-        headers=headers,
-    )
-    assert avanzar.status_code == 200, avanzar.text
-    assert avanzar.json()["fase_actual"] == "DRAFT_MENSUAL"
 
 
 @pytest.mark.asyncio
@@ -229,19 +191,6 @@ async def test_motor_v2_inicia_grafo_y_rechaza_resolucion_plana(
     assert estado_data["motor"] == "v2"
     assert estado_data["grafo_actual"]["grafo_id"] == EVENTO_V2
 
-    decidir = await client.post(
-        "/api/narrative/v2/partida/decidir-evento",
-        json={"date": DATE, "opcion_id": "op_a"},
-        headers=headers,
-    )
-    assert decidir.status_code == 409
-
-    responder = await client.post(
-        "/api/narrative/v2/partida/responder-conversacion",
-        json={"date": DATE, "opcion_numero": 1},
-        headers=headers,
-    )
-    assert responder.status_code == 409
 
     avanzar = await client.post(
         "/api/narrative/v2/partida/avanzar-nodo",
@@ -253,7 +202,7 @@ async def test_motor_v2_inicia_grafo_y_rechaza_resolucion_plana(
     assert avanzar.json()["fase_actual"] == "BALANCE_MES"
 
 
-def test_endpoints_planos_deprecados_y_campo_motor_en_openapi():
+def test_endpoints_planos_eliminados_y_campo_motor_en_openapi():
     from app.main import app
 
     spec = app.openapi()
@@ -268,7 +217,7 @@ def test_endpoints_planos_deprecados_y_campo_motor_en_openapi():
         ("/api/narrative/partida/draft-actual", "get"),
     ]
     for path, metodo in planos:
-        assert paths[path][metodo].get("deprecated") is True, f"{metodo.upper()} {path}"
+        assert path not in paths, f"Ruta eliminada {path} no debe estar en OpenAPI"
 
     schemas = spec["components"]["schemas"]
     assert "motor" in schemas["ElegirCartaMesV2Response"]["properties"]

@@ -1,8 +1,8 @@
 """
 setup_service.py
-Fase 0 común a ambos motores:
+Fase 0 del motor narrativo V2:
 - Oferta diaria de personajes y cartas para la selección inicial.
-- Creación de la partida (el motor se toma del universo).
+- Creación de la partida (motor V2 de grafos).
 - Reinicio de la partida del día.
 """
 
@@ -80,7 +80,7 @@ def _respuesta_inicio(
         afinidad=run["afinidad"],
         cartas_draft_actual=cartas_draft_actual,
         finalizacion=fin_resp,
-        motor=run.get("motor", "v1"),
+        motor=run.get("motor", "v2"),
         puntos_ganados=puntos_ganados,
     )
 
@@ -157,7 +157,7 @@ async def iniciar_partida(user_id: int, req: IniciarPartidaRequest) -> IniciarPa
         universo_id = cfg.get("universo_id")
 
         universo_doc = await db[COLL_SETTINGS].find_one({"_id": universo_id})
-        motor = universo_doc.get("motor", "v1") if universo_doc else "v1"
+        motor = universo_doc.get("motor", "v2") if universo_doc else "v2"
 
         if len(req.corte_elegida_ids) != 3:
             raise HTTPException(status_code=400, detail="Debes seleccionar exactamente 3 personajes para la corte.")
