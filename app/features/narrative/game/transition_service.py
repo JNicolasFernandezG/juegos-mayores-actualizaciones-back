@@ -61,7 +61,24 @@ async def avanzar_mes(user_id: int, req: AvanzarMesRequest) -> AvanzarMesV2Respo
     if not run:
         raise HTTPException(status_code=404, detail="Partida no encontrada.")
 
-    if run.get("fase_actual") != RunPhaseEnum.BALANCE_MES.value:
+    # Reintento idempotente: un segundo POST tras un avance exitoso (draft abierto o año
+    # terminado) devuelve el estado ya aplicado en lugar de un 400 que rompe al cliente.
+    fase_actual = run.get("fase_actual")
+    if fase_actual in (RunPhaseEnum.DRAFT_MENSUAL.value, RunPhaseEnum.FINALIZADA.value):
+        turno_previo = run.get("turno_actual", {})
+        draft_ids = turno_previo.get("cartas_ofrecidas_ids", []) if fase_actual == RunPhaseEnum.DRAFT_MENSUAL.value else []
+        draft_docs_previos = await db[COLL_CARDS].find({"_id": {"$in": draft_ids}}).to_list(None) if draft_ids else []
+        fin_resp = FinalizacionResponse(**run["finalizacion"]) if run.get("finalizacion") else None
+        return AvanzarMesV2Response(
+            mes_actual=run.get("mes_actual", 1),
+            fase_actual=fase_actual,
+            status=run.get("status", "in_progress"),
+            recursos=run.get("recursos", {}),
+            cartas_draft_actual=[CartaResponse(**c) for c in draft_docs_previos],
+            finalizacion=fin_resp,
+        )
+
+    if fase_actual != RunPhaseEnum.BALANCE_MES.value:
         raise HTTPException(status_code=400, detail="La partida no se encuentra en fase de balance mensual.")
 
     turno = run.get("turno_actual", {})

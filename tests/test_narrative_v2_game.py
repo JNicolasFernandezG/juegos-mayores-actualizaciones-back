@@ -137,9 +137,33 @@ async def _ejecutar_ciclo_v2():
             data = resp.json()
             if data["fase_actual"] == "FINALIZADA":
                 finalizada = True
+                # El reintento tras el cierre del año también debe ser idempotente.
+                resp = await client.post(
+                    "/api/narrative/v2/partida/avanzar-mes",
+                    json={"date": today_str},
+                    headers=guest_headers,
+                )
+                assert resp.status_code == 200, resp.text
+                repetido = resp.json()
+                assert repetido["fase_actual"] == "FINALIZADA"
+                assert repetido["finalizacion"] is not None
                 break
             assert data["mes_actual"] == mes + 1
             assert len(data["cartas_draft_actual"]) == 3
+
+            # Un segundo POST del avance no debe romper: devuelve el mismo draft ya aplicado.
+            resp = await client.post(
+                "/api/narrative/v2/partida/avanzar-mes",
+                json={"date": today_str},
+                headers=guest_headers,
+            )
+            assert resp.status_code == 200, resp.text
+            repetido = resp.json()
+            assert repetido["fase_actual"] == "DRAFT_MENSUAL"
+            assert repetido["mes_actual"] == data["mes_actual"]
+            assert [c["_id"] for c in repetido["cartas_draft_actual"]] == [
+                c["_id"] for c in data["cartas_draft_actual"]
+            ]
 
         # El ciclo anual termina siempre con finalización (victoria o derrota)
         assert finalizada
