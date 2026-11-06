@@ -1,9 +1,7 @@
 """
 turn_service.py
-Fase 1 común a ambos motores: valida el draft, aplica la carta elegida y deriva
-al motor de la partida para abrir el evento del mes.
-- Motor V1: sorteo plano del evento con probabilidades (motor_v1.turn_service).
-- Motor V2: inicio de un grafo de evento (motor_v2.turn_service).
+Fase 1 del motor V2: valida el draft, aplica la carta elegida y abre
+el grafo de evento del mes (motor_v2.turn_service).
 """
 
 import logging

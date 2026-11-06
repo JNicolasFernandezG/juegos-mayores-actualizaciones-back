@@ -1,4 +1,3 @@
-
 import pytest
 import asyncio
 import datetime
@@ -9,19 +8,35 @@ from app.core.database import connect_to_mongo, close_mongo_connection, get_data
 from app.core.security import crear_credencial_invitado, generar_guest_id
 from app.scripts.seed_narrative import seed_narrative_game
 
+FASES_AVANCE_NODO = {"TOMA_DECISION_EVENTO", "RESOLVER_CONVERSACION"}
+
+
 def test_narrative_v2_full_cycle():
     """
-    Test de integración extremo a extremo del flujo V2 ligero:
+    Test de integración extremo a extremo del flujo V2 de grafos:
     1. Verifica setup previo.
     2. Inicia partida V2 (/iniciar) con 3 miembros de corte y 3 cartas iniciales.
-    3. Itera los 12 meses usando la API delta V2:
-       - /elegir-carta-mes
-       - /decidir-evento
-       - /responder-conversacion (si aplica)
+    3. Itera los 12 meses usando la API V2:
+       - /elegir-carta-mes (devuelve grafo_actual)
+       - /avanzar-nodo hasta BALANCE_MES (evento y conversación comparten el motor)
        - /avanzar-mes
-    4. Verifica que al final del mes 12 el juego termina en victoria con finalizacion.
+    4. Verifica que al final del mes 12 la partida termina con finalización.
     """
     asyncio.run(_ejecutar_ciclo_v2())
+
+
+async def _avanzar_un_nodo(client, estado, today_str, guest_headers):
+    """Avanza un paso eligiendo la primera opción disponible del grafo activo."""
+    opciones = [op for op in estado["nodo_actual"]["opciones"] if op.get("disponible", True)]
+    assert opciones, f"El nodo {estado['nodo_actual']['id']} no tiene opciones disponibles."
+    resp = await client.post(
+        "/api/narrative/v2/partida/avanzar-nodo",
+        json={"date": today_str, "opcion_id": opciones[0]["id"]},
+        headers=guest_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.json()
+
 
 async def _ejecutar_ciclo_v2():
     await connect_to_mongo()
@@ -50,99 +65,76 @@ async def _ejecutar_ciclo_v2():
         corte_elegida = cfg["setup_corte_ofrecidos_ids"][:3]
         cartas_elegidas = cfg["setup_cartas_ofrecidas_ids"][:3]
 
-        # 1. Iniciar Partida V2
-        # Asegurar que el universo para este test de endpoints clásicos esté en modo motor 'v1'
-        await db["narrative_settings"].update_one({"_id": "corte_medieval"}, {"$set": {"motor": "v1"}})
+        # El ciclo completo vive en el motor de grafos V2
+        await db["narrative_settings"].update_one({"_id": "corte_medieval"}, {"$set": {"motor": "v2"}})
 
         resp = await client.post(
             "/api/narrative/v2/partida/iniciar",
             json={
                 "date": today_str,
                 "corte_elegida_ids": corte_elegida,
-                "cartas_iniciales_ids": cartas_elegidas
+                "cartas_iniciales_ids": cartas_elegidas,
             },
             headers=guest_headers,
         )
         assert resp.status_code == 200, resp.text
-        data_v2 = resp.json()
-        assert data_v2["mes_actual"] == 1
-        assert data_v2["fase_actual"] == "DRAFT_MENSUAL"
-        assert len(data_v2["cartas_draft_actual"]) == 3
+        data = resp.json()
+        assert data["mes_actual"] == 1
+        assert data["fase_actual"] == "DRAFT_MENSUAL"
+        assert len(data["cartas_draft_actual"]) == 3
 
-        # 2. Jugar los 12 meses con la API V2
+        finalizada = False
         for mes in range(1, 13):
-            # Fase 1: Elegir carta de draft
-            carta_id = data_v2["cartas_draft_actual"][0]["_id"]
+            # Fase 1: elegir carta de draft y abrir el grafo del evento del mes
+            carta_id = data["cartas_draft_actual"][0]["_id"]
             resp = await client.post(
                 "/api/narrative/v2/partida/elegir-carta-mes",
                 json={"date": today_str, "carta_id": carta_id},
                 headers=guest_headers,
             )
             assert resp.status_code == 200, resp.text
-            data_v2 = resp.json()
-
-            # Si la carta causó colapso de recursos
-            if data_v2["fase_actual"] == "FINALIZADA":
-                assert data_v2["finalizacion"] is not None
+            data = resp.json()
+            if data["fase_actual"] == "FINALIZADA":
+                finalizada = True
                 break
 
-            assert data_v2["fase_actual"] == "TOMA_DECISION_EVENTO"
-            assert data_v2["evento_actual"] is not None
+            assert data["fase_actual"] == "TOMA_DECISION_EVENTO", data
+            assert data["grafo_actual"] is not None
 
-            # Fase 2: Decidir opción en evento
-            opciones = data_v2["evento_actual"]["opciones"]
-            opcion = next(op for op in opciones if not op.get("bloqueada"))
-            resp = await client.post(
-                "/api/narrative/v2/partida/decidir-evento",
-                json={"date": today_str, "opcion_id": opcion["id"]},
-                headers=guest_headers,
-            )
-            assert resp.status_code == 200, resp.text
-            data_v2 = resp.json()
+            # Fases 2 y 3: evento y conversación se recorren con el mismo endpoint
+            estado = data["grafo_actual"]
+            pasos = 0
+            while estado["fase_actual"] in FASES_AVANCE_NODO and estado["status"] == "CONTINUA":
+                pasos += 1
+                assert pasos <= 60, "El grafo no converge a un nodo final."
+                estado = await _avanzar_un_nodo(client, estado, today_str, guest_headers)
 
-            # Si colapsó un recurso tras la decisión del evento, la partida pasa a FINALIZADA (Game Over)
-            if data_v2["fase_actual"] == "FINALIZADA":
-                assert data_v2["finalizacion"] is not None
+            if estado["status"] != "CONTINUA" or estado["fase_actual"] == "FINALIZADA":
+                data = estado
+                finalizada = True
                 break
 
-            # Fase 3: Responder diálogo de corte si ocurrió
-            if data_v2["fase_actual"] == "RESOLVER_CONVERSACION":
-                assert data_v2["conversacion_actual"] is not None
-                resp = await client.post(
-                    "/api/narrative/v2/partida/responder-conversacion",
-                    json={"date": today_str, "opcion_numero": 1},
-                    headers=guest_headers,
-                )
-                assert resp.status_code == 200, resp.text
-                data_v2 = resp.json()
-
-            # Si colapsó tras el diálogo o balance
-            if data_v2["fase_actual"] == "FINALIZADA":
-                assert data_v2["finalizacion"] is not None
-                break
-
-            # Fase 4: Avanzar mes
-            assert data_v2["fase_actual"] == "BALANCE_MES"
+            # Fase 4: balance y avance de mes
+            assert estado["fase_actual"] == "BALANCE_MES", estado
             resp = await client.post(
                 "/api/narrative/v2/partida/avanzar-mes",
                 json={"date": today_str},
                 headers=guest_headers,
             )
             assert resp.status_code == 200, resp.text
-            data_v2 = resp.json()
-
-            # Si colapsó por costos pasivos CADA_MES
-            if data_v2["fase_actual"] == "FINALIZADA":
+            data = resp.json()
+            if data["fase_actual"] == "FINALIZADA":
+                finalizada = True
                 break
+            assert data["mes_actual"] == mes + 1
+            assert len(data["cartas_draft_actual"]) == 3
 
-        # 3. Verificación de finalización V2 (Victoria o Game Over)
-        assert data_v2["fase_actual"] == "FINALIZADA"
-        assert data_v2["finalizacion"] is not None
-        if data_v2.get("status") == "completed":
-            assert data_v2["finalizacion"]["rango"] in ["S", "A", "B", "C"]
-        else:
-            assert data_v2["finalizacion"]["rango"] == "F"
+        # El ciclo anual termina siempre con finalización (victoria o derrota)
+        assert finalizada
+        assert data["finalizacion"] is not None
+        assert data["finalizacion"]["rango"] in ["S", "A", "B", "C", "F"]
 
     await close_mongo_connection()
+
 
 pytestmark = pytest.mark.integration

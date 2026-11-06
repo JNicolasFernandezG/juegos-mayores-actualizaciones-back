@@ -16,8 +16,6 @@ from app.features.narrative.constants import (
     COLL_SETTINGS,
     COLL_CHARACTERS,
     COLL_CARDS,
-    COLL_EVENTS,
-    COLL_CONVERSATIONS,
     COLL_ENDINGS,
     COLL_CHALLENGES,
     COLL_V2_EVENTS,
@@ -145,8 +143,8 @@ async def generar_mes_narrativo(year: int, month: int, universo_id: str) -> Dict
     eventos_v2 = await db[COLL_V2_EVENTS].find({"universo_id": universo_id}).to_list(None)
     convs_v2 = await db[COLL_V2_CONVERSATIONS].find({"universo_id": universo_id}).to_list(None)
 
-    eventos = eventos_v2 or await db[COLL_EVENTS].find({"universo_id": universo_id}).to_list(None)
-    convs = convs_v2 or await db[COLL_CONVERSATIONS].find({"universo_id": universo_id}).to_list(None)
+    eventos = eventos_v2
+    convs = convs_v2
 
     if len(pjs) < 5:
         raise HTTPException(status_code=400, detail=f"Se requieren al menos 5 personajes en el universo '{universo_id}' (hay {len(pjs)}).")
