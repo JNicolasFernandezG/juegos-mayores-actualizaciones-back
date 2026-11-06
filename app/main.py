@@ -129,15 +129,11 @@ openapi_tags = [
     {"name": "Narrativo - CRUD Universos"},
     {"name": "Narrativo - CRUD Personajes"},
     {"name": "Narrativo - CRUD Cartas"},
-    {"name": "Narrativo - CRUD Resultados"},
-    {"name": "Narrativo - CRUD Eventos"},
-    {"name": "Narrativo - CRUD Conversaciones"},
     {"name": "Narrativo - CRUD Finalizaciones"},
     {"name": "Narrativo - CRUD Eventos V2"},
     {"name": "Narrativo - CRUD Conversaciones V2"},
     {"name": "Narrativo - CRUD Eventos Especiales V2"},
     {"name": "Narrativo - CRUD Tags"},
-    {"name": "Narrativo - Legacy V1 (Deprecado)"},
 ]
 
 app = FastAPI(

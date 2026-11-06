@@ -18,7 +18,6 @@ from app.features.narrative.constants import (
     COLL_SETTINGS,
     COLL_V2_EVENTS,
 )
-from app.features.narrative.engine import event_director
 from app.features.narrative.engine.rule_engine import evaluar_condicion, ejecutar_accion
 from app.features.narrative.game import endings_service, setup_service, transition_service
 from app.features.narrative.game import turn_service as coordinador_comun
@@ -76,13 +75,9 @@ async def test_coordinador_adquiere_carta_ofrecida_aplica_efecto_y_deriva_a_v2(m
         llamadas_v2.append((run_recibido, turno_recibido))
         return "grafo_v2_iniciado"
 
-    async def no_debe_usar_v1(*_args):
-        raise AssertionError("Una run V2 no debe derivar al motor plano V1")
-
     monkeypatch.setattr(coordinador_comun, "obtener_mapa_recursos_universo", recursos_mapa)
     monkeypatch.setattr(coordinador_comun, "verificar_colapso_recursos", sin_colapso)
     monkeypatch.setattr(coordinador_comun, "iniciar_evento_grafo_mes", iniciar_v2)
-    monkeypatch.setattr(coordinador_comun, "sortear_evento_plano", no_debe_usar_v1)
 
     resultado = await coordinador_comun.elegir_carta_mes(
         75, ElegirCartaMesRequest(date="2099-01-01", carta_id="carta_elegida")
@@ -460,59 +455,6 @@ async def test_mes_12_cierra_sin_pasivos_sin_draft_y_sin_mes_13(monkeypatch):
     assert len(persistidas) == 1
     assert db[COLL_CHARACTERS].find_queries == []
     assert db[COLL_CARDS].find_queries == []
-
-
-@pytest.mark.defecto_caracterizado
-def test_defecto_proyeccion_0_por_ciento_puede_ganar_en_el_sorteo(monkeypatch):
-    """Defecto E08: proyección clampea a 0 y sorteo clampea el mismo peso a 0.1.
-
-    D05 aprueba unificar pesos para que lo mostrado como 0% nunca se sortee. Este caso
-    pertenece al director plano heredado y queda como reproducción, no como regla V2.
-    """
-    opcion = {
-        "id": "opt_azar",
-        "texto": "Arriesgar",
-        "resultados_posibles": [
-            {
-                "resultado_id": "res_cero_proyectado",
-                "peso_base": 40,
-                "modificadores_probabilidad": [
-                    {
-                        "condicion": {"tipo": "tiene_tag", "tag": "desafio"},
-                        "delta_peso": -40,
-                        "explicacion": "El modificador anula el peso",
-                    }
-                ],
-            },
-            {"resultado_id": "res_positivo", "peso_base": 60},
-        ],
-    }
-    evento = {"opciones": [opcion]}
-    run = run_n0(tags_activos=["desafio"])
-    resultados = {
-        "res_cero_proyectado": {"titulo": "Cero proyectado"},
-        "res_positivo": {"titulo": "Positivo"},
-    }
-
-    proyeccion = event_director.calcular_opciones_evento(evento, run, resultados)[0]
-    assert [(item.resultado_id, item.porcentaje) for item in proyeccion.probabilidades] == [
-        ("res_cero_proyectado", 0.0),
-        ("res_positivo", 100.0),
-    ]
-
-    pesos_sorteados = []
-
-    def choices_controlado(ids, weights, k):
-        pesos_sorteados.append(list(weights))
-        assert k == 1
-        return [ids[0]]
-
-    monkeypatch.setattr(event_director.random, "choices", choices_controlado)
-
-    ganador = event_director.sortear_resultado_opcion(opcion, run)
-
-    assert ganador == "res_cero_proyectado"
-    assert pesos_sorteados == [[0.1, 60.0]]
 
 
 @pytest.mark.comportamiento_preservado

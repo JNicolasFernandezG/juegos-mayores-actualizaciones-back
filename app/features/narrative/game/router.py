@@ -1,8 +1,8 @@
 """
 router.py
-Controladores FastAPI del módulo de Juego Narrativo:
+Controladores FastAPI del módulo de Juego Narrativo V2:
 - router (/api/narrative/partida): Setup diario, reinicio y modales de consulta bajo demanda.
-- router_v2 (/api/narrative/v2/partida): Ciclo reactivo nativo V2 (iniciar, draft, evento, diálogo, avance, estado).
+- router_v2 (/api/narrative/v2/partida): Ciclo reactivo nativo V2 basado en grafos (iniciar, draft, avance-nodo, estado).
 """
 
 from fastapi import APIRouter, Query, Depends
@@ -11,15 +11,10 @@ from typing import Optional, List
 from app.features.narrative.schemas.game_schemas import (
     IniciarPartidaRequest,
     ElegirCartaMesRequest,
-    DecidirEventoRequest,
-    ResponderConversacionRequest,
     AvanzarMesRequest,
     ReiniciarPartidaRequest,
-    ConversacionesPosiblesRequest,
     IniciarPartidaV2Response,
     ElegirCartaMesV2Response,
-    DecidirEventoV2Response,
-    ResponderConversacionV2Response,
     AvanzarMesV2Response,
     EstadoTurnoResponse,
     SetupDesafioResponse,
@@ -27,51 +22,32 @@ from app.features.narrative.schemas.game_schemas import (
     InventarioPartidaResponse,
     CortePartidaResponse,
     FinalizacionPartidaResponse,
-    EventoTurnoResponse
-)
-from app.features.narrative.schemas.catalog_schemas import (
-    ConversacionResponse,
-    ResultadoResponse,
-    CartaResponse
 )
 from app.features.narrative.schemas.v2_graph_schemas import (
     AvanzarNodoV2Request,
-    EstadoGrafoV2Response
+    EstadoGrafoV2Response,
 )
 from app.features.narrative.game.motor_v2.v2_graph_service import (
     avanzar_nodo_v2,
     obtener_grafo_actual_v2,
     iniciar_evento_mes_v2,
-    iniciar_conversacion_mes_v2
+    iniciar_conversacion_mes_v2,
 )
 from app.features.narrative.game.setup_service import (
     obtener_setup_desafio,
     iniciar_partida,
-    reiniciar_partida
+    reiniciar_partida,
 )
 from app.features.narrative.game.turn_service import elegir_carta_mes
-from app.features.narrative.game.motor_v1.turn_service import (
-    decidir_evento,
-    responder_conversacion
-)
 from app.features.narrative.game.transition_service import avanzar_mes
 from app.features.narrative.game.modals_service import (
     obtener_historial_partida,
     obtener_inventario_partida,
     obtener_corte_partida,
-    obtener_finalizacion_partida
-)
-from app.features.narrative.game.motor_v1.modals import (
-    obtener_evento_actual_partida,
-    obtener_conversacion_actual_partida,
-    obtener_resultado_actual_partida,
-    obtener_draft_actual_partida
+    obtener_finalizacion_partida,
 )
 from app.features.narrative.game.turn_state import obtener_turno_actual
 from app.features.narrative.game.identity import obtener_identidad_narrativa
-from app.features.narrative.admin.crud_service import (
-    obtener_conversaciones_posibles_por_personajes
-)
 
 # ============================================================================
 # ROUTER V2: CICLO MENSUAL NATIVO LIGERO (/api/narrative/v2/partida)
@@ -98,7 +74,7 @@ async def endpoint_v2_iniciar_partida(
     "/elegir-carta-mes",
     tags=["Narrativo - Flujo de Juego"],
     response_model=ElegirCartaMesV2Response,
-    summary="[V2] Fase 1: Elegir carta de draft mensual devolviendo solo el evento sorteado"
+    summary="[V2] Fase 1: Elegir carta de draft mensual devolviendo el grafo del evento sorteado"
 )
 async def endpoint_v2_elegir_carta_mes(
     req: ElegirCartaMesRequest,
@@ -106,34 +82,6 @@ async def endpoint_v2_elegir_carta_mes(
 ):
     """Aplica la carta seleccionada y retorna el evento sorteado del mes (o finalización si colapsó)."""
     return await elegir_carta_mes(user_id=user_id, req=req)
-
-@router_v2.post(
-    "/decidir-evento",
-    response_model=DecidirEventoV2Response,
-    summary="[V1 Plano, deprecado] Fase 2: Decidir opción en evento (usar /avanzar-nodo en motor V2)",
-    tags=["Narrativo - Legacy V1 (Deprecado)"],
-    deprecated=True
-)
-async def endpoint_v2_decidir_evento(
-    req: DecidirEventoRequest,
-    user_id: int = Depends(obtener_identidad_narrativa)
-):
-    """Resuelve la tirada plana V1. En partidas V2 responde 409 y se debe usar /avanzar-nodo."""
-    return await decidir_evento(user_id=user_id, req=req)
-
-@router_v2.post(
-    "/responder-conversacion",
-    response_model=ResponderConversacionV2Response,
-    summary="[V1 Plano, deprecado] Fase 3: Responder diálogo de corte (usar /avanzar-nodo en motor V2)",
-    tags=["Narrativo - Legacy V1 (Deprecado)"],
-    deprecated=True
-)
-async def endpoint_v2_responder_conversacion(
-    req: ResponderConversacionRequest,
-    user_id: int = Depends(obtener_identidad_narrativa)
-):
-    """Resuelve el diálogo plano V1. En partidas V2 responde 409 y se debe usar /avanzar-nodo."""
-    return await responder_conversacion(user_id=user_id, req=req)
 
 @router_v2.post(
     "/avanzar-mes",
@@ -254,36 +202,6 @@ async def endpoint_reiniciar_partida(
         expected_version=req.expected_version,
     )
 
-@router.post(
-    "/conversaciones-posibles",
-    tags=["Narrativo - Flujo de Juego"],
-    response_model=List[ConversacionResponse],
-    summary="Obtener conversaciones habilitadas según una mano de personajes (vía POST)"
-)
-async def endpoint_conversaciones_posibles_post(req: ConversacionesPosiblesRequest):
-    """Retorna los diálogos de corte disponibles según los personajes provistos vía payload JSON."""
-    return await obtener_conversaciones_posibles_por_personajes(
-        personajes_ids=req.personajes_ids,
-        universo_id=req.universo_id
-    )
-
-@router.get(
-    "/conversaciones-posibles",
-    tags=["Narrativo - Flujo de Juego"],
-    response_model=List[ConversacionResponse],
-    summary="Obtener conversaciones habilitadas según una mano de personajes (vía GET)"
-)
-async def endpoint_conversaciones_posibles_get(
-    personajes_ids: str = Query(..., description="IDs de personajes separados por coma (ej: pj_elena,pj_marcus)"),
-    universo_id: Optional[str] = Query(None, description="Filtro opcional por universo")
-):
-    """Retorna los diálogos de corte disponibles según los personajes provistos en Query String."""
-    ids = [x.strip() for x in personajes_ids.split(",") if x.strip()]
-    return await obtener_conversaciones_posibles_por_personajes(
-        personajes_ids=ids,
-        universo_id=universo_id
-    )
-
 @router.get(
     "/historial",
     tags=["Narrativo - Flujo de Juego"],
@@ -335,59 +253,3 @@ async def endpoint_obtener_finalizacion_partida(
 ):
     """Retorna los datos del epílogo final (derrota o victoria anual)."""
     return await obtener_finalizacion_partida(user_id=user_id, date=date)
-
-@router.get(
-    "/evento-actual",
-    response_model=Optional[EventoTurnoResponse],
-    summary="[V1 Plano, deprecado] Consultar únicamente el evento activo del mes (usar /estado)",
-    tags=["Narrativo - Legacy V1 (Deprecado)"],
-    deprecated=True
-)
-async def endpoint_obtener_evento_actual(
-    date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Fecha YYYY-MM-DD"),
-    user_id: int = Depends(obtener_identidad_narrativa)
-):
-    """Retorna únicamente el evento del mes activo con sus opciones y probabilidades."""
-    return await obtener_evento_actual_partida(user_id=user_id, date=date)
-
-@router.get(
-    "/conversacion-actual",
-    response_model=Optional[ConversacionResponse],
-    summary="[V1 Plano, deprecado] Consultar únicamente la conversación activa del mes (usar /estado)",
-    tags=["Narrativo - Legacy V1 (Deprecado)"],
-    deprecated=True
-)
-async def endpoint_obtener_conversacion_actual(
-    date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Fecha YYYY-MM-DD"),
-    user_id: int = Depends(obtener_identidad_narrativa)
-):
-    """Retorna únicamente el diálogo activo del mes o null si no se activó diálogo."""
-    return await obtener_conversacion_actual_partida(user_id=user_id, date=date)
-
-@router.get(
-    "/resultado-actual",
-    response_model=Optional[ResultadoResponse],
-    summary="[V1 Plano, deprecado] Consultar únicamente el resultado del evento recién resuelto (usar /estado)",
-    tags=["Narrativo - Legacy V1 (Deprecado)"],
-    deprecated=True
-)
-async def endpoint_obtener_resultado_actual(
-    date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Fecha YYYY-MM-DD"),
-    user_id: int = Depends(obtener_identidad_narrativa)
-):
-    """Retorna únicamente el resultado obtenido tras resolver el evento."""
-    return await obtener_resultado_actual_partida(user_id=user_id, date=date)
-
-@router.get(
-    "/draft-actual",
-    response_model=List[CartaResponse],
-    summary="[V1 Plano, deprecado] Consultar únicamente las cartas ofrecidas en el draft del mes actual (usar /estado)",
-    tags=["Narrativo - Legacy V1 (Deprecado)"],
-    deprecated=True
-)
-async def endpoint_obtener_draft_actual(
-    date: str = Query(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="Fecha YYYY-MM-DD"),
-    user_id: int = Depends(obtener_identidad_narrativa)
-):
-    """Retorna únicamente las 3 cartas ofrecidas en el draft mensual activo."""
-    return await obtener_draft_actual_partida(user_id=user_id, date=date)

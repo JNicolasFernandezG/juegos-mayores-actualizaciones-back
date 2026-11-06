@@ -1,26 +1,20 @@
-"""Estado común del turno para recargas/F5: expone el motor activo y el grafo V2 si lo hubiera."""
+"""Estado común del turno para recargas/F5: expone el motor V2 y el grafo activo."""
 
 from fastapi import HTTPException
 
 from app.core.database import get_database
 from app.features.narrative.constants import (
     COLL_CARDS,
-    COLL_RESULTS,
-    COLL_EVENTS,
-    COLL_CONVERSATIONS,
     COLL_RUNS,
 )
 from app.features.narrative.schemas.catalog_schemas import (
     CartaResponse,
     ResultadoResponse,
-    ConversacionResponse,
     FinalizacionResponse,
 )
 from app.features.narrative.schemas.game_schemas import (
-    EventoTurnoResponse,
     EstadoTurnoResponse,
 )
-from app.features.narrative.engine.event_director import calcular_opciones_evento
 from app.features.narrative.game.motor_v2.v2_graph_service import proyectar_grafo_actual
 from app.features.narrative.game.identity import filtro_run
 
@@ -34,14 +28,11 @@ async def obtener_turno_actual(user_id: int, date: str) -> EstadoTurnoResponse:
 
     turno = run.get("turno_actual", {})
     draft_ids = turno.get("cartas_ofrecidas_ids", [])
-    evento_id = turno.get("evento_actual_id")
-    resultado_id = turno.get("resultado_obtenido_id")
-    conversacion_id = turno.get("conversacion_actual_id")
 
     draft_docs = await db[COLL_CARDS].find({"_id": {"$in": draft_ids}}).to_list(None) if draft_ids else []
-    evento_doc = await db[COLL_EVENTS].find_one({"_id": evento_id}) if evento_id else None
-    res_doc = await db[COLL_RESULTS].find_one({"_id": resultado_id}) if resultado_id else None
-    if not res_doc and run.get("motor") == "v2" and run.get("historial_grafos"):
+
+    res_doc = None
+    if run.get("historial_grafos"):
         ultimo_nodo = run["historial_grafos"][-1]
         if ultimo_nodo.get("mes") == run.get("mes_actual", 1):
             from app.features.narrative.game.motor_v2.graph_engine import graph_engine
@@ -55,21 +46,6 @@ async def obtener_turno_actual(user_id: int, date: str) -> EstadoTurnoResponse:
                 "imagen": (g_doc or {}).get("imagen", ""),
                 "efectos": []
             }
-    conv_doc = await db[COLL_CONVERSATIONS].find_one({"_id": conversacion_id}) if conversacion_id else None
-
-    evento_resp = None
-    if evento_doc:
-        res_ids = {rp.get("resultado_id") for op in evento_doc.get("opciones", []) for rp in op.get("resultados_posibles", [])}
-        res_docs = await db[COLL_RESULTS].find({"_id": {"$in": list(res_ids)}}).to_list(None) if res_ids else []
-        res_dict = {r["_id"]: r for r in res_docs}
-        opciones_calc = calcular_opciones_evento(evento_doc, run, res_dict)
-        evento_resp = EventoTurnoResponse(
-            id=evento_doc["_id"],
-            titulo=evento_doc.get("titulo", ""),
-            descripcion=evento_doc.get("descripcion", ""),
-            imagen=evento_doc.get("imagen", ""),
-            opciones=opciones_calc,
-        )
 
     return EstadoTurnoResponse(
         date=date,
@@ -79,10 +55,10 @@ async def obtener_turno_actual(user_id: int, date: str) -> EstadoTurnoResponse:
         recursos=run.get("recursos", {}),
         afinidad=run.get("afinidad", {}),
         cartas_draft_actual=[CartaResponse(**c) for c in draft_docs],
-        evento_actual=evento_resp,
+        evento_actual=None,
         resultado_actual=ResultadoResponse(**res_doc) if res_doc else None,
-        conversacion_actual=ConversacionResponse(**conv_doc) if conv_doc else None,
+        conversacion_actual=None,
         finalizacion=FinalizacionResponse(**run["finalizacion"]) if run.get("finalizacion") else None,
         grafo_actual=await proyectar_grafo_actual(run),
-        motor=run.get("motor", "v1"),
+        motor=run.get("motor", "v2"),
     )
