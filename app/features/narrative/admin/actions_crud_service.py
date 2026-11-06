@@ -62,6 +62,15 @@ CATALOGO_PRIMITIVAS: List[Dict[str, Any]] = [
         "permitido_en": ["carta", "personaje", "nodo"],
     },
     {
+        "primitiva": PrimitivaOperacionEnum.MUTAR_ESTADO_ENTIDAD.value,
+        "nombre": "Mutar estado de entidad (Tag o Personaje)",
+        "descripcion": "Agrega o quita un tag del estado de la partida, o recluta/retira un personaje de la corte. Al retirar un personaje se eliminan sus modificadores pasivos y los tags que otorgó.",
+        "parametros_requeridos": ["entidad", "operacion", "id_entidad"],
+        "opciones_entidad": ["tag", "personaje"],
+        "opciones_operacion": ["alta", "baja"],
+        "permitido_en": ["carta", "personaje", "nodo"],
+    },
+    {
         "primitiva": PrimitivaOperacionEnum.MUTAR_ESTADO.value,
         "nombre": "Mutar estado genérico",
         "descripcion": "Mutación matemática sobre recursos, límites dinámicos, afinidades o variables con soporte aditivo, multiplicativo, divisorio, porcentual o fijado.",

@@ -31,7 +31,10 @@ from app.features.narrative.schemas.catalog_schemas import (
     ConversacionCreateRequest,
     ConversacionResponse,
     FinalizacionCreateRequest,
-    FinalizacionResponse
+    FinalizacionResponse,
+    TagCreateRequest,
+    TagUpdateRequest,
+    TagResponse
 )
 
 from app.features.narrative.schemas.game_schemas import (

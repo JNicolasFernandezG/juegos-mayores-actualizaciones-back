@@ -169,6 +169,10 @@
     <div id="inspectorRecursos"></div>
     <h3>Afinidad</h3>
     <div id="inspectorAfinidad"></div>
+    <h3>Corte actual</h3>
+    <div id="inspectorCorte"></div>
+    <h3>Tags activos y cartas en mano</h3>
+    <div id="inspectorInventario"></div>
     <h3>Última respuesta</h3>
     <div id="inspectorRaw"></div>
     <h3>Log de requests</h3>
@@ -194,6 +198,8 @@
     mes: null,
     recursos: null,
     afinidad: null,
+    inventario: null,
+    corte: null,
     draft: [],
     nodo: null,
     desenlace: null,
@@ -381,8 +387,18 @@
     render();
     Promise.resolve()
       .then(fn)
+      .then(refrescarInventario)
       .catch(mostrarError)
       .then(function () { setBusy(false); render(); });
+  }
+
+  function refrescarInventario() {
+    if (!state.mes) return null;
+    var q = "?date=" + encodeURIComponent(state.date);
+    return Promise.all([
+      api("/api/narrative/partida/inventario" + q).then(function (inv) { state.inventario = inv; }),
+      api("/api/narrative/partida/corte" + q).then(function (c) { state.corte = c; })
+    ]).catch(function () { /* las consultas del inspector son opcionales */ });
   }
 
   function mostrarError(e) {
@@ -400,6 +416,8 @@
     state.mes = null;
     state.recursos = null;
     state.afinidad = null;
+    state.inventario = null;
+    state.corte = null;
     state.draft = [];
     state.nodo = null;
     state.desenlace = null;
@@ -1104,6 +1122,8 @@
 
     $("#inspectorRecursos").innerHTML = renderRecursos();
     $("#inspectorAfinidad").innerHTML = renderAfinidad();
+    $("#inspectorCorte").innerHTML = renderCorte();
+    $("#inspectorInventario").innerHTML = renderInventario();
 
     var raw = state.ultimo ? JSON.stringify(state.ultimo, null, 2) : "Sin respuestas todavía.";
     $("#inspectorRaw").innerHTML = '<details class="rawbox"' + (state.ultimo ? " open" : "") + "><summary>Respuesta " +
@@ -1136,8 +1156,34 @@
     return html;
   }
 
-  function renderLog() {
-    var el = $("#log");
+  function renderCorte() {
+    if (!state.corte) return '<div class="hint">Sin corte todavía.</div>';
+    var corte = state.corte.corte || [];
+    if (!corte.length) return '<div class="hint">La corte está vacía.</div>';
+    var html = "";
+    corte.forEach(function (item) {
+      var p = item.personaje || {};
+      html += '<div class="aff"><span class="mono">' + esc(p.nombre || p._id || "—") + '</span><span class="aval">' + esc(item.afinidad) + "</span></div>";
+    });
+    return html;
+  }
+
+  function renderInventario() {
+    var inv = state.inventario;
+    if (!inv) return '<div class="hint">Sin inventario todavía.</div>';
+    var tags = inv.tags_activos || [];
+    var cartas = inv.cartas || [];
+    var html = '<div class="hint">' + tags.length + " tags activos</div><div>";
+    tags.forEach(function (t) { html += '<span class="chip tag">' + esc(t) + "</span>"; });
+    html += "</div>";
+    html += '<div class="hint" style="margin-top:6px">' + cartas.length + " cartas en mano</div><div>";
+    cartas.forEach(function (c) {
+      html += '<span class="chip">' + esc(c.nombre || c._id || c.id) + "</span>";
+    });
+    return html + "</div>";
+  }
+
+  function renderLog() {    var el = $("#log");
     if (!state.log.length) {
       el.innerHTML = '<div class="hint">Todavía no se hicieron requests.</div>';
       return;

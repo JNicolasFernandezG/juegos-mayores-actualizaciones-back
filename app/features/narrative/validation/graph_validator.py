@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Set
 
 from app.features.narrative.constants import (
+    COLL_TAGS,
     COLL_V2_CONVERSATIONS,
     COLL_V2_EVENTOS_ESPECIALES,
     COLL_V2_EVENTS,
@@ -161,12 +162,46 @@ def _alcanzables(nodos: Dict[str, Dict[str, Any]], raiz: str) -> Set[str]:
     return visitados
 
 
+def hallazgos_de_tags_referenciados(
+    tags: Sequence[Any] = (),
+    condiciones: Sequence[Any] = (),
+    *,
+    tags_validos: Optional[Set[str]] = None,
+) -> List[Hallazgo]:
+    """Verifica que los tags declarados existan en el catálogo del universo."""
+    if tags_validos is None:
+        return []
+
+    def buscar_tag(tag: Any) -> Optional[Hallazgo]:
+        tag_id = _crudo(tag)
+        if tag_id and tag_id not in tags_validos:
+            return Hallazgo(
+                "tag_inexistente",
+                f"El tag '{tag_id}' no existe en el catálogo del universo.",
+            )
+        return None
+
+    hallazgos: List[Hallazgo] = []
+    for tag in tags:
+        encontrado = buscar_tag(tag)
+        if encontrado:
+            hallazgos.append(encontrado)
+    for crudo in condiciones:
+        condicion = _as_dict(crudo)
+        if _crudo(condicion.get("tipo")) == "tiene_tag":
+            encontrado = buscar_tag(condicion.get("tag"))
+            if encontrado:
+                hallazgos.append(encontrado)
+    return hallazgos
+
+
 def hallazgos_de_efectos(
     efectos: Sequence[Any],
     *,
     recursos_validos: Optional[Set[str]] = None,
     catalogo_acciones: Optional[Dict[str, Any]] = None,
     catalogo_frecuencias: Optional[Dict[str, Any]] = None,
+    tags_validos: Optional[Set[str]] = None,
     nodo_id: Optional[str] = None,
 ) -> List[Hallazgo]:
     """
@@ -192,6 +227,11 @@ def hallazgos_de_efectos(
                 "evento_no_despachado",
                 f"El efecto '{etiqueta}' usa '{evento}': el motor no lo emite y no está activo en el catálogo de frecuencias.",
             )
+
+        hallazgos.extend(hallazgos_de_tags_referenciados(
+            condiciones=efecto.get("condiciones") or [],
+            tags_validos=tags_validos,
+        ))
 
         acciones = [_as_dict(a) for a in (efecto.get("acciones") or [])]
         if efecto.get("accion"):
@@ -225,6 +265,25 @@ def hallazgos_de_efectos(
                     f"El efecto '{etiqueta}' modifica afinidad de un personaje sin decir cuál.",
                 )
 
+            tags_de_accion: List[Any] = []
+            if primitiva in ("otorgar_tag", "remover_tag"):
+                tags_de_accion.append(params.get("tag"))
+            elif primitiva == "mutar_estado_entidad" \
+                    and (_crudo(params.get("entidad")) or "").lower() == "tag":
+                tags_de_accion.append(params.get("id_entidad") or params.get("tag"))
+            for tag in tags_de_accion:
+                tag_id = _crudo(tag)
+                if not tag_id:
+                    error(
+                        "tag_sin_id",
+                        f"El efecto '{etiqueta}' ({accion_id}) opera sobre tags sin declarar cuál.",
+                    )
+                elif tags_validos is not None and tag_id not in tags_validos:
+                    error(
+                        "tag_inexistente",
+                        f"El efecto '{etiqueta}' ({accion_id}) usa el tag '{tag_id}', que no existe en el catálogo del universo.",
+                    )
+
     return hallazgos
 
 
@@ -235,11 +294,12 @@ def validar_grafo(
     recursos_validos: Optional[Set[str]] = None,
     catalogo_acciones: Optional[Dict[str, Any]] = None,
     catalogo_frecuencias: Optional[Dict[str, Any]] = None,
+    tags_validos: Optional[Set[str]] = None,
 ) -> ResultadoValidacion:
     """
     Valida la estructura de un evento, conversación o evento especial V2.
 
-    Los tres catálogos son opcionales: sin ellos la validación es puramente estructural.
+    Los catálogos son opcionales: sin ellos la validación es puramente estructural.
     Con ellos, además se rechaza contenido que el motor ejecutaría en silencio
     (recursos inexistentes, acciones o frecuencias fuera del catálogo del universo).
     """
@@ -315,6 +375,11 @@ def validar_grafo(
                     nodo_id=clave,
                 )
 
+        for tag in (nodo.get("impactos_tags") or []):
+            hallazgos_de_tag = hallazgos_de_tags_referenciados([tag], tags_validos=tags_validos)
+            for hallazgo in hallazgos_de_tag:
+                error(hallazgo.codigo, hallazgo.mensaje, nodo_id=clave)
+
         desenlace = _crudo(nodo.get("tipo_desenlace"))
         if desenlace is not None and desenlace not in _TIPOS_DESENLACE_VALIDOS:
             error(
@@ -335,6 +400,7 @@ def validar_grafo(
             recursos_validos=recursos_validos,
             catalogo_acciones=catalogo_acciones,
             catalogo_frecuencias=catalogo_frecuencias,
+            tags_validos=tags_validos,
             nodo_id=clave,
         ))
 
@@ -447,10 +513,13 @@ async def validar_efectos_almacenables(
     efectos: Sequence[Any],
     universo_id: str,
     db=None,
+    *,
+    tags: Sequence[Any] = (),
+    condiciones_aparicion: Sequence[Any] = (),
 ) -> List[Hallazgo]:
     """
     Barato de pasar en cada guardado de carta o personaje: usa los mismos catálogos
-    que el motor carga en la partida, así que lo que se rechoca acá es lo que en el
+    que el motor carga en la partida, así que lo que se rechaza acá es lo que en el
     juego se ejecutaría en silencio.
     """
     if db is None:
@@ -459,7 +528,13 @@ async def validar_efectos_almacenables(
         db = get_database()
 
     contexto = await _cargar_contexto_universo(str(universo_id), db)
-    return hallazgos_de_efectos(efectos, **contexto)
+    hallazgos = hallazgos_de_efectos(efectos, **contexto)
+    hallazgos.extend(hallazgos_de_tags_referenciados(
+        tags,
+        condiciones_aparicion,
+        tags_validos=contexto["tags_validos"],
+    ))
+    return hallazgos
 
 
 async def _cargar_contexto_universo(universo_id: str, db) -> Dict[str, Any]:
@@ -468,10 +543,12 @@ async def _cargar_contexto_universo(universo_id: str, db) -> Dict[str, Any]:
 
     recursos_mapa = await obtener_mapa_recursos_universo(universo_id)
     acciones, frecuencias = await obtener_catalogos_universo(universo_id, db)
+    tags_docs = await db[COLL_TAGS].find({"universo_id": universo_id}, {"_id": 1}).to_list(None)
     return {
         "recursos_validos": {str(clave).lower() for clave in recursos_mapa},
         "catalogo_acciones": acciones,
         "catalogo_frecuencias": frecuencias,
+        "tags_validos": {str(doc["_id"]) for doc in tags_docs},
     }
 
 

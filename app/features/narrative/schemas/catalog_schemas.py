@@ -92,6 +92,7 @@ class CartaCreateRequest(BaseModel):
     tags: List[str] = []
     condiciones_aparicion: List[CondicionSchema] = []
     efectos: List[EfectoSchema] = []
+    peso_draft_mensual: float = Field(1.0, ge=0.0, description="Peso relativo en el sorteo del draft mensual (1.0 = normal, menor = más rara)")
 
     model_config = {"populate_by_name": True}
 
@@ -207,3 +208,37 @@ class FinalizacionCreateRequest(BaseModel):
 
 class FinalizacionResponse(FinalizacionCreateRequest):
     pass
+
+
+# ============================================================================
+# 8. CATÁLOGO DE TAGS (narrative_tags)
+# ============================================================================
+
+class TagCreateRequest(BaseModel):
+    id: str = Field(..., alias="_id", description="Identificador único slug (ej: disciplina_militar)")
+    universo_id: str
+    nombre: str
+    descripcion: Optional[str] = ""
+    color: str = "#64748b"
+    icono: Optional[str] = "tag"
+    categoria: Optional[str] = "general"
+
+    model_config = {"populate_by_name": True}
+
+class TagUpdateRequest(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    color: Optional[str] = None
+    icono: Optional[str] = None
+    categoria: Optional[str] = None
+
+class TagResponse(BaseModel):
+    id: str = Field(..., alias="_id")
+    universo_id: str
+    nombre: str
+    descripcion: Optional[str] = ""
+    color: str = "#64748b"
+    icono: Optional[str] = "tag"
+    categoria: Optional[str] = "general"
+
+    model_config = {"populate_by_name": True}

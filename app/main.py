@@ -76,6 +76,12 @@ async def lifespan(app: FastAPI):
                 except Exception as e_seed_v2:
                     logger.warning(f"Aviso durante la siembra de grafos V2: {e_seed_v2}")
             try:
+                from app.scripts.seed_narrative_tags import seed_narrative_catalogs
+                resumen_catalogos = await seed_narrative_catalogs()
+                logger.info(f"Catálogos narrativos verificados: {resumen_catalogos}")
+            except Exception as e_cat:
+                logger.warning(f"Aviso durante la siembra del catálogo de tags/acciones: {e_cat}")
+            try:
                 from app.features.narrative.admin.challenge_service import sembrar_finalizaciones_default
                 await sembrar_finalizaciones_default()
             except Exception as e_fin:
@@ -130,6 +136,7 @@ openapi_tags = [
     {"name": "Narrativo - CRUD Eventos V2"},
     {"name": "Narrativo - CRUD Conversaciones V2"},
     {"name": "Narrativo - CRUD Eventos Especiales V2"},
+    {"name": "Narrativo - CRUD Tags"},
     {"name": "Narrativo - Legacy V1 (Deprecado)"},
 ]
 

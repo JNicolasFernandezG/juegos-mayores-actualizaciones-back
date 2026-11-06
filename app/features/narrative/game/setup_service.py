@@ -35,6 +35,8 @@ from app.features.narrative.schemas.game_schemas import (
 )
 from app.features.narrative.schemas.rules_schemas import EfectoSchema
 from app.features.narrative.engine.rule_engine import despachar_efectos, evaluar_condiciones
+from app.features.narrative.engine.tag_state import personajes_activos, sincronizar_personajes
+from app.features.narrative.game.draft_sampling import sortear_cartas_draft
 from app.features.narrative.engine.catalog_loader import obtener_catalogos_universo
 from app.features.narrative.game.endings_service import (
     verificar_colapso_recursos,
@@ -184,9 +186,15 @@ async def iniciar_partida(user_id: int, req: IniciarPartidaRequest) -> IniciarPa
 
         afinidades = {p["_id"]: p.get("afinidad_inicial", 50) for p in personajes_docs}
         tags_activos = set()
+        tags_origen = {}
+        for p in personajes_docs:
+            propios = [t for t in p.get("tags", []) if t]
+            tags_origen[str(p["_id"])] = propios
+            tags_activos.update(propios)
         for c in cartas_docs:
-            for t in c.get("tags", []):
-                tags_activos.add(t)
+            propios = [t for t in c.get("tags", []) if t]
+            tags_origen[str(c["_id"])] = propios
+            tags_activos.update(propios)
 
         generation = await _proxima_generacion(user_id, req.date)
         run = {
@@ -204,6 +212,7 @@ async def iniciar_partida(user_id: int, req: IniciarPartidaRequest) -> IniciarPa
             "afinidad": afinidades,
             "cartas_en_mano": req.cartas_iniciales_ids,
             "tags_activos": list(tags_activos),
+            "tags_origen": tags_origen,
             "turno_actual": {
                 "cartas_ofrecidas_ids": [],
                 "carta_elegida_id": None,
@@ -263,6 +272,8 @@ async def iniciar_partida(user_id: int, req: IniciarPartidaRequest) -> IniciarPa
                 catalogo_frecuencias=cat_frecuencias,
             )
 
+        await sincronizar_personajes(run, personajes_activos(run), db)
+
         derrota = await verificar_colapso_recursos(run)
         if not derrota:
             pool_mensuales = cfg.get("pool_cartas_mensuales_ids", [])
@@ -276,7 +287,7 @@ async def iniciar_partida(user_id: int, req: IniciarPartidaRequest) -> IniciarPa
                 if evaluar_condiciones(cartas_docs_map.get(cid, {}).get("condiciones_aparicion", []), run)
             ]
             candidatas = elegibles if len(elegibles) >= 3 else (elegibles + [cid for cid in disponibles if cid not in elegibles])
-            cartas_ofrecidas_mes = random.sample(candidatas, min(3, len(candidatas)))
+            cartas_ofrecidas_mes = sortear_cartas_draft(candidatas, cartas_docs_map)
             run["turno_actual"]["cartas_ofrecidas_ids"] = cartas_ofrecidas_mes
 
         try:

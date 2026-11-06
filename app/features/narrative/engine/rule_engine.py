@@ -16,6 +16,7 @@ from app.features.narrative.schemas.rules_schemas import (
     AccionReferenciadaSchema,
     PrimitivaOperacionEnum,
 )
+from app.features.narrative.engine.tag_state import quitar_origen, quitar_tag, registrar_tags
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +165,9 @@ def _extraer_primitiva_y_params(
             "tag": accion.get("tag"),
             "destino": "portador" if not accion.get("personaje_id") else "personaje",
         }
+    elif isinstance(accion, dict) and "primitiva" in accion:
+        accion_id = accion["primitiva"]
+        params = accion.get("parametros") if isinstance(accion.get("parametros"), dict) else {k: v for k, v in accion.items() if k != "primitiva"}
     else:
         return "", {}
 
@@ -298,17 +302,16 @@ def ejecutar_accion(
     elif primitiva in (TipoAccionEnum.OTORGAR_TAG.value, PrimitivaOperacionEnum.OTORGAR_TAG.value):
         tag = params.get("tag")
         if tag:
-            tags = run_data.setdefault("tags_activos", [])
-            if tag not in tags:
-                tags.append(tag)
+            if duenio_id:
+                registrar_tags(run_data, duenio_id, [tag])
+            else:
+                tags = run_data.setdefault("tags_activos", [])
+                if tag not in tags:
+                    tags.append(tag)
 
     # 4. Remover Tag Pasivo
     elif primitiva == PrimitivaOperacionEnum.REMOVER_TAG.value:
-        tag = params.get("tag")
-        if tag:
-            tags = run_data.setdefault("tags_activos", [])
-            if tag in tags:
-                tags.remove(tag)
+        quitar_tag(run_data, params.get("tag"))
 
     # 5. Amortiguar Daño Pasivo
     elif primitiva in (TipoAccionEnum.AMORTIGUAR_DANIO.value, PrimitivaOperacionEnum.AMORTIGUAR_DANIO.value):
@@ -415,6 +418,56 @@ def ejecutar_accion(
             actual_var = float(variables.get(var_clave, 0.0))
             nueva_var = _aplicar_operacion_matematica(actual_var, op_mat, valor_num)
             variables[var_clave] = round(nueva_var, 4)
+
+    # 7. Mutar Estado de Entidad (Tag o Personaje)
+    elif primitiva == PrimitivaOperacionEnum.MUTAR_ESTADO_ENTIDAD.value:
+        entidad = (params.get("entidad") or "").lower()
+        operacion = (params.get("operacion") or "").lower()
+        id_entidad = params.get("id_entidad") or params.get("tag") or params.get("personaje_id")
+        if not id_entidad:
+            return
+
+        # A) Entidad = Tag
+        if entidad == "tag":
+            if operacion in ("alta", "agregar"):
+                if duenio_id:
+                    registrar_tags(run_data, duenio_id, [id_entidad])
+                else:
+                    tags = run_data.setdefault("tags_activos", [])
+                    if id_entidad not in tags:
+                        tags.append(id_entidad)
+            elif operacion in ("baja", "eliminar", "remover"):
+                quitar_tag(run_data, id_entidad)
+
+        # B) Entidad = Personaje
+        elif entidad == "personaje":
+            corte = run_data.setdefault("corte_activa", [])
+            afinidades = run_data.setdefault("afinidad", {})
+
+            if operacion in ("alta", "agregar"):
+                if id_entidad not in corte:
+                    corte.append(id_entidad)
+                if id_entidad not in afinidades:
+                    afinidades[id_entidad] = 50
+                adq = run_data.setdefault("adquisiciones", {})
+                if id_entidad not in adq:
+                    adq[id_entidad] = {"mes": run_data.get("mes_actual", 1), "tipo": "personaje"}
+
+            elif operacion in ("baja", "eliminar", "remover"):
+                # Limpieza Total: Corte y afinidad
+                if id_entidad in corte:
+                    corte.remove(id_entidad)
+                if id_entidad in afinidades:
+                    del afinidades[id_entidad]
+
+                # Purgar amortiguadores y modificadores pasivos del personaje
+                mods = run_data.get("modificadores_pasivos", [])
+                run_data["modificadores_pasivos"] = [
+                    m for m in mods if m.get("fuente") != id_entidad
+                ]
+
+                # Retirar los tags que solo aportaba este personaje
+                quitar_origen(run_data, id_entidad)
 
 
 

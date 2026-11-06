@@ -48,6 +48,7 @@ from app.features.narrative.schemas.game_schemas import (
     EventoTurnoResponse
 )
 from app.features.narrative.engine.rule_engine import despachar_efectos, evaluar_condiciones
+from app.features.narrative.engine.tag_state import personajes_activos, sincronizar_personajes
 from app.features.narrative.engine.event_director import (
     seleccionar_evento_mes,
     sortear_resultado_opcion,
@@ -180,6 +181,7 @@ async def decidir_evento(user_id: int, req: DecidirEventoRequest) -> DecidirEven
     recursos_mapa = await obtener_mapa_recursos_universo(run["universo_id"])
     efectos_res = [EfectoSchema(**e) for e in res_doc.get("efectos", [])]
     despachar_efectos(DisparadorEnum.AL_OBTENER, run, efectos_res, recursos_mapa)
+    await sincronizar_personajes(run, personajes_activos(run), db)
 
     for imp in res_doc.get("impacto_afinidad", []):
         pid = imp.get("personaje_id")

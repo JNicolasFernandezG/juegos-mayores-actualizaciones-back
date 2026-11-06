@@ -23,7 +23,10 @@ from app.features.narrative.schemas import (
     ConversacionCreateRequest,
     ConversacionResponse,
     FinalizacionCreateRequest,
-    FinalizacionResponse
+    FinalizacionResponse,
+    TagCreateRequest,
+    TagUpdateRequest,
+    TagResponse
 )
 from app.features.narrative.schemas.v2_graph_schemas import (
     EventoV2GrafoSchema,
@@ -40,6 +43,10 @@ from app.features.narrative.validation import (
 from app.features.narrative.admin.rules_catalog import obtener_catalogo_reglas_dict
 from app.features.narrative.admin.image_service import procesar_y_guardar_imagen_narrativa
 from app.features.narrative.admin.crud_service import (
+    crear_o_actualizar_tag,
+    obtener_tags,
+    obtener_tag_por_id,
+    eliminar_tag,
     crear_o_actualizar_universo,
     obtener_universos,
     obtener_universo_por_id,
@@ -472,6 +479,50 @@ async def endpoint_validar_grafos_v2(req: ValidarGrafoV2Request):
         "total": len(resultados),
         "invalidos": sum(1 for r in resultados if not r.valido)
     }
+
+
+
+
+# ============================================================================
+# TAGS NARRATIVOS (narrative_tags)
+# ============================================================================
+
+@router.get("/tags", response_model=List[TagResponse], summary="Listar tags narrativos del catálogo", tags=["Narrativo - CRUD Tags"])
+async def endpoint_listar_tags(
+    universo_id: Optional[str] = Query(None, description="Filtrar por universo"),
+    limit: Optional[int] = Query(None, description="Límite de resultados"),
+    skip: int = Query(0, description="Offset de paginación")
+):
+    return await obtener_tags(universo_id=universo_id, limit=limit, skip=skip)
+
+@router.get("/tags/{tag_id}", response_model=TagResponse, summary="Obtener tag por ID (slug)", tags=["Narrativo - CRUD Tags"])
+async def endpoint_obtener_tag(tag_id: str = Path(...)):
+    tag = await obtener_tag_por_id(tag_id)
+    if not tag:
+        raise HTTPException(status_code=404, detail=f"Tag '{tag_id}' no encontrado.")
+    return tag
+
+@router.post("/tags", response_model=TagResponse, summary="Crear o actualizar tag narrativo", tags=["Narrativo - CRUD Tags"])
+async def endpoint_guardar_tag(req: TagCreateRequest):
+    return await crear_o_actualizar_tag(req)
+
+@router.put("/tags/{tag_id}", response_model=TagResponse, summary="Actualizar tag existente", tags=["Narrativo - CRUD Tags"])
+async def endpoint_actualizar_tag(tag_id: str = Path(...), req: TagUpdateRequest = ...):
+    actual = await obtener_tag_por_id(tag_id)
+    if not actual:
+        raise HTTPException(status_code=404, detail=f"Tag '{tag_id}' no encontrado.")
+    data_dict = actual.model_dump(by_alias=True)
+    update_data = req.model_dump(exclude_unset=True)
+    data_dict.update(update_data)
+    tag_actualizado = TagCreateRequest(**data_dict)
+    return await crear_o_actualizar_tag(tag_actualizado)
+
+@router.delete("/tags/{tag_id}", summary="Eliminar tag del catálogo", tags=["Narrativo - CRUD Tags"])
+async def endpoint_eliminar_tag(tag_id: str = Path(...)):
+    exito = await eliminar_tag(tag_id)
+    if not exito:
+        raise HTTPException(status_code=404, detail="Tag no encontrado.")
+    return {"message": "Tag eliminado correctamente."}
 
 
 # Incluir subrouter de acciones y frecuencias desacopladas

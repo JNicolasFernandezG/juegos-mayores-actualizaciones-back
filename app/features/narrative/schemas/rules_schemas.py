@@ -22,6 +22,7 @@ class PrimitivaOperacionEnum(str, Enum):
     REMOVER_TAG = "remover_tag"
     AMORTIGUAR_DANIO = "amortiguar_danio"
     MUTAR_ESTADO = "mutar_estado"
+    MUTAR_ESTADO_ENTIDAD = "mutar_estado_entidad"
 
 class DestinoAfinidadEnum(str, Enum):
     PORTADOR = "portador"
@@ -60,6 +61,9 @@ class ParametrosAccionSchema(BaseModel):
     personaje_id: Optional[str] = None
     tag: Optional[str] = None
     porcentaje: Optional[float] = None
+    entidad: Optional[str] = None        # "tag" | "personaje"
+    operacion: Optional[str] = None      # "alta" | "baja"
+    id_entidad: Optional[str] = None     # tag_id o personaje_id
 
 class AccionReferenciadaSchema(BaseModel):
     accion_id: str

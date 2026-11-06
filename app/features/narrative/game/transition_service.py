@@ -38,6 +38,8 @@ from app.features.narrative.schemas.game_schemas import (
 from app.features.narrative.schemas.rules_schemas import EfectoSchema
 from app.features.narrative.engine.rule_engine import despachar_efectos, evaluar_condiciones
 from app.features.narrative.engine.catalog_loader import obtener_catalogos_universo
+from app.features.narrative.engine.tag_state import personajes_activos, sincronizar_personajes
+from app.features.narrative.game.draft_sampling import sortear_cartas_draft
 from app.features.narrative.game.endings_service import (
     verificar_colapso_recursos,
     calcular_finalizacion_victoria,
@@ -146,6 +148,9 @@ async def avanzar_mes(user_id: int, req: AvanzarMesRequest) -> AvanzarMesV2Respo
             catalogo_frecuencias=cat_frecuencias,
         )
 
+    # Los efectos mensuales pueden reclutar personajes: activar sus tags estáticos
+    await sincronizar_personajes(run, personajes_activos(run), db)
+
     # Si algún recurso colapsó por costos mensuales pasivos:
     derrota = await verificar_colapso_recursos(run)
     if derrota:
@@ -176,7 +181,7 @@ async def avanzar_mes(user_id: int, req: AvanzarMesRequest) -> AvanzarMesV2Respo
         if evaluar_condiciones(cartas_docs_map.get(cid, {}).get("condiciones_aparicion", []), run)
     ]
     candidatas = elegibles if len(elegibles) >= 3 else (elegibles + [cid for cid in disponibles if cid not in elegibles])
-    cartas_sorteadas = random.sample(candidatas, min(3, len(candidatas)))
+    cartas_sorteadas = sortear_cartas_draft(candidatas, cartas_docs_map)
     run["turno_actual"] = {
         "cartas_ofrecidas_ids": cartas_sorteadas,
         "carta_elegida_id": None,

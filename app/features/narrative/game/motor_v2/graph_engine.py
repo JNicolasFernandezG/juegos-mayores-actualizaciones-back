@@ -25,6 +25,7 @@ from app.features.narrative.constants import (
 )
 from app.features.narrative.enums import RunPhaseEnum, DisparadorEnum, TipoResultadoEnum
 from app.features.narrative.schemas.rules_schemas import EfectoSchema
+from app.features.narrative.engine.tag_state import personajes_activos, sincronizar_personajes
 from app.features.narrative.engine.rule_engine import despachar_efectos, aplicar_delta_recurso
 from app.features.narrative.engine.catalog_loader import obtener_catalogos_universo
 from app.features.narrative.schemas.v2_graph_schemas import (
@@ -584,6 +585,9 @@ class GraphTraversalEngine:
             await self._despachar_reactivos(
                 run, disparador_reactivo, recursos_mapa, cat_acciones, cat_frecuencias, db
             )
+
+        # Desenlaces o reactivos pueden reclutar personajes: activar sus tags estáticos
+        await sincronizar_personajes(run, personajes_activos(run), db)
 
         cruces_afinidad = self._detectar_cruces_afinidad(afinidad_before, afinidad)
 

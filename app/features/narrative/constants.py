@@ -2,6 +2,7 @@
 Constantes de nombres de colecciones en MongoDB para el motor narrativo.
 """
 
+COLL_TAGS = "narrative_tags"
 COLL_SETTINGS = "narrative_settings"
 COLL_CHARACTERS = "narrative_characters"
 COLL_CARDS = "narrative_cards"

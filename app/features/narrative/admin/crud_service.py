@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from app.core.database import get_database
 from app.features.narrative.validation import validar_efectos_almacenables, validar_grafo_para_guardado
 from app.features.narrative.constants import (
+    COLL_TAGS,
     COLL_SETTINGS,
     COLL_CHARACTERS,
     COLL_CARDS,
@@ -36,7 +37,10 @@ from app.features.narrative.schemas.catalog_schemas import (
     ConversacionCreateRequest,
     ConversacionResponse,
     FinalizacionCreateRequest,
-    FinalizacionResponse
+    FinalizacionResponse,
+    TagCreateRequest,
+    TagUpdateRequest,
+    TagResponse
 )
 from app.features.narrative.schemas.v2_graph_schemas import (
     EventoV2GrafoSchema,
@@ -90,7 +94,12 @@ async def guardar_item_con_efectos(
     response_cls: Type[T]
 ) -> T:
     """Guarda una carta o personaje sólo si cada efecto es ejecutable por el motor."""
-    hallazgos = await validar_efectos_almacenables(getattr(req, "efectos", None) or [], req.universo_id)
+    hallazgos = await validar_efectos_almacenables(
+        getattr(req, "efectos", None) or [],
+        req.universo_id,
+        tags=getattr(req, "tags", None) or [],
+        condiciones_aparicion=getattr(req, "condiciones_aparicion", None) or [],
+    )
     if hallazgos:
         raise HTTPException(
             status_code=422,
@@ -302,3 +311,24 @@ async def obtener_evento_especial_v2_por_id(evento_id: str) -> Optional[EventoEs
 async def eliminar_evento_especial_v2(evento_id: str) -> bool:
     return await eliminar_item_catalogo_por_id(COLL_V2_EVENTOS_ESPECIALES, evento_id)
 
+
+
+# ============================================================================
+# TAGS NARRATIVOS (narrative_tags)
+# ============================================================================
+
+async def crear_o_actualizar_tag(req: TagCreateRequest) -> TagResponse:
+    return await guardar_item_catalogo(COLL_TAGS, req.id, req, TagResponse)
+
+async def obtener_tags(
+    universo_id: Optional[str] = None,
+    limit: Optional[int] = None,
+    skip: int = 0
+) -> List[TagResponse]:
+    return await listar_items_catalogo(COLL_TAGS, TagResponse, universo_id, limit, skip)
+
+async def obtener_tag_por_id(tag_id: str) -> Optional[TagResponse]:
+    return await obtener_item_catalogo_por_id(COLL_TAGS, tag_id, TagResponse)
+
+async def eliminar_tag(tag_id: str) -> bool:
+    return await eliminar_item_catalogo_por_id(COLL_TAGS, tag_id)

@@ -6219,6 +6219,285 @@
         ]
       }
     },
+    "/api/narrative/admin/tags": {
+      "get": {
+        "tags": [
+          "Narrativo - CRUD Tags"
+        ],
+        "summary": "Listar tags narrativos del catálogo",
+        "operationId": "endpoint_listar_tags_api_narrative_admin_tags_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "universo_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtrar por universo",
+              "title": "Universo Id"
+            },
+            "description": "Filtrar por universo"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Límite de resultados",
+              "title": "Limit"
+            },
+            "description": "Límite de resultados"
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "Offset de paginación",
+              "default": 0,
+              "title": "Skip"
+            },
+            "description": "Offset de paginación"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TagResponse"
+                  },
+                  "title": "Response Endpoint Listar Tags Api Narrative Admin Tags Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Narrativo - CRUD Tags"
+        ],
+        "summary": "Crear o actualizar tag narrativo",
+        "operationId": "endpoint_guardar_tag_api_narrative_admin_tags_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/narrative/admin/tags/{tag_id}": {
+      "get": {
+        "tags": [
+          "Narrativo - CRUD Tags"
+        ],
+        "summary": "Obtener tag por ID (slug)",
+        "operationId": "endpoint_obtener_tag_api_narrative_admin_tags__tag_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tag Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Narrativo - CRUD Tags"
+        ],
+        "summary": "Actualizar tag existente",
+        "operationId": "endpoint_actualizar_tag_api_narrative_admin_tags__tag_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tag Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Narrativo - CRUD Tags"
+        ],
+        "summary": "Eliminar tag del catálogo",
+        "operationId": "endpoint_eliminar_tag_api_narrative_admin_tags__tag_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tag Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/narrative/admin/operaciones": {
       "get": {
         "tags": [
@@ -7610,6 +7889,13 @@
             "type": "array",
             "title": "Efectos",
             "default": []
+          },
+          "peso_draft_mensual": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Peso Draft Mensual",
+            "description": "Peso relativo en el sorteo del draft mensual (1.0 = normal, menor = más rara)",
+            "default": 1.0
           }
         },
         "type": "object",
@@ -7671,6 +7957,13 @@
             "type": "array",
             "title": "Efectos",
             "default": []
+          },
+          "peso_draft_mensual": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Peso Draft Mensual",
+            "description": "Peso relativo en el sorteo del draft mensual (1.0 = normal, menor = más rara)",
+            "default": 1.0
           }
         },
         "type": "object",
@@ -9776,6 +10069,19 @@
             ],
             "title": "Puntos Ganados",
             "description": "Puntos acreditados por finalizar la partida (solo en transición terminal)"
+          },
+          "conversacion_actual": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversacion Actual",
+            "description": "Diálogo o evento especial encadenado que se presentará tras confirmar el resultado del evento actual"
           }
         },
         "type": "object",
@@ -11529,6 +11835,39 @@
               }
             ],
             "title": "Porcentaje"
+          },
+          "entidad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entidad"
+          },
+          "operacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operacion"
+          },
+          "id_entidad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Entidad"
           }
         },
         "type": "object",
@@ -11759,7 +12098,8 @@
           "otorgar_tag",
           "remover_tag",
           "amortiguar_danio",
-          "mutar_estado"
+          "mutar_estado",
+          "mutar_estado_entidad"
         ],
         "title": "PrimitivaOperacionEnum"
       },
@@ -12324,6 +12664,196 @@
           "cartas_ofrecidas"
         ],
         "title": "SetupDesafioResponse"
+      },
+      "TagCreateRequest": {
+        "properties": {
+          "_id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Identificador único slug (ej: disciplina_militar)"
+          },
+          "universo_id": {
+            "type": "string",
+            "title": "Universo Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion",
+            "default": ""
+          },
+          "color": {
+            "type": "string",
+            "title": "Color",
+            "default": "#64748b"
+          },
+          "icono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icono",
+            "default": "tag"
+          },
+          "categoria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria",
+            "default": "general"
+          }
+        },
+        "type": "object",
+        "required": [
+          "_id",
+          "universo_id",
+          "nombre"
+        ],
+        "title": "TagCreateRequest"
+      },
+      "TagResponse": {
+        "properties": {
+          "_id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "universo_id": {
+            "type": "string",
+            "title": "Universo Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion",
+            "default": ""
+          },
+          "color": {
+            "type": "string",
+            "title": "Color",
+            "default": "#64748b"
+          },
+          "icono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icono",
+            "default": "tag"
+          },
+          "categoria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria",
+            "default": "general"
+          }
+        },
+        "type": "object",
+        "required": [
+          "_id",
+          "universo_id",
+          "nombre"
+        ],
+        "title": "TagResponse"
+      },
+      "TagUpdateRequest": {
+        "properties": {
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "icono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icono"
+          },
+          "categoria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria"
+          }
+        },
+        "type": "object",
+        "title": "TagUpdateRequest"
       },
       "TipoAccionEnum": {
         "type": "string",
@@ -13344,6 +13874,9 @@
     },
     {
       "name": "Narrativo - CRUD Eventos Especiales V2"
+    },
+    {
+      "name": "Narrativo - CRUD Tags"
     },
     {
       "name": "Narrativo - Legacy V1 (Deprecado)"
