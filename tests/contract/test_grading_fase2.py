@@ -454,3 +454,45 @@ async def test_consistent_client_time_is_not_flagged(
     assert stored.get("time_suspect") is not True
     assert stored["started_at"] is not None
     assert 95 <= stored["server_elapsed_seconds"] <= 120
+
+
+@pytest.mark.asyncio
+async def test_wordle_exceeding_six_attempts_is_marked_failed(
+    client, test_db, seeded_user, seeded_challenge, make_token
+):
+    await seeded_challenge(game_id="wordle", date="2099-06-20", config={"solution": "TEST", "max_attempts": 6})
+    user = await seeded_user(puntos=0)
+    token = make_token(user["id"])
+
+    # Enviar un intento con 7 guesses alegando completado
+    guesses = [{"word": f"TEST{i}"} for i in range(7)]
+    response = await client.post(
+        "/api/games/attempts",
+        json={
+            "game_id": "wordle",
+            "date": "2099-06-20",
+            "status": "completed",
+            "word": "TEST",
+            "guesses": guesses,
+            "attempts": 7,
+            "grade": "C",
+            "score": 50,
+            "stars": 1,
+        },
+        headers=_auth(token),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "failed"
+    assert body["grade"] == "F"
+    assert body["score"] == 0
+    assert body["stars"] == 0
+    assert body["puntos_ganados"] == 0
+
+    stored = await test_db["user_attempts"].find_one(
+        {"user_id": user["id"], "game_id": "wordle", "date": "2099-06-20"}
+    )
+    assert stored["status"] == "failed"
+    assert stored["grade"] == "F"
+    assert stored["score"] == 0

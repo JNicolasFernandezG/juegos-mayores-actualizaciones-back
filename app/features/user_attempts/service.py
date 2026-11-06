@@ -136,9 +136,11 @@ def calculate_grade_and_score(
         elif attempts <= 4:
             grade = "B"
             stars = 2
-        else:
+        elif attempts <= 6:
             grade = "C"
             stars = 1
+        else:
+            return ("F", 0, 0)
 
     elif gid == "sudoku":
         # Sudoku: los errores mandan; 0 vidas restantes nunca es S
@@ -488,6 +490,11 @@ async def save_user_attempt(
             time_taken_seconds=time_taken,
             escalas_tiempo=escalas_juego
         )
+
+    # Wordle tiene un límite estricto de 6 intentos: si se superan, se marca como fallida
+    if game_id == "wordle" and (attempts_value > 6 or (req.guesses and len(req.guesses) > 6)):
+        final_status = "failed"
+        grade, score, stars = "F", 0, 0
 
     doc = {
         "user_id": user_id,
