@@ -4934,6 +4934,54 @@
         }
       }
     },
+    "/api/narrative/admin/v2/seed": {
+      "get": {
+        "tags": [
+          "Narrativo - Administración"
+        ],
+        "summary": "Estado del último intento de siembra de grafos V2",
+        "description": "Reporta qué hizo el arranque y cuántos grafos hay hoy, sin exponer logs.",
+        "operationId": "endpoint_estado_seed_v2_api_narrative_admin_v2_seed_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Narrativo - Administración"
+        ],
+        "summary": "Ejecutar la siembra insert-only de grafos V2",
+        "description": "Dispara el mismo seed del arranque y devuelve el resultado o el error real.",
+        "operationId": "endpoint_ejecutar_seed_v2_api_narrative_admin_v2_seed_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/narrative/admin/v2/validar": {
       "post": {
         "tags": [

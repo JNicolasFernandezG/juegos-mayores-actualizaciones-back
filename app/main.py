@@ -42,6 +42,7 @@ async def lifespan(app: FastAPI):
     await connect_to_mongo()
     import asyncio
     autogen_lock = asyncio.Lock()
+    app.state.seed_v2_status = "pendiente"
 
     async def _generar_desafios_si_falta():
         # Serializa arranque y ciclo periódico: dos corridas superpuestas multiplican las ráfagas a la RAE.
@@ -106,8 +107,10 @@ async def lifespan(app: FastAPI):
                     logger.warning("[NARRATIVE V2 SEED] La base quedó sin eventos V2 tras la siembra.")
                 else:
                     logger.info(f"[NARRATIVE V2 SEED] Eventos V2 disponibles: {total_eventos_v2}")
+                app.state.seed_v2_status = f"ok: {total_eventos_v2} eventos"
             except Exception as e_seed_v2:
                 logger.warning(f"Aviso durante la siembra de grafos V2: {e_seed_v2}")
+                app.state.seed_v2_status = f"error: {type(e_seed_v2).__name__}: {e_seed_v2}"
             # Los desafíos narrativos se arman con los pools de grafos: generarlos
             # después del seed evita sobrescribir el mes con pools vacíos.
             await _generar_desafios_si_falta()

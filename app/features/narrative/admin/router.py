@@ -5,7 +5,7 @@ Expone endpoints REST para catálogo de reglas, carga de multimedia WebP,
 gestión de colecciones estáticas y generador procedural mensual.
 """
 
-from fastapi import APIRouter, Query, Path, HTTPException, File, UploadFile, Depends
+from fastapi import APIRouter, Query, Path, HTTPException, File, Request, UploadFile, Depends
 from typing import Optional, List, Dict, Any
 
 from app.features.narrative.admin.actions_router import actions_admin_router
@@ -332,6 +332,59 @@ async def endpoint_eliminar_evento_especial_v2(evento_id: str = Path(...)):
     if not exito:
         raise HTTPException(status_code=404, detail="Evento especial V2 no encontrado.")
     return {"message": "Evento especial V2 eliminado correctamente."}
+
+@router.get(
+    "/v2/seed",
+    summary="Estado del último intento de siembra de grafos V2",
+    tags=["Narrativo - Administración"]
+)
+async def endpoint_estado_seed_v2(request: Request):
+    """Reporta qué hizo el arranque y cuántos grafos hay hoy, sin exponer logs."""
+    from app.core.database import get_database
+    from app.features.narrative.constants import (
+        COLL_V2_CONVERSATIONS,
+        COLL_V2_EVENTOS_ESPECIALES,
+        COLL_V2_EVENTS,
+    )
+
+    db = get_database()
+    return {
+        "arranque": getattr(request.app.state, "seed_v2_status", "sin_registro"),
+        "eventos": await db[COLL_V2_EVENTS].count_documents({}),
+        "conversaciones": await db[COLL_V2_CONVERSATIONS].count_documents({}),
+        "eventos_especiales": await db[COLL_V2_EVENTOS_ESPECIALES].count_documents({}),
+    }
+
+@router.post(
+    "/v2/seed",
+    summary="Ejecutar la siembra insert-only de grafos V2",
+    tags=["Narrativo - Administración"]
+)
+async def endpoint_ejecutar_seed_v2():
+    """Dispara el mismo seed del arranque y devuelve el resultado o el error real."""
+    from app.core.database import get_database
+    from app.features.narrative.constants import (
+        COLL_V2_CONVERSATIONS,
+        COLL_V2_EVENTOS_ESPECIALES,
+        COLL_V2_EVENTS,
+    )
+    from app.scripts.seed_narrative_v2_graphs import seed_v2_graphs
+
+    try:
+        await seed_v2_graphs()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Seed V2 falló: {type(exc).__name__}: {exc}",
+        )
+
+    db = get_database()
+    return {
+        "success": True,
+        "eventos": await db[COLL_V2_EVENTS].count_documents({}),
+        "conversaciones": await db[COLL_V2_CONVERSATIONS].count_documents({}),
+        "eventos_especiales": await db[COLL_V2_EVENTOS_ESPECIALES].count_documents({}),
+    }
 
 @router.post(
     "/v2/validar",
