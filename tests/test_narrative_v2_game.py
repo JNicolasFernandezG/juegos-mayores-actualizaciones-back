@@ -25,19 +25,6 @@ def test_narrative_v2_full_cycle():
     asyncio.run(_ejecutar_ciclo_v2())
 
 
-async def _avanzar_un_nodo(client, estado, today_str, guest_headers):
-    """Avanza un paso eligiendo la primera opción disponible del grafo activo."""
-    opciones = [op for op in estado["nodo_actual"]["opciones"] if op.get("disponible", True)]
-    assert opciones, f"El nodo {estado['nodo_actual']['id']} no tiene opciones disponibles."
-    resp = await client.post(
-        "/api/narrative/v2/partida/avanzar-nodo",
-        json={"date": today_str, "opcion_id": opciones[0]["id"]},
-        headers=guest_headers,
-    )
-    assert resp.status_code == 200, resp.text
-    return resp.json()
-
-
 async def _ejecutar_ciclo_v2():
     await connect_to_mongo()
     db = get_database()
@@ -65,8 +52,12 @@ async def _ejecutar_ciclo_v2():
         corte_elegida = cfg["setup_corte_ofrecidos_ids"][:3]
         cartas_elegidas = cfg["setup_cartas_ofrecidas_ids"][:3]
 
-        # El ciclo completo vive en el motor de grafos V2
-        await db["narrative_settings"].update_one({"_id": "corte_medieval"}, {"$set": {"motor": "v2"}})
+        # El ciclo completo vive en el motor de grafos V2. El seed de test tiene menos
+        # eventos que meses del año, así que se habilita el reciclaje controlado del motor.
+        await db["narrative_settings"].update_one(
+            {"_id": "corte_medieval"},
+            {"$set": {"motor": "v2", "reciclaje_eventos_v2": True}},
+        )
 
         resp = await client.post(
             "/api/narrative/v2/partida/iniciar",
@@ -101,17 +92,38 @@ async def _ejecutar_ciclo_v2():
             assert data["fase_actual"] == "TOMA_DECISION_EVENTO", data
             assert data["grafo_actual"] is not None
 
-            # Fases 2 y 3: evento y conversación se recorren con el mismo endpoint
+            # Fases 2 y 3: evento y conversación se recorren con el mismo endpoint.
+            # Si el evento encadena un diálogo, el nodo activo pasa al grafo de conversación.
             estado = data["grafo_actual"]
             pasos = 0
-            while estado["fase_actual"] in FASES_AVANCE_NODO and estado["status"] == "CONTINUA":
+            while estado["fase_actual"] in FASES_AVANCE_NODO:
+                if estado.get("conversacion_actual"):
+                    resp = await client.get(
+                        "/api/narrative/v2/partida/grafo-actual",
+                        params={"date": today_str},
+                        headers=guest_headers,
+                    )
+                    assert resp.status_code == 200, resp.text
+                    estado = resp.json()
+                opciones = [
+                    op for op in estado["nodo_actual"]["opciones"] if op.get("disponible", True)
+                ]
+                assert opciones, f"El nodo {estado['nodo_actual']['id']} no tiene opciones disponibles."
                 pasos += 1
                 assert pasos <= 60, "El grafo no converge a un nodo final."
-                estado = await _avanzar_un_nodo(client, estado, today_str, guest_headers)
+                resp = await client.post(
+                    "/api/narrative/v2/partida/avanzar-nodo",
+                    json={"date": today_str, "opcion_id": opciones[0]["id"]},
+                    headers=guest_headers,
+                )
+                assert resp.status_code == 200, resp.text
+                estado = resp.json()
+                if estado["fase_actual"] == "FINALIZADA" or estado.get("finalizacion"):
+                    finalizada = True
+                    break
 
-            if estado["status"] != "CONTINUA" or estado["fase_actual"] == "FINALIZADA":
+            if finalizada:
                 data = estado
-                finalizada = True
                 break
 
             # Fase 4: balance y avance de mes
