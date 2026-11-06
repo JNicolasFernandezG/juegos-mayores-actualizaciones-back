@@ -57,7 +57,6 @@ async def lifespan(app: FastAPI):
                     await seed_sudoku_challenges()
                 except Exception as e_static:
                     logger.warning(f"Aviso durante la siembra estática de desafíos: {e_static}")
-            await _generar_desafios_si_falta()
             try:
                 from app.features.narrative.constants import (
                     COLL_CARDS,
@@ -70,6 +69,19 @@ async def lifespan(app: FastAPI):
                 if await db[COLL_SETTINGS].count_documents({"_id": "corte_medieval"}) == 0:
                     from app.scripts.seed_narrative import seed_universo_narrativo
                     await seed_universo_narrativo()
+                else:
+                    # V1 está retirado: un universo heredado con motor v1 dejaría la
+                    # partida sin endpoints de grafo. Solo corregimos el universo base.
+                    motor = await db[COLL_SETTINGS].update_many(
+                        {"_id": "corte_medieval", "motor": {"$nin": ["v2"]}},
+                        {"$set": {"motor": "v2"}},
+                    )
+                    reciclaje = await db[COLL_SETTINGS].update_many(
+                        {"_id": "corte_medieval", "reciclaje_eventos_v2": {"$exists": False}},
+                        {"$set": {"reciclaje_eventos_v2": True}},
+                    )
+                    if motor.modified_count or reciclaje.modified_count:
+                        logger.info("[NARRATIVE SEED] Universo base migrado a motor v2.")
                 faltantes = []
                 for nombre, coleccion in (("personajes", COLL_CHARACTERS), ("cartas", COLL_CARDS)):
                     if await db[coleccion].count_documents({}) == 0:
@@ -84,23 +96,21 @@ async def lifespan(app: FastAPI):
                 logger.warning(f"Aviso durante la siembra del universo narrativo: {e_seed}")
             try:
                 from app.features.narrative.constants import COLL_V2_EVENTS
+                from app.scripts.seed_narrative_v2_graphs import seed_v2_graphs
                 db = get_database()
-                # Sin flag explícito sembramos solo cuando el motor quedó sin eventos.
-                # El seed es insert-only, así que repetirlo no pisa ediciones del admin.
-                sembrar_v2 = (
-                    settings.SEED_NARRATIVE_V2
-                    or await db[COLL_V2_EVENTS].count_documents({}) == 0
-                )
-                if sembrar_v2:
-                    from app.scripts.seed_narrative_v2_graphs import seed_v2_graphs
-                    await seed_v2_graphs()
-                    total_eventos_v2 = await db[COLL_V2_EVENTS].count_documents({})
-                    if total_eventos_v2 == 0:
-                        logger.warning("[NARRATIVE V2 SEED] La base quedó sin eventos V2 tras la siembra.")
-                    else:
-                        logger.info(f"[NARRATIVE V2 SEED] Eventos V2 disponibles: {total_eventos_v2}")
+                # Insert-only ($setOnInsert por _id): cada arranque restaura los grafos
+                # que falten y nunca pisa ediciones del admin.
+                await seed_v2_graphs()
+                total_eventos_v2 = await db[COLL_V2_EVENTS].count_documents({})
+                if total_eventos_v2 == 0:
+                    logger.warning("[NARRATIVE V2 SEED] La base quedó sin eventos V2 tras la siembra.")
+                else:
+                    logger.info(f"[NARRATIVE V2 SEED] Eventos V2 disponibles: {total_eventos_v2}")
             except Exception as e_seed_v2:
                 logger.warning(f"Aviso durante la siembra de grafos V2: {e_seed_v2}")
+            # Los desafíos narrativos se arman con los pools de grafos: generarlos
+            # después del seed evita sobrescribir el mes con pools vacíos.
+            await _generar_desafios_si_falta()
             try:
                 from app.scripts.seed_narrative_tags import seed_narrative_catalogs
                 resumen_catalogos = await seed_narrative_catalogs()

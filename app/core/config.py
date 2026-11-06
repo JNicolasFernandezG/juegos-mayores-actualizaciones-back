@@ -85,9 +85,6 @@ class Settings(BaseSettings):
     GRADING_ENFORCE_SUDOKU: bool = False
     GRADING_ENFORCE_CRUCIGRAMA: bool = False
 
-    # Fuerza la siembra V2 en cada arranque. Sin el flag, se siembra solo si no hay eventos V2.
-    SEED_NARRATIVE_V2: bool = False
-
     # Seeds estáticos de desafíos (Wordle/Sopa/Sudoku de calendario fijo). Opt-in y nunca pisan datos.
     SEED_STATIC_CHALLENGES: bool = False
 
