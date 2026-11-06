@@ -11,7 +11,7 @@
         "tags": [
           "Autenticación"
         ],
-        "summary": "Iniciar sesión como Operador de Sistemas (Con Rate Limiting)",
+        "summary": "Iniciar sesión como Operador de Sistemas (Con Rate Limiting y Cookie HttpOnly)",
         "operationId": "endpoint_login_sistemas_api_auth_login_sistemas_post",
         "requestBody": {
           "content": {
@@ -50,7 +50,7 @@
         "tags": [
           "Autenticación"
         ],
-        "summary": "Ingreso de alumnos mediante PIN de 6 dígitos (Con Rate Limiting anti-fuerza bruta)",
+        "summary": "Ingreso de alumnos mediante PIN de 6 dígitos (Con Rate Limiting y Cookie HttpOnly)",
         "operationId": "endpoint_login_codigo_api_auth_ingresar_codigo_post",
         "requestBody": {
           "content": {
@@ -82,6 +82,49 @@
             }
           }
         }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Cerrar sesión y limpiar cookies protegidas de sesión",
+        "operationId": "endpoint_logout_api_auth_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/session": {
+      "get": {
+        "tags": [
+          "Autenticación"
+        ],
+        "summary": "Verificar sesión actual desde cookie protegida o Bearer token",
+        "operationId": "endpoint_check_session_api_auth_session_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/auth/verificar-token": {

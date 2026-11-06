@@ -6,6 +6,7 @@ Dos transportes, ambos verificados por el backend:
 
 - ``Authorization: Bearer`` con JWT válido: valida firma, expiración, permisos del
   servicio y estado de la cuenta.
+- Cookie HttpOnly ``access_token`` emitida por el backend al iniciar sesión.
 - ``X-Guest-Credential`` emitido por ``POST /api/auth/guest-credential``: credencial
   firmada cuyo ``guest_id`` no puede elegir el cliente.
 
@@ -18,7 +19,7 @@ import hashlib
 from contextvars import ContextVar
 from typing import Optional, Tuple
 
-from fastapi import Header, HTTPException, status
+from fastapi import Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials
 
 from app.core.dependencies import get_current_user
@@ -47,18 +48,24 @@ def _guest_id_valido(valor: Optional[str]) -> Optional[str]:
 async def obtener_identidad_narrativa(
     authorization: Optional[str] = Header(None),
     x_guest_credential: Optional[str] = Header(None),
+    request: Request = None,
 ) -> int:
     """
     Dependencia de request: autentica usuario o invitado y publica la identidad
     efectiva en ContextVars. Devuelve el id de usuario (0 para invitado).
     """
+    token = None
     if authorization is not None:
         partes = authorization.split()
         if len(partes) != 2 or partes[0].lower() != "bearer" or not partes[1]:
             raise _no_autorizado("Token de autenticación inválido o expirado.")
+        token = partes[1]
+    elif request is not None:
+        token = request.cookies.get("access_token") or request.cookies.get("admin_session_token")
 
+    if token:
         user = await get_current_user(
-            HTTPAuthorizationCredentials(scheme="Bearer", credentials=partes[1])
+            request, HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
         )
         user_id = int(user["id"])
         token_guest = _guest_id_actual.set(None)

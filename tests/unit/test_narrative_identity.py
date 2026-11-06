@@ -76,7 +76,8 @@ async def test_invitados_distintos_no_comparten_partida():
 
 @pytest.mark.asyncio
 async def test_usuario_autenticado_ignora_credencial_de_invitado(monkeypatch):
-    async def _fake_current_user(_credentials):
+    async def _fake_current_user(_request, _credentials):
+        assert _credentials.credentials == "token-valido"
         return {"id": 4242}
 
     monkeypatch.setattr(identity, "get_current_user", _fake_current_user)
