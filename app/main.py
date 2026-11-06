@@ -8,7 +8,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import logging
 
 from app.core.config import settings
-from app.core.database import connect_to_mongo, close_mongo_connection
+from app.core.database import connect_to_mongo, close_mongo_connection, get_database
 from app.core.security_middleware import AbsoluteSecurityMiddleware
 from app.core.rate_limit import RateLimitMiddleware
 from app.features.auth.router import router as auth_router

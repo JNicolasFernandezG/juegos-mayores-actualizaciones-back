@@ -17,6 +17,13 @@ def test_universo_seed_usa_motor_v2_y_reciclaje():
     assert universo.reciclaje_eventos_v2 is True
 
 
+def test_main_tiene_get_database_para_el_seed_de_arranque():
+    """El lifespan siembra con get_database(); un import faltante lo rompe en silencio."""
+    from app import main
+
+    assert callable(main.get_database)
+
+
 def _universo(universo_id: str, nombre: str) -> UniversoCreateRequest:
     return UniversoCreateRequest(
         id=universo_id,
