@@ -1,6 +1,6 @@
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.core.security import decode_access_token
 from app.core.database import get_database
@@ -8,24 +8,59 @@ from app.core.config import settings
 
 security_bearer = HTTPBearer(auto_error=False)
 
+def set_auth_cookie(response: Response, request: Request, token: str) -> None:
+    """Configura una cookie de sesión protegida con HttpOnly, SameSite=Lax y Secure."""
+    is_secure = bool(
+        request.url.scheme == "https"
+        or request.headers.get("x-forwarded-proto") == "https"
+        or request.headers.get("x-forwarded-ssl") == "on"
+        or (request.url.hostname and "asistodo.com.ar" in request.url.hostname)
+    )
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        secure=is_secure,
+        samesite="lax",
+        max_age=settings.JWT_EXPIRATION_DAYS * 86400,
+        path="/"
+    )
+
+def clear_auth_cookie(response: Response) -> None:
+    """Elimina la cookie de sesión protegida al cerrar sesión."""
+    response.delete_cookie(
+        key="access_token",
+        path="/",
+        httponly=True,
+        samesite="lax"
+    )
+
 async def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer)
 ) -> Dict[str, Any]:
     """
-    Extrae y valida el token JWT del encabezado Authorization Bearer.
+    Extrae y valida el token JWT del encabezado Authorization Bearer o de la cookie HttpOnly 'access_token'.
     Verifica firma con JWT_SECRET compartido con el Autenticador Central,
-    valida expiración y permisos de servicio para 'mayoresactualizaciones'.
+    valida expiración y permisos de servicio para 'mayoresactualizaciones' / 'cognijuegos'.
     Garantiza que el perfil local exista en MongoDB para asegurar la persistencia
     de progresos y partidas de juegos.
     """
-    if not credentials or not credentials.credentials:
+    token = None
+    if credentials and credentials.credentials:
+        token = credentials.credentials
+    elif request and request.cookies.get("access_token"):
+        token = request.cookies.get("access_token")
+    elif request and request.cookies.get("admin_session_token"):
+        token = request.cookies.get("admin_session_token")
+
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Autenticación requerida. Token no proporcionado.",
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-    token = credentials.credentials
     payload = decode_access_token(token)
     if not payload:
         raise HTTPException(

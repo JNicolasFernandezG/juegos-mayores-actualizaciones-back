@@ -67,9 +67,15 @@ def _ip_cliente(request: Request) -> str:
 
 def _es_admin(request: Request) -> bool:
     auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
+    token = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+    elif request.cookies.get("access_token"):
+        token = request.cookies.get("access_token")
+
+    if not token:
         return False
-    payload = decode_access_token(auth_header.split(" ", 1)[1])
+    payload = decode_access_token(token)
     if not payload:
         return False
     return payload.get("tipoUsuario") == 2 or payload.get("rol") == 2
