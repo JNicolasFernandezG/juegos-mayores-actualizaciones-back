@@ -95,7 +95,7 @@ async def proyectar_grafo_actual(run: Dict[str, Any]) -> Optional[EstadoGrafoV2R
     if not grafo:
         return None
 
-    nodos = grafo.get("nodos", {})
+    nodos = graph_engine._obtener_nodos_dict(grafo)
     nodo_data = nodos.get(nodo_actual_id)
     if not nodo_data:
         return None

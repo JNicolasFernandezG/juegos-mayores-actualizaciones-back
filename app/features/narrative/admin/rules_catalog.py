@@ -21,9 +21,9 @@ def obtener_catalogo_reglas_dict() -> Dict[str, Any]:
         "disparadores": [
             {"clave": DisparadorEnum.AL_OBTENER.value, "label": "Al obtener la carta o reclutar personaje"},
             {"clave": DisparadorEnum.CADA_MES.value, "label": "Al comenzar cada mes"},
+            {"clave": DisparadorEnum.AL_DESENLACE.value, "label": "Al cerrar el desenlace del nodo final"},
             {"clave": DisparadorEnum.EN_EVENTO_POSITIVO.value, "label": "Tras un desenlace positivo en el evento"},
-            {"clave": DisparadorEnum.EN_EVENTO_NEGATIVO.value, "label": "Tras un desenlace negativo en el evento"},
-            {"clave": DisparadorEnum.AL_FINAL_PARTIDA.value, "label": "Al completar los 12 meses"}
+            {"clave": DisparadorEnum.EN_EVENTO_NEGATIVO.value, "label": "Tras un desenlace negativo en el evento"}
         ],
         "operadores": [
             {"clave": OperadorEnum.MAYOR_IGUAL.value, "label": "Mayor o igual (>=)"},

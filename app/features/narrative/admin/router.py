@@ -34,7 +34,7 @@ from app.features.narrative.schemas.v2_graph_schemas import (
 )
 from app.features.narrative.validation import (
     TIPOS_VALIDOS,
-    validar_grafo,
+    validar_grafo_para_guardado,
     validar_grafos_almacenados
 )
 from app.features.narrative.admin.rules_catalog import obtener_catalogo_reglas_dict
@@ -439,7 +439,7 @@ async def endpoint_eliminar_evento_especial_v2(evento_id: str = Path(...)):
 @router.post(
     "/v2/validar",
     response_model=ValidarGrafoV2Response,
-    summary="Validar grafos V2 (referencias, hojas, pesos y ciclos)",
+    summary="Validar grafos V2 (estructura, catálogo y ejecutabilidad de los desenlaces)",
     tags=["Narrativo - Administración"]
 )
 async def endpoint_validar_grafos_v2(req: ValidarGrafoV2Request):
@@ -456,7 +456,7 @@ async def endpoint_validar_grafos_v2(req: ValidarGrafoV2Request):
                 status_code=400,
                 detail="Para validar un grafo inline se requiere indicar 'tipo'."
             )
-        resultados = [validar_grafo(req.grafo, req.tipo)]
+        resultados = [await validar_grafo_para_guardado(req.grafo, req.tipo)]
     else:
         tipos = [req.tipo] if req.tipo else None
         resultados = await validar_grafos_almacenados(

@@ -1119,6 +1119,7 @@
           "cada_mes",
           "en_evento_positivo",
           "en_evento_negativo",
+          "al_desenlace",
           "al_final_partida"
         ],
         "title": "DisparadorEnum"

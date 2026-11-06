@@ -245,3 +245,167 @@ def test_tipo_invalido_se_reporta():
     assert not resultado.valido
     assert [h.codigo for h in resultado.errores] == ["tipo_invalido"]
     assert "evento" in TIPOS_VALIDOS
+
+
+# ---------------------------------------------------------------------------
+# Validación semántica del desenlace: lo que el motor no puede ejecutar
+# ---------------------------------------------------------------------------
+
+def _nodo_final_con_efectos(efectos, **extra):
+    nodo = _nodo("fin", es_final=True)
+    nodo.update(extra)
+    nodo["efectos"] = efectos
+    return nodo
+
+
+def _con_contexto(recursos=("oro", "pueblo"), acciones=None, frecuencias=None):
+    return {
+        "recursos_validos": set(recursos),
+        "catalogo_acciones": acciones or {},
+        "catalogo_frecuencias": frecuencias or {},
+    }
+
+
+def test_efecto_bien_declarado_pasa():
+    grafo = _evento({
+        "inicio": _nodo("inicio", siguiente="fin"),
+        "fin": _nodo_final_con_efectos([
+            {
+                "disparador": "al_desenlace",
+                "acciones": [{"accion_id": "modificar_recurso", "parametros": {"clave": "oro", "valor": -5}}],
+            }
+        ], impactos_recursos=[{"recurso": "pueblo", "delta": 3}]),
+    })
+    resultado = validar_grafo(grafo, "evento", **_con_contexto())
+
+    assert resultado.valido, [h.as_dict() for h in resultado.errores]
+
+
+def test_recurso_inexistente_en_impacto_y_en_efecto_es_error():
+    grafo = _evento({
+        "inicio": _nodo("inicio", siguiente="fin"),
+        "fin": _nodo_final_con_efectos([
+            {
+                "disparador": "al_desenlace",
+                "acciones": [{"accion_id": "modificar_recurso", "parametros": {"clave": "azufre", "valor": 10}}],
+            }
+        ], impactos_recursos=[{"recurso": "madera", "delta": 4}]),
+    })
+    resultado = validar_grafo(grafo, "evento", **_con_contexto())
+
+    codigos = [h.codigo for h in resultado.errores]
+    assert "recurso_inexistente" in codigos
+    assert {h.nodo_id for h in resultado.errores if h.codigo == "recurso_inexistente"} == {"fin"}
+
+
+def test_frecuencia_fuera_del_catalogo_es_error():
+    grafo = _evento({
+        "inicio": _nodo("inicio", siguiente="fin"),
+        "fin": _nodo_final_con_efectos([
+            {
+                "frecuencia_id": "cada_4_meses",
+                "acciones": [{"accion_id": "otorgar_tag", "parametros": {"tag": "sequia"}}],
+            }
+        ]),
+    })
+    resultado = validar_grafo(grafo, "evento", **_con_contexto())
+
+    assert "evento_no_despachado" in _codigos(resultado)
+
+    # La misma frecuencia sí es ejecutable cuando el universo la catalogó
+    resultado = validar_grafo(
+        grafo,
+        "evento",
+        **_con_contexto(frecuencias={"cada_4_meses": {"id": "cada_4_meses", "evento_motor": "inicio_mes", "cada": 4}}),
+    )
+    assert resultado.valido, [h.as_dict() for h in resultado.errores]
+
+
+def test_accion_que_no_es_catalogo_ni_primitiva_es_error():
+    grafo = _evento({
+        "inicio": _nodo("inicio", siguiente="fin"),
+        "fin": _nodo_final_con_efectos([
+            {
+                "disparador": "al_desenlace",
+                "acciones": [{"accion_id": "invocar_dragon", "parametros": {}}],
+            }
+        ]),
+    })
+    resultado = validar_grafo(grafo, "evento", **_con_contexto())
+
+    assert "accion_desconocida" in _codigos(resultado)
+
+
+def test_accion_catalogada_se_resuelve_por_su_primitiva():
+    grafo = _evento({
+        "inicio": _nodo("inicio", siguiente="fin"),
+        "fin": _nodo_final_con_efectos([
+            {
+                "disparador": "al_desenlace",
+                "acciones": [{"accion_id": "tributo_real", "parametros": {"clave": "oro", "valor": -5}}],
+            }
+        ]),
+    })
+    resultado = validar_grafo(
+        grafo,
+        "evento",
+        **_con_contexto(acciones={"tributo_real": {"primitiva": "modificar_recurso"}}),
+    )
+
+    assert resultado.valido, [h.as_dict() for h in resultado.errores]
+
+    # Y el recurso sigue siendo exigido aunque la acción exista en el catálogo
+    resultado = validar_grafo(
+        grafo,
+        "evento",
+        **_con_contexto(recursos=("pueblo",), acciones={"tributo_real": {"primitiva": "modificar_recurso"}}),
+    )
+    assert "recurso_inexistente" in _codigos(resultado)
+
+
+def test_efecto_sin_evento_o_sin_acciones_es_error():
+    grafo = _evento({
+        "inicio": _nodo("inicio", siguiente="fin"),
+        "fin": _nodo_final_con_efectos([
+            {"acciones": []},
+            {"disparador": "al_desenlace", "acciones": []},
+        ]),
+    })
+    resultado = validar_grafo(grafo, "evento", **_con_contexto())
+
+    assert {"efecto_sin_evento", "efecto_sin_acciones"} <= _codigos(resultado)
+
+
+def test_efectos_en_nodo_intermedio_es_error():
+    grafo = _evento({
+        "inicio": {
+            **_nodo("inicio", siguiente="fin"),
+            "efectos": [{"disparador": "al_desenlace", "acciones": [{"accion_id": "otorgar_tag", "parametros": {"tag": "x"}}]}],
+        },
+        "fin": _nodo("fin", es_final=True),
+    })
+    resultado = validar_grafo(grafo, "evento", **_con_contexto())
+
+    assert "efectos_en_nodo_no_final" in _codigos(resultado)
+
+
+def test_tipo_desenlace_desconocido_es_error():
+    fin = _nodo("fin", es_final=True)
+    fin["tipo_desenlace"] = "doloroso"
+    grafo = _evento({"inicio": _nodo("inicio", siguiente="fin"), "fin": fin})
+    resultado = validar_grafo(grafo, "evento")
+
+    assert "tipo_desenlace_invalido" in _codigos(resultado)
+
+
+def test_validacion_estructural_no_exige_catalogos():
+    """Sin catálogo, el validador puro no puede opinar sobre recursos ni frecuencias."""
+    grafo = _evento({
+        "inicio": _nodo("inicio", siguiente="fin"),
+        "fin": _nodo_final_con_efectos([
+            {"frecuencia_id": "cada_4_meses", "acciones": [{"accion_id": "modificar_recurso", "parametros": {"clave": "oro"}}]}
+        ], impactos_recursos=[{"recurso": "azufre", "delta": 1}]),
+    })
+    resultado = validar_grafo(grafo, "evento")
+
+    assert resultado.valido

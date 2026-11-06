@@ -30,7 +30,7 @@ CATALOGO_PRIMITIVAS: List[Dict[str, Any]] = [
         "descripcion": "Aumenta o disminuye el valor de un recurso numérico del universo (positivo suma, negativo resta).",
         "parametros_requeridos": ["clave", "valor", "tipo_calculo"],
         "soporta_calculo": ["fijo", "porcentual"],
-        "permitido_en": ["carta", "personaje"],
+        "permitido_en": ["carta", "personaje", "nodo"],
     },
     {
         "primitiva": PrimitivaOperacionEnum.MODIFICAR_AFINIDAD.value,
@@ -38,28 +38,28 @@ CATALOGO_PRIMITIVAS: List[Dict[str, Any]] = [
         "descripcion": "Modifica la afinidad (0 a 100) con el personaje portador o uno específico.",
         "parametros_requeridos": ["destino", "valor"],
         "opciones_destino": ["portador", "personaje"],
-        "permitido_en": ["carta", "personaje"],
+        "permitido_en": ["carta", "personaje", "nodo"],
     },
     {
         "primitiva": PrimitivaOperacionEnum.OTORGAR_TAG.value,
         "nombre": "Otorgar tag pasivo",
         "descripcion": "Otorga un tag pasivo permanente al estado vivo de la partida.",
         "parametros_requeridos": ["tag"],
-        "permitido_en": ["carta", "personaje"],
+        "permitido_en": ["carta", "personaje", "nodo"],
     },
     {
         "primitiva": PrimitivaOperacionEnum.REMOVER_TAG.value,
         "nombre": "Remover tag",
         "descripcion": "Remueve un tag activo del estado de la partida.",
         "parametros_requeridos": ["tag"],
-        "permitido_en": ["carta", "personaje"],
+        "permitido_en": ["carta", "personaje", "nodo"],
     },
     {
         "primitiva": PrimitivaOperacionEnum.AMORTIGUAR_DANIO.value,
         "nombre": "Amortiguar daño de recurso",
         "descripcion": "Registra un modificador pasivo que reduce porcentualmente las pérdidas de un recurso.",
         "parametros_requeridos": ["clave", "valor"],
-        "permitido_en": ["carta", "personaje"],
+        "permitido_en": ["carta", "personaje", "nodo"],
     },
     {
         "primitiva": PrimitivaOperacionEnum.MUTAR_ESTADO.value,
@@ -74,11 +74,11 @@ CATALOGO_PRIMITIVAS: List[Dict[str, Any]] = [
             "afinidad.<target>",
             "variables.<clave>"
         ],
-        "permitido_en": ["carta", "personaje"],
+        "permitido_en": ["carta", "personaje", "nodo"],
     },
 ]
 
-# Eventos soportados por el ciclo de vida del motor
+# Eventos que el motor realmente despacha; el panel sólo ofrece lo ejecutable.
 EVENTOS_MOTOR: List[Dict[str, Any]] = [
     {
         "evento_motor": "al_obtener",
@@ -92,6 +92,24 @@ EVENTOS_MOTOR: List[Dict[str, Any]] = [
         "descripcion": "Se evalúa al inicio de cada mes. Puede configurarse periodicidad (ej. cada 1, 2 meses) relativa a la adquisición.",
         "soporta_intervalo": True,
         "opciones_conteo": ["adquisicion", "inicio_partida"],
+    },
+    {
+        "evento_motor": "al_desenlace",
+        "nombre": "Al cerrar el desenlace",
+        "descripcion": "Se ejecuta sobre los efectos declarados en el nodo final del grafo, appena se aplican sus impactos.",
+        "soporta_intervalo": False,
+    },
+    {
+        "evento_motor": "en_evento_positivo",
+        "nombre": "Tras desenlace positivo",
+        "descripcion": "Reacción de cartas y corte cuando el desenlace del grafo se declara positivo.",
+        "soporta_intervalo": False,
+    },
+    {
+        "evento_motor": "en_evento_negativo",
+        "nombre": "Tras desenlace negativo",
+        "descripcion": "Reacción de cartas y corte cuando el desenlace del grafo se declara negativo.",
+        "soporta_intervalo": False,
     },
 ]
 
@@ -132,12 +150,15 @@ async def crear_accion(payload: AccionCatalogoCreateRequest) -> AccionCatalogoRe
     db = get_database()
     col = db[COLL_ACTIONS]
 
-    # Verificar existencia previa
-    existente = await col.find_one({"_id": payload.id, "universo_id": payload.universo_id})
+    # El _id es único en toda la colección: el mismo nombre en otro universo también choca.
+    existente = await col.find_one({"_id": payload.id})
     if existente:
         raise HTTPException(
             status_code=409,
-            detail=f"Ya existe una acción con ID '{payload.id}' en el universo '{payload.universo_id}'.",
+            detail=(
+                f"Ya existe una acción con ID '{payload.id}' en el universo "
+                f"'{existente.get('universo_id')}'. Los IDs de acción son globales; usa otro ID."
+            ),
         )
 
     doc = {
@@ -265,22 +286,17 @@ async def eliminar_accion(accion_id: str, universo_id: Optional[str] = None) -> 
 
 
 async def obtener_frecuencias_universo(universo_id: str) -> FrecuenciasUniversoDocument:
+    """Lee el catálogo sin escribir: los defaults se materializan en memoria hasta que alguien los guarde."""
     db = get_database()
-    col = db[COLL_FREQUENCIES]
-    doc_id = f"frecuencias_{universo_id}"
-    doc = await col.find_one({"_id": doc_id})
+    doc = await db[COLL_FREQUENCIES].find_one({"_id": f"frecuencias_{universo_id}"})
 
     if not doc:
-        # Inicializar frecuencias predeterminadas para este universo
-        items_def = _frecuencias_default(universo_id)
-        doc = {
-            "_id": doc_id,
-            "universo_id": universo_id,
-            "version": 1,
-            "items": items_def,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
-        await col.insert_one(doc)
+        return FrecuenciasUniversoDocument(
+            _id=f"frecuencias_{universo_id}",
+            universo_id=universo_id,
+            version=0,
+            items=_frecuencias_default(universo_id),
+        )
 
     return FrecuenciasUniversoDocument(**doc)
 
@@ -310,16 +326,41 @@ async def actualizar_frecuencias_universo(
             detail=f"Conflicto de concurrencia: versión esperada {payload.expected_version} difiere de la actual {doc.get('version', 1)}.",
         )
 
-    # Validar unicidad de IDs en el array
+    # Validar unicidad de IDs y que cada frecuencia apunte a un evento que el motor emite
+    eventos_validos = {e["evento_motor"] for e in EVENTOS_MOTOR}
+    conteos_validos = {
+        conteo
+        for evento in EVENTOS_MOTOR
+        for conteo in evento.get("opciones_conteo", [])
+    }
     vistos = set()
     items_dict = []
     for item in payload.items:
         if item.id in vistos:
             raise HTTPException(status_code=422, detail=f"ID de frecuencia duplicado en el catálogo: '{item.id}'.")
         vistos.add(item.id)
+        if item.evento_motor not in eventos_validos:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"La frecuencia '{item.id}' usa el evento '{item.evento_motor}', que el motor no emite. "
+                    f"Válidos: {sorted(eventos_validos)}."
+                ),
+            )
+        if item.evento_motor != "inicio_mes" and item.cada != 1:
+            raise HTTPException(
+                status_code=422,
+                detail=f"La frecuencia '{item.id}' define 'cada={item.cada}' pero '{item.evento_motor}' no tiene periodicidad.",
+            )
+        if item.evento_motor == "inicio_mes" and item.conteo_desde not in conteos_validos:
+            raise HTTPException(
+                status_code=422,
+                detail=f"La frecuencia '{item.id}' cuenta desde '{item.conteo_desde}', opción no soportada.",
+            )
         items_dict.append(item.model_dump())
 
     updates = {
+        "universo_id": universo_id,
         "version": doc.get("version", 1) + 1,
         "items": items_dict,
         "updated_at": datetime.now(timezone.utc).isoformat(),

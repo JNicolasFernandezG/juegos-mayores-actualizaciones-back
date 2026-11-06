@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo flujo narrativo V2 — motor real</title>
+<style>
+  :root {
+    --bg: #14100e; --panel: #1f1814; --panel2: #2a201a; --border: #4a3826;
+    --gold: #d9a441; --gold-dim: #8a6a2a; --text: #e8dcc4; --muted: #a5906b;
+    --green: #7bb661; --red: #d06050; --blue: #6ea8c9; --violet: #a98bd4;
+  }
+  * { box-sizing: border-box; }
+  html, body { min-height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif; font-size: 14px;
+  }
+  header {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+    padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; color: var(--gold); letter-spacing: .4px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  label { color: var(--muted); font-size: 12px; display: flex; flex-direction: column; gap: 2px; }
+  input, select, button {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 4px; padding: 6px 9px; font-size: 13px; font-family: inherit;
+  }
+  button { cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--gold); }
+  button.primary { background: var(--gold); color: #1a1208; font-weight: 700; border-color: var(--gold); }
+  button.danger { border-color: var(--red); color: var(--red); }
+  button.small { padding: 4px 8px; font-size: 12px; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .pill { padding: 3px 10px; border-radius: 12px; border: 1px solid var(--gold-dim); color: var(--gold); font-size: 11px; white-space: nowrap; }
+  .pill.v2 { border-color: var(--blue); color: var(--blue); }
+  .pill.fail { border-color: var(--red); color: var(--red); }
+  .pill.ok { border-color: var(--green); color: var(--green); }
+  .pill.neutral { border-color: var(--border); color: var(--muted); }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 14px; padding: 14px 16px; align-items: start; }
+  @media (max-width: 1050px) { main { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px; margin-bottom: 14px;
+  }
+  .panel h2 { margin: 0 0 10px; font-size: 14px; color: var(--gold); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .panel h3 { margin: 14px 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .stage { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .stage-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .stage-title { font-size: 18px; font-weight: 700; color: var(--gold); margin: 0; }
+  .speaker { color: var(--gold); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+  .node-text { font-size: 15px; line-height: 1.55; margin: 8px 0 14px; white-space: pre-wrap; }
+  .consequence { border-left: 3px solid var(--gold-dim); padding: 8px 12px; margin: 10px 0 14px; background: #241c16; color: var(--text); white-space: pre-wrap; }
+  .node-img { max-width: 100%; max-height: 240px; border-radius: 6px; border: 1px solid var(--border); margin: 8px 0; display: block; }
+  .options { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .opt {
+    text-align: left; padding: 11px 13px; border-radius: 6px; background: var(--panel);
+    border: 1px solid var(--border); color: var(--text); font-size: 14px;
+  }
+  .opt:hover:not(:disabled) { border-color: var(--gold); background: #33261a; }
+  .opt .why { display: block; font-size: 11px; color: var(--red); margin-top: 4px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .res { margin-bottom: 8px; }
+  .res .rlabel { display: inline-block; width: 90px; color: var(--muted); }
+  .res .rval { display: inline-block; width: 44px; text-align: right; font-weight: 700; }
+  .res .bar { display: inline-block; width: 140px; height: 10px; background: var(--panel2); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; vertical-align: middle; margin: 0 8px; }
+  .res .bar .fill { height: 100%; background: var(--green); transition: width .25s ease; }
+  .res.mid .bar .fill { background: var(--gold); }
+  .res.low .bar .fill { background: var(--red); }
+  .delta { font-size: 12px; font-weight: 700; }
+  .delta.pos { color: var(--green); }
+  .delta.neg { color: var(--red); }
+  .delta.zero { color: var(--muted); }
+  .aff { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px dotted var(--border); font-size: 12px; }
+  .aff .aval { color: var(--gold); font-weight: 700; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+  .card { border: 1px solid var(--border); border-radius: 6px; padding: 9px 10px; background: var(--panel2); }
+  .card.selected { border-color: var(--gold); background: #3a2c18; }
+  .card .nm { font-weight: 700; color: var(--gold); }
+  .card .tt { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .card button { width: 100%; margin-top: 8px; }
+  .selitem { border: 1px solid var(--border); border-radius: 6px; padding: 9px; background: var(--panel2); cursor: pointer; }
+  .selitem:hover { border-color: var(--gold-dim); }
+  .selitem.selected { border-color: var(--gold); background: #3a2c18; }
+  .selitem .nm { font-weight: 700; color: var(--gold); }
+  .selitem .tt { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .selitem .chips { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 1px 7px; color: var(--muted); }
+  .chip.tag { border-color: var(--gold-dim); color: var(--gold); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .info { border: 1px solid var(--blue); background: #17242b; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; font-size: 13px; line-height: 1.6; }
+  .info strong { color: var(--blue); }
+  .aviso { border: 1px solid var(--green); background: #1c2718; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; color: var(--green); }
+  .banner { border: 1px solid var(--red); background: #2c1714; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+  .banner h3 { margin: 0 0 6px; color: var(--red); font-size: 14px; }
+  .banner .detail { font-size: 12px; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+  .banner .hint { color: var(--muted); }
+  .checks { display: flex; flex-direction: column; gap: 5px; }
+  .check { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; line-height: 1.4; }
+  .check .mark { flex: 0 0 auto; font-weight: 800; width: 16px; }
+  .check.ok .mark { color: var(--green); }
+  .check.fail .mark { color: var(--red); }
+  .check.neutral .mark { color: var(--muted); }
+  .check.fail { color: #f0b2a8; }
+  .krow { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px dotted var(--border); font-size: 12px; }
+  .krow .k { color: var(--muted); }
+  .krow .v { color: var(--text); font-family: Consolas, monospace; text-align: right; word-break: break-all; }
+  .krow .v.ok { color: var(--green); }
+  .krow .v.fail { color: var(--red); }
+  .raw, .logitem pre {
+    background: #0d0a08; border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px; overflow: auto; font-family: Consolas, monospace; font-size: 11px;
+    color: var(--muted); max-height: 340px; white-space: pre-wrap; word-break: break-word;
+  }
+  details.rawbox summary { cursor: pointer; color: var(--gold); font-size: 12px; margin: 8px 0; }
+  .log { max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .logitem { border: 1px solid var(--border); border-radius: 6px; background: #171210; }
+  .logitem summary {
+    cursor: pointer; padding: 6px 8px; font-family: Consolas, monospace; font-size: 11px;
+    color: var(--muted); display: flex; justify-content: space-between; gap: 8px;
+  }
+  .logitem summary .st { font-weight: 700; }
+  .logitem summary .st.ok { color: var(--green); }
+  .logitem summary .st.err { color: var(--red); }
+  .logitem pre { border: none; border-top: 1px solid var(--border); border-radius: 0; margin: 0; max-height: 260px; }
+  .final-title { font-size: 20px; color: var(--gold); font-weight: 800; margin: 0 0 8px; }
+  .rank { font-size: 30px; font-weight: 800; color: var(--gold); }
+  .mono { font-family: Consolas, monospace; }
+  .muted { color: var(--muted); }
+  .sep { height: 1px; background: var(--border); margin: 12px 0; }
+  .chain { border: 1px solid var(--violet); background: #241c2b; border-radius: 8px; padding: 12px 14px; margin: 12px 0; }
+  .chain strong { color: var(--violet); }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>Demo flujo narrativo V2</h1>
+    <span class="pill v2">motor real</span>
+    <span class="pill neutral" id="sesionPill">invitado: —</span>
+  </div>
+  <div class="controls">
+    <label>API base
+      <input id="apiBase" size="28" autocomplete="off" spellcheck="false">
+    </label>
+    <label>Fecha
+      <input id="fecha" type="date">
+    </label>
+    <button id="btnNuevaSesion" class="small" title="Descarta la credencial de invitado guardada y pide una nueva">Nueva sesión</button>
+  </div>
+</header>
+
+<main>
+  <section class="panel" id="juegoPanel">
+    <h2>Flujo de la partida</h2>
+    <div id="banner"></div>
+    <div id="contenido"></div>
+  </section>
+
+  <aside class="panel" id="inspectorPanel">
+    <h2>Inspector</h2>
+    <div id="inspectorEstado"></div>
+    <h3>Chequeos de la última transición</h3>
+    <div id="inspectorChecks" class="checks"></div>
+    <h3>Recursos</h3>
+    <div id="inspectorRecursos"></div>
+    <h3>Afinidad</h3>
+    <div id="inspectorAfinidad"></div>
+    <h3>Última respuesta</h3>
+    <div id="inspectorRaw"></div>
+    <h3>Log de requests</h3>
+    <div id="log" class="log"></div>
+  </aside>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  // ==========================================================================
+  // Estado
+  // ==========================================================================
+  var state = {
+    apiBase: location.origin,
+    date: "",
+    guest: { credential: null, guestId: null },
+    screen: "inicio",
+    setup: null,
+    seleccion: { personajes: [], cartas: [] },
+    motor: null,
+    mes: null,
+    recursos: null,
+    afinidad: null,
+    draft: [],
+    nodo: null,
+    desenlace: null,
+    pendingChain: null,
+    balance: null,
+    final: null,
+    ultimo: null,
+    checks: [],
+    error: null,
+    aviso: null,
+    log: [],
+    busy: false
+  };
+
+  var MAX_LOG = 80;
+  var STORAGE = {
+    apiBase: "demoNarrativo.apiBase",
+    date: "demoNarrativo.date",
+    credential: "demoNarrativo.credential",
+    guestId: "demoNarrativo.guestId"
+  };
+  var RECURSO_LABEL = { oro: "Oro", pueblo: "Pueblo", ejercito: "Ejército", fe: "Fe" };
+
+  // ==========================================================================
+  // Utilidades
+  // ==========================================================================
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function hoyISO() {
+    var d = new Date();
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+  }
+  function esc(v) {
+    return String(v === null || v === undefined ? "" : v).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function shortId(id, n) {
+    if (!id) return "—";
+    var s = String(id);
+    return s.length > (n || 26) ? s.slice(0, n || 26) + "…" : s;
+  }
+  function esFinalStatus(s) {
+    return !!s && ["CONTINUA", "in_progress", ""].indexOf(s) === -1;
+  }
+  function chk(ok, text) { return { ok: ok, text: text }; }
+  function checkNeutral(text) { return { ok: null, text: text }; }
+  function numDelta(v) {
+    if (v === null || v === undefined || v === 0) return '<span class="delta zero">±0</span>';
+    var cls = v > 0 ? "pos" : "neg";
+    var sign = v > 0 ? "+" : "";
+    return '<span class="delta ' + cls + '">' + sign + v + "</span>";
+  }
+  function barClass(v) { return v >= 60 ? "" : (v >= 30 ? "mid" : "low"); }
+  function imgTag(src, alt) {
+    if (!src) return "";
+    var abs = /^https?:\/\//i.test(src) ? src : state.apiBase.replace(/\/+$/, "") + (src.charAt(0) === "/" ? "" : "/") + src;
+    return '<img class="node-img" src="' + esc(abs) + '" alt="' + esc(alt || "") + '" loading="lazy" onerror="this.style.display=\'none\'">';
+  }
+  function detalleTexto(detail) {
+    if (detail === null || detail === undefined) return "Sin detalle";
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      return detail.map(function (d) {
+        if (d && typeof d === "object") {
+          var loc = Array.isArray(d.loc) ? d.loc.filter(function (x) { return x !== "body"; }).join(".") : "";
+          return (loc ? loc + ": " : "") + (d.msg || d.message || JSON.stringify(d));
+        }
+        return String(d);
+      }).join(" | ");
+    }
+    if (typeof detail === "object") {
+      if (detail.mensaje) return String(detail.mensaje);
+      if (detail.detail) return detalleTexto(detail.detail);
+      if (detail.message) return String(detail.message);
+      return JSON.stringify(detail);
+    }
+    return String(detail);
+  }
+  function hintPara(status) {
+    if (status === 0) return "No hay conexión con el backend o la URL base es incorrecta.";
+    if (status === 400) return "Transición de fase inválida. Es exactamente el síntoma del bug de encadenamiento: se pidió avanzar-mes sin haber resuelto la conversación encadenada.";
+    if (status === 401) return "La credencial de invitado no fue aceptada. Probá «Nueva sesión».";
+    if (status === 404) return "No hay partida activa para esa fecha. Volvé al setup e iniciá una.";
+    if (status === 409) return "La partida o el grafo no está en el estado esperado. Usá Reanudar para sincronizar con el servidor.";
+    if (status === 422) return "La barrera de validación rechazó el payload.";
+    return "Revisá el detalle y el log de requests.";
+  }
+
+  // ==========================================================================
+  // HTTP
+  // ==========================================================================
+  function ApiError(status, message, payload) {
+    this.name = "ApiError";
+    this.status = status;
+    this.message = message;
+    this.payload = payload;
+  }
+  ApiError.prototype = Object.create(Error.prototype);
+
+  function registrar(entry) {
+    state.log.unshift(entry);
+    if (state.log.length > MAX_LOG) state.log.length = MAX_LOG;
+  }
+
+  function api(path, opts) {
+    opts = opts || {};
+    var method = opts.method || "GET";
+    var auth = opts.auth !== false;
+    var retry = opts.retry !== false;
+    var extraHeaders = opts.headers || {};
+    var base = state.apiBase.replace(/\/+$/, "");
+    var url = base + path;
+    var headers = Object.assign({ Accept: "application/json" }, extraHeaders);
+    if (opts.body !== undefined) headers["Content-Type"] = "application/json";
+    if (auth && state.guest.credential) headers["X-Guest-Credential"] = state.guest.credential;
+
+    var t0 = performance.now();
+    return fetch(url, {
+      method: method,
+      headers: headers,
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        var json = null;
+        try { json = text ? JSON.parse(text) : null; } catch (e) { json = text; }
+        var respuestaLog = json;
+        if (path.indexOf("/guest-credential") !== -1 && json && typeof json === "object") {
+          respuestaLog = Object.assign({}, json, { credential: "<redactada>" });
+        }
+        registrar({
+          method: method,
+          path: path,
+          status: res.status,
+          ms: Math.round(performance.now() - t0),
+          request: opts.body !== undefined ? opts.body : null,
+          response: respuestaLog
+        });
+        if (res.status === 401 && auth && retry) {
+          return obtenerCredencial().then(function () {
+            return api(path, { method: method, body: opts.body, auth: auth, headers: extraHeaders, retry: false });
+          });
+        }
+        if (!res.ok) {
+          throw new ApiError(res.status, detalleTexto(json), json);
+        }
+        return json;
+      });
+    }, function (netErr) {
+      registrar({
+        method: method,
+        path: path,
+        status: "ERR",
+        ms: Math.round(performance.now() - t0),
+        request: opts.body !== undefined ? opts.body : null,
+        response: String(netErr)
+      });
+      throw new ApiError(0, "No se pudo conectar con " + url + ". " + (netErr && netErr.message ? netErr.message : ""), null);
+    });
+  }
+
+  function obtenerCredencial() {
+    var actual = state.guest.credential;
+    var headers = actual ? { "X-Guest-Credential": actual } : {};
+    return api("/api/auth/guest-credential", { method: "POST", auth: false, headers: headers, retry: false })
+      .then(function (data) {
+        state.guest.credential = data.credential;
+        state.guest.guestId = data.guest_id;
+        sessionStorage.setItem(STORAGE.credential, data.credential);
+        sessionStorage.setItem(STORAGE.guestId, data.guest_id);
+        actualizarSesionUI();
+        return data;
+      });
+  }
+
+  // ==========================================================================
+  // Acciones
+  // ==========================================================================
+  function setBusy(v) { state.busy = v; }
+
+  function conAccion(fn) {
+    if (state.busy) return;
+    setBusy(true);
+    state.error = null;
+    render();
+    Promise.resolve()
+      .then(fn)
+      .catch(mostrarError)
+      .then(function () { setBusy(false); render(); });
+  }
+
+  function mostrarError(e) {
+    state.error = {
+      status: e && typeof e.status === "number" ? e.status : "—",
+      mensaje: e && e.message ? e.message : String(e),
+      payload: e && e.payload ? e.payload : null
+    };
+  }
+
+  function resetPartidaUI() {
+    state.setup = null;
+    state.seleccion = { personajes: [], cartas: [] };
+    state.motor = null;
+    state.mes = null;
+    state.recursos = null;
+    state.afinidad = null;
+    state.draft = [];
+    state.nodo = null;
+    state.desenlace = null;
+    state.pendingChain = null;
+    state.balance = null;
+    state.final = null;
+    state.ultimo = null;
+    state.checks = [];
+    state.error = null;
+    state.aviso = null;
+  }
+
+  function iniciarDemo() {
+    conAccion(function () {
+      resetPartidaUI();
+      return (state.guest.credential ? Promise.resolve() : obtenerCredencial())
+        .then(cargarSetup);
+    });
+  }
+
+  function cargarSetup() {
+    return api("/api/narrative/partida/setup?date=" + encodeURIComponent(state.date))
+      .then(function (data) {
+        state.setup = data;
+        state.seleccion = { personajes: [], cartas: [] };
+        state.checks = [];
+        state.screen = "setup";
+      });
+  }
+
+  function reanudar() {
+    conAccion(function () {
+      state.error = null;
+      state.aviso = null;
+      return api("/api/narrative/v2/partida/estado?date=" + encodeURIComponent(state.date))
+        .then(function (est) {
+          state.motor = est.motor || state.motor;
+          state.mes = est.mes_actual;
+          state.recursos = est.recursos || null;
+          state.afinidad = est.afinidad || null;
+          state.ultimo = est.grafo_actual || null;
+          if (est.finalizacion || esFinalStatus(est.status)) {
+            state.final = { finalizacion: est.finalizacion, status: est.status, puntos: null };
+            state.checks = [chk(true, "Partida finalizada: status = " + (est.status || "—"))];
+            state.screen = "final";
+            return;
+          }
+          if (est.fase_actual === "DRAFT_MENSUAL") {
+            state.draft = est.cartas_draft_actual || [];
+            state.checks = [
+              chk(true, "Reanudada en DRAFT_MENSUAL (mes " + est.mes_actual + ")"),
+              chk(state.draft.length > 0, "draft disponible: " + state.draft.length + " cartas")
+            ];
+            state.screen = "draft";
+            return;
+          }
+          if (est.fase_actual === "BALANCE_MES") {
+            state.checks = [chk(true, "Reanudada en BALANCE_MES (mes " + est.mes_actual + ")")];
+            state.screen = "balance";
+            return;
+          }
+          if (est.fase_actual === "TOMA_DECISION_EVENTO" || est.fase_actual === "RESOLVER_CONVERSACION") {
+            return api("/api/narrative/v2/partida/grafo-actual?date=" + encodeURIComponent(state.date))
+              .then(function (g) {
+                if (!g) {
+                  throw new ApiError(0, "La partida está en fase " + est.fase_actual + " pero /grafo-actual no devolvió nodo activo.", null);
+                }
+                handleGrafo(g, est.fase_actual);
+              });
+          }
+          throw new ApiError(0, "Fase desconocida al reanudar: " + est.fase_actual, est);
+        });
+    });
+  }
+
+  function reiniciarPartida() {
+    conAccion(function () {
+      state.error = null;
+      return api("/api/narrative/partida/reiniciar", {
+        method: "POST",
+        body: { date: state.date }
+      }).then(function (r) {
+        resetPartidaUI();
+        state.aviso = r && r.message ? r.message : "Partida reiniciada.";
+        if (r && r.next_generation) {
+          state.aviso += " Nueva generación: " + r.next_generation + ".";
+        }
+        return cargarSetup();
+      });
+    });
+  }
+
+  function toggleSeleccion(tipo, id) {
+    var lista = state.seleccion[tipo];
+    var idx = lista.indexOf(id);
+    if (idx >= 0) {
+      lista.splice(idx, 1);
+    } else {
+      if (lista.length >= 3) {
+        state.aviso = "Solo se pueden elegir 3 " + (tipo === "personajes" ? "personajes" : "cartas") + ".";
+        render();
+        state.aviso = null;
+        return;
+      }
+      lista.push(id);
+    }
+    state.aviso = null;
+    render();
+  }
+
+  function iniciarPartida() {
+    var sel = state.seleccion;
+    if (sel.personajes.length !== 3 || sel.cartas.length !== 3) {
+      state.aviso = "Seleccioná exactamente 3 personajes y 3 cartas.";
+      render();
+      state.aviso = null;
+      return;
+    }
+    conAccion(function () {
+      return api("/api/narrative/v2/partida/iniciar", {
+        method: "POST",
+        body: {
+          date: state.date,
+          corte_elegida_ids: sel.personajes.slice(),
+          cartas_iniciales_ids: sel.cartas.slice()
+        }
+      }).then(function (r) {
+        state.motor = r.motor || null;
+        state.mes = r.mes_actual;
+        state.recursos = r.recursos || null;
+        state.afinidad = r.afinidad || null;
+        state.draft = r.cartas_draft_actual || [];
+        state.setup = null;
+        state.ultimo = r;
+        state.checks = [
+          chk(r.motor === "v2", "motor = " + (r.motor || "—") + " (se espera v2)"),
+          chk(r.fase_actual === "DRAFT_MENSUAL", "fase = " + (r.fase_actual || "—")),
+          chk(state.draft.length > 0, "draft inicial: " + state.draft.length + " cartas")
+        ];
+        if (r.finalizacion) {
+          state.final = { finalizacion: r.finalizacion, status: "FINALIZADA", puntos: r.puntos_ganados };
+          state.screen = "final";
+        } else {
+          state.screen = "draft";
+        }
+      });
+    });
+  }
+
+  function elegirCarta(cartaId) {
+    conAccion(function () {
+      return api("/api/narrative/v2/partida/elegir-carta-mes", {
+        method: "POST",
+        body: { date: state.date, carta_id: cartaId }
+      }).then(function (r) {
+        state.motor = r.motor || state.motor;
+        if (r.recursos) state.recursos = r.recursos;
+        state.ultimo = r.grafo_actual || r;
+        state.checks = [
+          chk(r.motor === "v2", "motor = " + (r.motor || "—") + " (se espera v2)"),
+          chk(!!r.grafo_actual, "grafo_actual presente"),
+          chk(r.fase_actual === "TOMA_DECISION_EVENTO" || !!r.finalizacion, "fase = " + (r.fase_actual || "—")),
+          chk(!r.evento_actual, "evento_actual es null (no se usó el camino V1 plano)")
+        ];
+        if (r.finalizacion) {
+          state.final = { finalizacion: r.finalizacion, status: "FINALIZADA", puntos: r.puntos_ganados };
+          state.screen = "final";
+        } else if (r.grafo_actual) {
+          handleGrafo(r.grafo_actual, r.fase_actual, true);
+        } else {
+          state.checks.push(checkNeutral("Sin grafo sorteado: la partida pasa a balance"));
+          state.screen = "balance";
+        }
+      });
+    });
+  }
+
+  function avanzarNodo(opcionId) {
+    conAccion(function () {
+      return api("/api/narrative/v2/partida/avanzar-nodo", {
+        method: "POST",
+        body: { date: state.date, opcion_id: opcionId }
+      }).then(function (r) {
+        handleGrafo(r);
+      });
+    });
+  }
+
+  function handleGrafo(g, faseEsperada, conservarChecks) {
+    var recursosAntes = state.recursos ? Object.assign({}, state.recursos) : null;
+    var afinidadAntes = state.afinidad ? Object.assign({}, state.afinidad) : null;
+
+    state.ultimo = g;
+    if (g.recursos) state.recursos = g.recursos;
+    if (g.afinidad) state.afinidad = g.afinidad;
+
+    var nodo = g.nodo_actual || {};
+    var checks = conservarChecks ? state.checks.slice() : [];
+
+    checks.push(chk(!!g.grafo_id, "grafo_id = " + (g.grafo_id || "—") + " (" + (g.tipo || "?") + ")"));
+    checks.push(chk(!!nodo.texto, "nodo_actual trae texto"));
+
+    if (nodo.es_final) {
+      checks.push(chk(true, "nodo_actual.es_final = true (el desenlace se preservó)"));
+      checks.push(chk(!!g.recursos, "recursos aplicados en la respuesta"));
+      checks.push(chk(!!g.afinidad, "afinidad aplicada en la respuesta"));
+      checks.push(chk(
+        g.fase_actual === "RESOLVER_CONVERSACION" || g.fase_actual === "BALANCE_MES" || g.fase_actual === "FINALIZADA" || !!g.finalizacion || esFinalStatus(g.status),
+        "fase tras el desenlace = " + (g.fase_actual || "—")
+      ));
+      if (g.conversacion_actual) {
+        var dec = (g.conversacion_actual.decisiones || []).length;
+        checks.push(chk(true, "encadenado: " + g.conversacion_actual._id + " (" + dec + " decisiones)"));
+      } else {
+        checks.push(checkNeutral("sin conversación/evento encadenado: salto directo"));
+      }
+      if (g.finalizacion) {
+        checks.push(chk(true, "finalización presente: " + (g.finalizacion.titulo || g.finalizacion.id || "—")));
+      }
+      state.desenlace = {
+        grafo: g,
+        nodo: nodo,
+        chain: g.conversacion_actual || null,
+        recursosAntes: recursosAntes,
+        afinidadAntes: afinidadAntes
+      };
+      state.pendingChain = g.conversacion_actual || null;
+      state.nodo = null;
+      state.screen = "desenlace";
+    } else {
+      checks.push(chk((nodo.opciones || []).length > 0, "nodo intermedio con " + (nodo.opciones || []).length + " opciones"));
+      state.nodo = g;
+      state.desenlace = null;
+      state.pendingChain = null;
+      state.screen = "nodo";
+    }
+    state.checks = checks;
+  }
+
+  function continuarDesenlace() {
+    var d = state.desenlace;
+    if (!d) return;
+    if (state.pendingChain) {
+      var chain = state.pendingChain;
+      var norm = nodoDesdeChain(chain);
+      state.pendingChain = null;
+      state.nodo = norm;
+      state.ultimo = norm;
+      state.checks = [
+        chk(!!norm.nodo_actual.texto, "el diálogo encadenado trae texto"),
+        chk(norm.nodo_actual.opciones.length > 0, "el diálogo encadenado trae " + norm.nodo_actual.opciones.length + " decisiones"),
+        chk(norm.grafo_id === chain._id, "grafo activo = " + norm.grafo_id)
+      ];
+      state.screen = "nodo";
+      render();
+      return;
+    }
+    var g = d.grafo;
+    if (g && (g.finalizacion || esFinalStatus(g.status))) {
+      state.final = { finalizacion: g.finalizacion, status: g.status, puntos: g.puntos_ganados };
+      state.checks = [chk(true, "epílogo: status = " + (g.status || "—"))];
+      state.screen = "final";
+      render();
+      return;
+    }
+    state.balance = { recursos: state.recursos, afinidad: state.afinidad };
+    state.checks = [chk(g && g.fase_actual === "BALANCE_MES", "fase = " + (g ? g.fase_actual : "—") + " (se espera BALANCE_MES)")];
+    state.screen = "balance";
+    render();
+  }
+
+  function nodoDesdeChain(chain) {
+    var frases = chain.frases || [];
+    var speaker = (frases[0] && frases[0].personajeId) ||
+      (chain.requisitos && chain.requisitos[0] && chain.requisitos[0].personajeId) ||
+      "narrador";
+    var texto = frases.map(function (f) { return f.texto; }).filter(Boolean).join("\n\n");
+    var opciones = (chain.decisiones || []).map(function (d) {
+      return { id: d.opcion, texto: d.texto, disponible: true, motivo_bloqueo: null };
+    });
+    return {
+      fase_actual: "RESOLVER_CONVERSACION",
+      grafo_id: chain._id,
+      tipo: "conversacion",
+      titulo: chain.titulo || "Diálogo encadenado",
+      imagen: chain.imagen || "",
+      nodo_actual: {
+        id: chain.nodo_id,
+        hablante_id: speaker,
+        texto: texto,
+        imagen: chain.imagen || null,
+        es_final: false,
+        opciones: opciones,
+        resultado_texto: "",
+        impactos_recursos: [],
+        impactos_afinidad: [],
+        impactos_tags: []
+      },
+      afinidad: null,
+      recursos: null,
+      status: "CONTINUA",
+      finalizacion: null,
+      conversacion_actual: null
+    };
+  }
+
+  function avanzarMes() {
+    conAccion(function () {
+      return api("/api/narrative/v2/partida/avanzar-mes", {
+        method: "POST",
+        body: { date: state.date }
+      }).then(function (r) {
+        state.mes = r.mes_actual;
+        state.recursos = r.recursos || state.recursos;
+        state.ultimo = r;
+        state.checks = [
+          chk(r.fase_actual === "DRAFT_MENSUAL", "fase = " + (r.fase_actual || "—") + " (se espera DRAFT_MENSUAL)"),
+          chk((r.cartas_draft_actual || []).length > 0, "draft del mes " + r.mes_actual + ": " + (r.cartas_draft_actual || []).length + " cartas")
+        ];
+        if (r.finalizacion || esFinalStatus(r.status)) {
+          state.final = { finalizacion: r.finalizacion, status: r.status, puntos: r.puntos_ganados };
+          state.screen = "final";
+        } else {
+          state.draft = r.cartas_draft_actual || [];
+          state.nodo = null;
+          state.desenlace = null;
+          state.pendingChain = null;
+          state.balance = null;
+          state.screen = "draft";
+        }
+      });
+    });
+  }
+
+  function nuevaSesion() {
+    sessionStorage.removeItem(STORAGE.credential);
+    sessionStorage.removeItem(STORAGE.guestId);
+    state.guest = { credential: null, guestId: null };
+    actualizarSesionUI();
+    iniciarDemo();
+  }
+
+  // ==========================================================================
+  // Render
+  // ==========================================================================
+  function render() {
+    renderBanner();
+    renderContenido();
+    renderInspector();
+    actualizarSesionUI();
+  }
+
+  function actualizarSesionUI() {
+    var pill = $("#sesionPill");
+    if (state.guest.guestId) {
+      pill.textContent = "invitado: " + shortId(state.guest.guestId, 12);
+      pill.className = "pill ok";
+    } else {
+      pill.textContent = "invitado: —";
+      pill.className = "pill neutral";
+    }
+  }
+
+  function renderBanner() {
+    var html = "";
+    if (state.error) {
+      var detalle = state.error.mensaje;
+      if (state.error.payload && state.error.payload.detail) {
+        detalle = detalleTexto(state.error.payload.detail);
+      }
+      html += '<div class="banner">' +
+        '<h3>Error ' + esc(state.error.status) + "</h3>" +
+        '<div class="detail">' + esc(detalle) + "</div>" +
+        '<div class="hint">' + esc(hintPara(typeof state.error.status === "number" ? state.error.status : -1)) + "</div>" +
+        "</div>";
+    }
+    if (state.aviso) {
+      html += '<div class="aviso">' + esc(state.aviso) + "</div>";
+    }
+    $("#banner").innerHTML = html;
+  }
+
+  function renderContenido() {
+    var el = $("#contenido");
+    var fn = {
+      inicio: renderInicio,
+      setup: renderSetup,
+      draft: renderDraft,
+      nodo: renderNodo,
+      desenlace: renderDesenlace,
+      balance: renderBalance,
+      final: renderFinal
+    }[state.screen] || renderInicio;
+    el.innerHTML = fn();
+    if (state.busy) {
+      el.insertAdjacentHTML("afterbegin", '<div class="hint">Procesando…</div>');
+    }
+  }
+
+  function renderInicio() {
+    return '' +
+      '<div class="info">' +
+        "<strong>Qué hace esta demo:</strong> ejecuta el flujo completo del motor V2 contra los endpoints reales del backend, " +
+        "usando una credencial de invitado firmada. Secuencia: setup → iniciar partida → draft mensual → evento con grafo → " +
+        "desenlace (con impactos) → conversación o evento especial encadenado → balance mensual → mes siguiente." +
+        '<div class="hint">El objetivo es verificar, en particular, que el desenlace terminal <b>se preserve</b> y que la ' +
+        "conversación encadenada se resuelva <b>antes</b> de pedir <span class=\"mono\">avanzar-mes</span>. La demo nunca " +
+        "llama a avanzar-mes si la fase es RESOLVER_CONVERSACION.</div>" +
+        '<div class="hint">Fecha por defecto: hoy. La API base se puede cambiar (por defecto, el mismo origen que sirve este archivo).</div>' +
+      "</div>" +
+      '<div class="actions">' +
+        '<button class="primary" data-action="iniciar-demo"' + (state.busy ? " disabled" : "") + ">Comenzar</button>" +
+      "</div>";
+  }
+
+  function renderSetup() {
+    var s = state.setup;
+    if (!s) return '<div class="hint">Cargando setup…</div>';
+    var html = "";
+    html += '<div class="stage-head">' +
+      '<span class="pill v2">setup</span>' +
+      '<span class="pill neutral mono">' + esc(s.date || state.date) + "</span>" +
+      "</div>";
+    html += '<p class="muted">Universo: <b style="color:var(--gold)">' + esc(s.universo_nombre || s.universo_id) + "</b></p>";
+    if (s.universo_descripcion) html += '<p class="hint">' + esc(s.universo_descripcion) + "</p>";
+
+    if (s.tiene_partida_activa) {
+      html += '<div class="chain">' +
+        "<strong>Hay una partida activa</strong> para esta fecha en la fase " +
+        '<span class="mono">' + esc(s.fase_partida_activa || "—") + "</span>." +
+        '<div class="hint">Reanudar consulta /estado y /grafo-actual para reconstruir el punto exacto. Reiniciar archiva la generación actual y vuelve al setup.</div>' +
+        '<div class="actions">' +
+          '<button class="primary" data-action="reanudar"' + (state.busy ? " disabled" : "") + ">Reanudar</button>" +
+          '<button class="danger" data-action="reiniciar"' + (state.busy ? " disabled" : "") + ">Reiniciar partida</button>" +
+        "</div>" +
+      "</div>";
+      return html;
+    }
+
+    html += '<h3>Personajes ofrecidos — elegí 3 (' + state.seleccion.personajes.length + "/3)</h3>";
+    html += '<div class="cards">';
+    (s.personajes_ofrecidos || []).forEach(function (p) {
+      var sel = state.seleccion.personajes.indexOf(p._id) >= 0;
+      var chips = "";
+      (p.tags || []).slice(0, 4).forEach(function (t) { chips += '<span class="chip tag">' + esc(t) + "</span>"; });
+      html += '<div class="selitem' + (sel ? " selected" : "") + '" data-action="toggle-personaje" data-id="' + esc(p._id) + '">' +
+        '<div class="nm">' + esc(p.nombre) + "</div>" +
+        '<div class="tt">' + esc(p.titulo || "") + (p.afinidad_inicial !== undefined ? " · afinidad " + esc(p.afinidad_inicial) : "") + "</div>" +
+        (p.descripcion ? '<div class="tt">' + esc(p.descripcion) + "</div>" : "") +
+        (chips ? '<div class="chips">' + chips + "</div>" : "") +
+      "</div>";
+    });
+    html += "</div>";
+
+    html += '<h3>Cartas ofrecidas — elegí 3 (' + state.seleccion.cartas.length + "/3)</h3>";
+    html += '<div class="cards">';
+    (s.cartas_ofrecidas || []).forEach(function (c) {
+      var sel = state.seleccion.cartas.indexOf(c._id) >= 0;
+      html += '<div class="selitem' + (sel ? " selected" : "") + '" data-action="toggle-carta" data-id="' + esc(c._id) + '">' +
+        '<div class="nm">' + esc(c.nombre) + "</div>" +
+        '<div class="tt">' + esc(c.categoria || "") + "</div>" +
+        (c.descripcion ? '<div class="tt">' + esc(c.descripcion) + "</div>" : "") +
+      "</div>";
+    });
+    html += "</div>";
+
+    var listo = state.seleccion.personajes.length === 3 && state.seleccion.cartas.length === 3;
+    html += '<div class="actions">' +
+      '<button class="primary" data-action="iniciar-partida"' + (!listo || state.busy ? " disabled" : "") + ">Iniciar partida (V2)</button>" +
+      '<button data-action="recargar-setup"' + (state.busy ? " disabled" : "") + ">Recargar setup</button>" +
+      "</div>";
+    if (!listo) html += '<div class="hint">Faltan seleccionar: ' +
+      (3 - state.seleccion.personajes.length) + " personaje(s) y " +
+      (3 - state.seleccion.cartas.length) + " carta(s).</div>";
+    return html;
+  }
+
+  function renderDraft() {
+    var html = '<div class="stage-head">' +
+      '<span class="pill v2">DRAFT_MENSUAL</span>' +
+      '<span class="pill neutral">mes ' + esc(state.mes || "—") + "</span>" +
+      "</div>";
+    html += '<p class="muted">Elegí una carta para el mes. El backend sortea el evento del mes y devuelve el grafo ya iniciado en su nodo raíz.</p>';
+    html += '<div class="cards">';
+    (state.draft || []).forEach(function (c) {
+      html += '<div class="card">' +
+        '<div class="nm">' + esc(c.nombre) + "</div>" +
+        '<div class="tt">' + esc(c.categoria || "") + "</div>" +
+        (c.descripcion ? '<div class="tt">' + esc(c.descripcion) + "</div>" : "") +
+        '<button class="primary" data-action="elegir-carta" data-id="' + esc(c._id) + '"' + (state.busy ? " disabled" : "") + ">Elegir esta carta</button>" +
+      "</div>";
+    });
+    if (!state.draft || state.draft.length === 0) {
+      html += '<div class="hint">No hay cartas de draft en la respuesta.</div>';
+    }
+    html += "</div>";
+    return html;
+  }
+
+  function renderNodo() {
+    var g = state.nodo;
+    if (!g) return '<div class="hint">Sin nodo activo.</div>';
+    var n = g.nodo_actual || {};
+    var tipoLabel = g.tipo === "evento" ? "Evento del mes" :
+      g.tipo === "conversacion" ? "Conversación de corte" :
+      g.tipo === "evento_especial" ? "Evento especial" : (g.tipo || "Grafo");
+    var html = '<div class="stage">';
+    html += '<div class="stage-head">' +
+      '<span class="pill v2">' + esc(tipoLabel) + "</span>" +
+      '<span class="pill neutral mono">' + esc(g.fase_actual || "—") + "</span>" +
+      '<span class="pill neutral mono">' + esc(g.grafo_id || "—") + "</span>" +
+      "</div>";
+    html += '<h3 class="stage-title">' + esc(g.titulo || "") + "</h3>";
+    html += imgTag(n.imagen || g.imagen, g.titulo);
+    html += '<div class="speaker">' + esc(n.hablante_id || "narrador") + "</div>";
+    html += '<div class="node-text">' + esc(n.texto || "") + "</div>";
+    var ops = n.opciones || [];
+    if (ops.length) {
+      html += '<div class="options">';
+      ops.forEach(function (op) {
+        html += '<button class="opt" data-action="avanzar-nodo" data-id="' + esc(op.id) + '"' +
+          (!op.disponible || state.busy ? " disabled" : "") + ">" +
+          esc(op.texto) +
+          (!op.disponible && op.motivo_bloqueo ? '<span class="why">' + esc(op.motivo_bloqueo) + "</span>" : "") +
+        "</button>";
+      });
+      html += "</div>";
+    } else {
+      html += '<div class="banner"><h3>Nodo sin opciones</h3><div class="detail">El grafo no ofrece opciones para continuar. Revisá la respuesta cruda en el inspector.</div></div>';
+    }
+    html += "</div>";
+    html += '<div class="actions">' +
+      '<button data-action="recargar-grafo"' + (state.busy ? " disabled" : "") + ">Refrescar grafo activo</button>" +
+      "</div>";
+    return html;
+  }
+
+  function renderDesenlace() {
+    var d = state.desenlace;
+    if (!d) return '<div class="hint">Sin desenlace.</div>';
+    var g = d.grafo;
+    var n = d.nodo || {};
+    var html = '<div class="stage">';
+    html += '<div class="stage-head">' +
+      '<span class="pill ok">DESENLACE</span>' +
+      '<span class="pill neutral mono">' + esc(g.tipo || "—") + "</span>" +
+      '<span class="pill neutral mono">' + esc(g.fase_actual || "—") + "</span>" +
+      "</div>";
+    html += '<h3 class="stage-title">' + esc(g.titulo || "") + "</h3>";
+    html += imgTag(n.imagen || g.imagen, g.titulo);
+    html += '<div class="speaker">' + esc(n.hablante_id || "narrador") + "</div>";
+    html += '<div class="node-text">' + esc(n.texto || "") + "</div>";
+    if (n.resultado_texto) {
+      html += '<div class="consequence"><span class="speaker">Consecuencia</span><div class="node-text" style="margin:6px 0 0">' + esc(n.resultado_texto) + "</div></div>";
+    }
+
+    var impactos = n.impactos_recursos || [];
+    if (impactos.length) {
+      html += "<h3>Impactos declarados en el nodo</h3><div>";
+      impactos.forEach(function (i) {
+        html += '<span class="chip tag" style="margin-right:6px">' + esc(RECURSO_LABEL[i.recurso] || i.recurso) + " " + esc(i.delta > 0 ? "+" + i.delta : i.delta) + "</span>";
+      });
+      html += "</div>";
+    }
+    var impAff = n.impactos_afinidad || [];
+    if (impAff.length) {
+      html += "<h3>Impactos de afinidad declarados</h3><div>";
+      impAff.forEach(function (i) {
+        html += '<span class="chip tag" style="margin-right:6px">' + esc(i.personaje_id) + " " + esc(i.delta > 0 ? "+" + i.delta : i.delta) + "</span>";
+      });
+      html += "</div>";
+    }
+    if ((n.impactos_tags || []).length) {
+      html += "<h3>Tags otorgados</h3><div>";
+      n.impactos_tags.forEach(function (t) { html += '<span class="chip tag" style="margin-right:6px">' + esc(t) + "</span>"; });
+      html += "</div>";
+    }
+
+    if (d.recursosAntes && g.recursos) {
+      html += "<h3>Balance neto de recursos (incluye reactivos)</h3>";
+      Object.keys(g.recursos).forEach(function (k) {
+        var antes = d.recursosAntes[k];
+        var ahora = g.recursos[k];
+        var delta = (typeof antes === "number" && typeof ahora === "number") ? ahora - antes : null;
+        html += '<div class="res ' + barClass(ahora) + '">' +
+          '<span class="rlabel">' + esc(RECURSO_LABEL[k] || k) + "</span>" +
+          '<span class="rval">' + esc(ahora) + "</span>" +
+          '<span class="bar"><span class="fill" style="width:' + Math.max(0, Math.min(100, ahora)) + '%"></span></span>' +
+          numDelta(delta) +
+        "</div>";
+      });
+    }
+
+    if (d.chain) {
+      var dec = (d.chain.decisiones || []).length;
+      html += '<div class="chain">' +
+        "<strong>El motor encadenó un " + esc(d.chain.requisitos && d.chain.requisitos.length ? "diálogo" : "grafo") + ":</strong> " +
+        esc(d.chain.titulo || d.chain._id) +
+        ' <span class="mono muted">(' + esc(d.chain._id) + ")</span>" +
+        '<div class="hint">' + dec + " decisiones disponibles. La fase del servidor ya es RESOLVER_CONVERSACION: hay que jugar este diálogo antes de avanzar el mes.</div>" +
+      "</div>";
+    } else if (g.finalizacion || esFinalStatus(g.status)) {
+      html += '<div class="chain"><strong>La partida terminó con este desenlace.</strong><div class="hint">Status: ' + esc(g.status || "—") + "</div></div>";
+    }
+
+    html += "</div>";
+    html += '<div class="actions">';
+    if (d.chain) {
+      html += '<button class="primary" data-action="continuar-desenlace"' + (state.busy ? " disabled" : "") + ">Continuar con el diálogo encadenado</button>";
+    } else if (g.finalizacion || esFinalStatus(g.status)) {
+      html += '<button class="primary" data-action="continuar-desenlace"' + (state.busy ? " disabled" : "") + ">Ver epílogo</button>";
+    } else {
+      html += '<button class="primary" data-action="continuar-desenlace"' + (state.busy ? " disabled" : "") + ">Cerrar el mes y pasar a balance</button>";
+    }
+    html += "</div>";
+    return html;
+  }
+
+  function renderBalance() {
+    var html = '<div class="stage-head">' +
+      '<span class="pill v2">BALANCE_MES</span>' +
+      '<span class="pill neutral">mes ' + esc(state.mes || "—") + "</span>" +
+      "</div>";
+    html += '<p class="muted">El desenlace ya se aplicó. Avanzar mes ejecuta los pasivos <span class="mono">cada_mes</span>, ' +
+      "guarda el historial y sortea el draft del mes siguiente. No se puede avanzar el mes si todavía queda un grafo activo.</p>";
+    html += '<div class="actions">' +
+      '<button class="primary" data-action="avanzar-mes"' + (state.busy ? " disabled" : "") + ">Avanzar al mes siguiente</button>" +
+      "</div>";
+    return html;
+  }
+
+  function renderFinal() {
+    var f = state.final || {};
+    var fin = f.finalizacion || {};
+    var html = '<div class="stage">';
+    html += '<div class="stage-head"><span class="pill ok">FIN DE PARTIDA</span>' +
+      '<span class="pill neutral mono">' + esc(f.status || "—") + "</span>" +
+      (state.mes ? '<span class="pill neutral">mes ' + esc(state.mes) + "</span>" : "") +
+      "</div>";
+    if (fin.titulo) html += '<p class="final-title">' + esc(fin.titulo) + "</p>";
+    if (fin.imagen) html += imgTag(fin.imagen, fin.titulo);
+    if (fin.texto) html += '<div class="node-text">' + esc(fin.texto) + "</div>";
+    if (fin.rango) html += '<div>Rango: <span class="rank">' + esc(fin.rango) + "</span></div>";
+    if (fin.recurso_clave) html += '<div class="hint">Recurso que colapsó: <span class="mono">' + esc(fin.recurso_clave) + "</span></div>";
+    if (f.puntos !== null && f.puntos !== undefined) html += '<div class="hint">Puntos acreditados: <b>' + esc(f.puntos) + "</b></div>";
+    if (!fin.titulo && !fin.texto) {
+      html += '<div class="hint">La partida terminó sin objeto de finalización en la respuesta. Revisá el inspector.</div>';
+    }
+    html += "</div>";
+    html += '<div class="actions">' +
+      '<button class="primary" data-action="reiniciar"' + (state.busy ? " disabled" : "") + ">Reiniciar y volver al setup</button>" +
+      '<button data-action="recargar-setup"' + (state.busy ? " disabled" : "") + ">Volver al setup sin reiniciar</button>" +
+      "</div>";
+    return html;
+  }
+
+  // ==========================================================================
+  // Inspector
+  // ==========================================================================
+  function renderInspector() {
+    var u = state.ultimo || {};
+    var fase = u.fase_actual || (state.desenlace && state.desenlace.grafo ? state.desenlace.grafo.fase_actual : null) || "—";
+    var status = u.status || (state.final && state.final.status) || "—";
+    var grafoId = u.grafo_id || (state.nodo && state.nodo.grafo_id) || "—";
+    var tipo = u.tipo || (state.nodo && state.nodo.tipo) || "—";
+    var nodo = (state.nodo && state.nodo.nodo_actual) ||
+      (state.desenlace && state.desenlace.nodo) ||
+      (u.nodo_actual) || {};
+    var encadenado = (state.pendingChain && state.pendingChain._id) ||
+      (u.conversacion_actual && u.conversacion_actual._id) || "—";
+    var motor = state.motor || (u.motor) || "—";
+
+    var rows = [
+      ["motor", motor, motor === "v2" ? "ok" : (motor === "—" ? "" : "fail")],
+      ["fase", fase, ""],
+      ["status", status, esFinalStatus(status) ? "fail" : ""],
+      ["mes", state.mes || "—", ""],
+      ["grafo", grafoId, ""],
+      ["tipo", tipo, ""],
+      ["nodo", nodo.id || "—", ""],
+      ["es_final", String(!!nodo.es_final), nodo.es_final ? "ok" : ""],
+      ["encadenado", encadenado, encadenado !== "—" ? "ok" : ""],
+      ["invitado", state.guest.guestId ? shortId(state.guest.guestId, 18) : "—", ""]
+    ];
+    var estadoHtml = "";
+    rows.forEach(function (r) {
+      estadoHtml += '<div class="krow"><span class="k">' + esc(r[0]) + '</span><span class="v ' + r[2] + '">' + esc(r[1]) + "</span></div>";
+    });
+    $("#inspectorEstado").innerHTML = estadoHtml;
+
+    var checksHtml = "";
+    if (!state.checks || state.checks.length === 0) {
+      checksHtml = '<div class="check neutral"><span class="mark">·</span><span>Sin chequeos todavía.</span></div>';
+    } else {
+      state.checks.forEach(function (c) {
+        var cls = c.ok === true ? "ok" : (c.ok === false ? "fail" : "neutral");
+        var mark = c.ok === true ? "✓" : (c.ok === false ? "✕" : "·");
+        checksHtml += '<div class="check ' + cls + '"><span class="mark">' + mark + "</span><span>" + esc(c.text) + "</span></div>";
+      });
+    }
+    $("#inspectorChecks").innerHTML = checksHtml;
+
+    $("#inspectorRecursos").innerHTML = renderRecursos();
+    $("#inspectorAfinidad").innerHTML = renderAfinidad();
+
+    var raw = state.ultimo ? JSON.stringify(state.ultimo, null, 2) : "Sin respuestas todavía.";
+    $("#inspectorRaw").innerHTML = '<details class="rawbox"' + (state.ultimo ? " open" : "") + "><summary>Respuesta " +
+      (state.error ? "con error" : "más reciente") + "</summary><pre class='raw'>" + esc(raw) + "</pre></details>";
+
+    renderLog();
+  }
+
+  function renderRecursos() {
+    if (!state.recursos) return '<div class="hint">Sin recursos todavía.</div>';
+    var html = "";
+    Object.keys(state.recursos).forEach(function (k) {
+      var v = state.recursos[k];
+      html += '<div class="res ' + barClass(v) + '">' +
+        '<span class="rlabel">' + esc(RECURSO_LABEL[k] || k) + "</span>" +
+        '<span class="rval">' + esc(v) + "</span>" +
+        '<span class="bar"><span class="fill" style="width:' + Math.max(0, Math.min(100, v)) + '%"></span></span>' +
+      "</div>";
+    });
+    return html;
+  }
+
+  function renderAfinidad() {
+    if (!state.afinidad) return '<div class="hint">Sin afinidad todavía.</div>';
+    var html = "";
+    Object.keys(state.afinidad).forEach(function (k) {
+      var v = state.afinidad[k];
+      html += '<div class="aff"><span class="mono">' + esc(k) + '</span><span class="aval">' + esc(v) + "</span></div>";
+    });
+    return html;
+  }
+
+  function renderLog() {
+    var el = $("#log");
+    if (!state.log.length) {
+      el.innerHTML = '<div class="hint">Todavía no se hicieron requests.</div>';
+      return;
+    }
+    var html = "";
+    state.log.forEach(function (e, i) {
+      var ok = typeof e.status === "number" && e.status >= 200 && e.status < 300;
+      var summary = '<span>' + esc(e.method) + " " + esc(e.path) + '</span>' +
+        '<span><span class="st ' + (ok ? "ok" : "err") + '">' + esc(e.status) + "</span> · " + esc(e.ms) + " ms</span>";
+      var body = "REQUEST:\n" + esc(e.request === null || e.request === undefined ? "—" : JSON.stringify(e.request, null, 2)) +
+        "\n\nRESPONSE:\n" + esc(typeof e.response === "string" ? e.response : JSON.stringify(e.response, null, 2));
+      html += '<details class="logitem"' + (i === 0 ? " open" : "") + "><summary>" + summary + "</summary><pre>" + body + "</pre></details>";
+    });
+    el.innerHTML = html;
+  }
+
+  // ==========================================================================
+  // Eventos
+  // ==========================================================================
+  function manejarAccion(action, id) {
+    switch (action) {
+      case "iniciar-demo": iniciarDemo(); break;
+      case "reanudar": reanudar(); break;
+      case "reiniciar": reiniciarPartida(); break;
+      case "toggle-personaje": toggleSeleccion("personajes", id); break;
+      case "toggle-carta": toggleSeleccion("cartas", id); break;
+      case "iniciar-partida": iniciarPartida(); break;
+      case "elegir-carta": elegirCarta(id); break;
+      case "avanzar-nodo": avanzarNodo(id); break;
+      case "continuar-desenlace": continuarDesenlace(); break;
+      case "avanzar-mes": avanzarMes(); break;
+      case "recargar-setup": conAccion(function () { state.aviso = null; return cargarSetup(); }); break;
+      case "recargar-grafo":
+        conAccion(function () {
+          return api("/api/narrative/v2/partida/grafo-actual?date=" + encodeURIComponent(state.date))
+            .then(function (g) {
+              if (!g) throw new ApiError(0, "No hay grafo activo en la partida.", null);
+              handleGrafo(g);
+            });
+        });
+        break;
+    }
+  }
+
+  function init() {
+    state.apiBase = localStorage.getItem(STORAGE.apiBase) || location.origin;
+    state.date = localStorage.getItem(STORAGE.date) || hoyISO();
+    state.guest.credential = sessionStorage.getItem(STORAGE.credential) || null;
+    state.guest.guestId = sessionStorage.getItem(STORAGE.guestId) || null;
+
+    var apiInput = $("#apiBase");
+    var fechaInput = $("#fecha");
+    apiInput.value = state.apiBase;
+    fechaInput.value = state.date;
+
+    apiInput.addEventListener("change", function () {
+      var v = (apiInput.value || "").trim() || location.origin;
+      state.apiBase = v.replace(/\/+$/, "");
+      apiInput.value = state.apiBase;
+      localStorage.setItem(STORAGE.apiBase, state.apiBase);
+      iniciarDemo();
+    });
+    fechaInput.addEventListener("change", function () {
+      var v = fechaInput.value;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+      state.date = v;
+      localStorage.setItem(STORAGE.date, v);
+      iniciarDemo();
+    });
+    $("#btnNuevaSesion").addEventListener("click", nuevaSesion);
+    $("#contenido").addEventListener("click", function (ev) {
+      var el = ev.target.closest("[data-action]");
+      if (!el) return;
+      if (el.disabled) return;
+      var action = el.getAttribute("data-action");
+      if (action === "toggle-personaje" || action === "toggle-carta" || action === "elegir-carta" || action === "avanzar-nodo") {
+        manejarAccion(action, el.getAttribute("data-id"));
+        return;
+      }
+      manejarAccion(action, null);
+    });
+
+    render();
+    iniciarDemo();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

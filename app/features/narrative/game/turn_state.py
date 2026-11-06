@@ -41,6 +41,20 @@ async def obtener_turno_actual(user_id: int, date: str) -> EstadoTurnoResponse:
     draft_docs = await db[COLL_CARDS].find({"_id": {"$in": draft_ids}}).to_list(None) if draft_ids else []
     evento_doc = await db[COLL_EVENTS].find_one({"_id": evento_id}) if evento_id else None
     res_doc = await db[COLL_RESULTS].find_one({"_id": resultado_id}) if resultado_id else None
+    if not res_doc and run.get("motor") == "v2" and run.get("historial_grafos"):
+        ultimo_nodo = run["historial_grafos"][-1]
+        if ultimo_nodo.get("mes") == run.get("mes_actual", 1):
+            from app.features.narrative.game.motor_v2.graph_engine import graph_engine
+            g_doc = await graph_engine.obtener_grafo(ultimo_nodo.get("tipo", "evento"), ultimo_nodo.get("grafo_id", ""))
+            res_doc = {
+                "_id": str(ultimo_nodo.get("resultado_obtenido_id") or "res_v2"),
+                "universo_id": run.get("universo_id", "corte_medieval"),
+                "titulo": (g_doc or {}).get("titulo", "Desenlace"),
+                "texto": str(ultimo_nodo.get("resultado_texto") or ""),
+                "tipo_resultado": "neutro",
+                "imagen": (g_doc or {}).get("imagen", ""),
+                "efectos": []
+            }
     conv_doc = await db[COLL_CONVERSATIONS].find_one({"_id": conversacion_id}) if conversacion_id else None
 
     evento_resp = None

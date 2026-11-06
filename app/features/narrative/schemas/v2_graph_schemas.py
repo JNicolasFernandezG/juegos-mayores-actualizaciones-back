@@ -1,9 +1,12 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 
-from app.features.narrative.schemas.rules_schemas import CondicionSchema
-from app.features.narrative.schemas.catalog_schemas import ImpactoAfinidadSchema
-from app.features.narrative.enums import TipoCondicionEnum, DireccionEventoEspecialEnum
+from app.features.narrative.schemas.rules_schemas import CondicionSchema, EfectoSchema
+from app.features.narrative.schemas.catalog_schemas import (
+    ImpactoAfinidadSchema,
+    ModificadorProbabilidadSchema,
+)
+from app.features.narrative.enums import TipoCondicionEnum, DireccionEventoEspecialEnum, TipoResultadoEnum
 
 # ============================================================================
 # MODELOS PYDANTIC: MOTOR NARRATIVO V2 BASADO EN GRAFOS DE DECISIÓN
@@ -16,6 +19,10 @@ class ImpactoRecursoSchema(BaseModel):
 class DesenlaceNodoSchema(BaseModel):
     nodo: str = Field(..., description="ID del nodo destino posible de la opción")
     peso: float = Field(default=1.0, description="Peso relativo del desenlace para el sorteo ponderado")
+    modificadores_probabilidad: List[ModificadorProbabilidadSchema] = Field(
+        default_factory=list,
+        description="Deltas de peso aplicados sólo si la condición se cumple en la partida; un peso anulado deja de sortearse."
+    )
 
 class OpcionNodoSchema(BaseModel):
     id: str = Field(..., description="Identificador único de la opción (ej: opt_1, opt_apoyar_marcus)")
@@ -54,6 +61,14 @@ class NodoNarrativoSchema(BaseModel):
     impactos_recursos: List[ImpactoRecursoSchema] = Field(default_factory=list, description="Impactos en recursos si es_final=True")
     impactos_afinidad: List[ImpactoAfinidadSchema] = Field(default_factory=list, description="Impactos en afinidad si es_final=True")
     impactos_tags: List[str] = Field(default_factory=list, description="Tags permanentes otorgados al reino si es_final=True")
+    tipo_desenlace: Optional[TipoResultadoEnum] = Field(
+        default=None,
+        description="Semantica del desenlace (positivo/negativo/neutro). Si viene vacia, el motor la infiere del delta total aplicado."
+    )
+    efectos: List[EfectoSchema] = Field(
+        default_factory=list,
+        description="Efectos ECA del desenlace, despachados contra el catalogo de acciones/frecuencias del universo. Quedan del lado del servidor: no se envian al cliente para no revelar el desenlace."
+    )
 
     @staticmethod
     def _generar_motivo_bloqueo(cond: Any) -> str:
@@ -222,6 +237,10 @@ class EstadoGrafoV2Response(BaseModel):
     finalizacion: Optional[Dict[str, Any]] = Field(default=None, description="Datos del epílogo si la partida terminó (derrota)")
     status: str = Field(default="CONTINUA", description="Estado de la partida ('CONTINUA', 'VICTORIA', 'DERROTA')")
     puntos_ganados: Optional[int] = Field(default=None, description="Puntos acreditados por finalizar la partida (solo en transición terminal)")
+    conversacion_actual: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Diálogo o evento especial encadenado que se presentará tras confirmar el resultado del evento actual",
+    )
 
 # ============================================================================
 # VALIDACIÓN ESTÁTICA DE GRAFOS V2

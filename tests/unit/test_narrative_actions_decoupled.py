@@ -326,6 +326,86 @@ def test_mutar_estado_afinidad_y_variables():
     assert run_data["variables"]["inflacion"] == 12.5
 
 
+def test_frecuencia_ausente_del_catalogo_no_dispara():
+    """El catálogo manda: sin ítem activo, 'mensual' deja de ser un atajo que dispara siempre."""
+    run_data = {"mes_actual": 3, "recursos": {"oro": 100}}
+    efecto = EfectoSchema(
+        frecuencia_id="mensual",
+        acciones=[
+            AccionReferenciadaSchema(
+                accion_id="modificar_recurso",
+                parametros=ParametrosAccionSchema(clave="oro", valor=10),
+            )
+        ],
+    )
+
+    # Catálogo cargado pero sin el ítem: el efecto queda inofensivo
+    despachar_efectos(
+        DisparadorEnum.CADA_MES,
+        run_data,
+        [efecto],
+        catalogo_frecuencias={},
+        mes_actual=3,
+    )
+    assert run_data["recursos"]["oro"] == 100
+
+    # Con el ítem activo, la misma frecuencia vuelve a disparar
+    despachar_efectos(
+        DisparadorEnum.CADA_MES,
+        run_data,
+        [efecto],
+        catalogo_frecuencias={
+            "mensual": {"id": "mensual", "evento_motor": "inicio_mes", "cada": 1, "conteo_desde": "inicio_partida"}
+        },
+        mes_actual=3,
+    )
+    assert run_data["recursos"]["oro"] == 110
+
+
+def test_frecuencia_de_otro_evento_no_dispara_en_desenlace():
+    run_data = {"mes_actual": 3, "recursos": {"oro": 100}}
+    efecto = EfectoSchema(
+        frecuencia_id="cada_2_meses",
+        acciones=[
+            AccionReferenciadaSchema(
+                accion_id="modificar_recurso",
+                parametros=ParametrosAccionSchema(clave="oro", valor=10),
+            )
+        ],
+    )
+    catalogo = {
+        "cada_2_meses": {"id": "cada_2_meses", "evento_motor": "inicio_mes", "cada": 2, "conteo_desde": "adquisicion"}
+    }
+
+    despachar_efectos(
+        DisparadorEnum.AL_DESENLACE,
+        run_data,
+        [efecto],
+        catalogo_frecuencias=catalogo,
+        mes_actual=3,
+    )
+    assert run_data["recursos"]["oro"] == 100
+
+
+def test_efecto_de_desenlace_dispara_solo_con_su_evento():
+    run_data = {"recursos": {"pueblo": 50}}
+    efecto = EfectoSchema(
+        disparador=DisparadorEnum.AL_DESENLACE,
+        acciones=[
+            AccionReferenciadaSchema(
+                accion_id="modificar_recurso",
+                parametros=ParametrosAccionSchema(clave="pueblo", valor=-5),
+            )
+        ],
+    )
+
+    despachar_efectos(DisparadorEnum.CADA_MES, run_data, [efecto], catalogo_frecuencias={})
+    assert run_data["recursos"]["pueblo"] == 50
+
+    despachar_efectos(DisparadorEnum.AL_DESENLACE, run_data, [efecto], catalogo_frecuencias={})
+    assert run_data["recursos"]["pueblo"] == 45
+
+
 def test_condiciones_aparicion_evaluacion():
     run_data = {
         "recursos": {"oro": 100},

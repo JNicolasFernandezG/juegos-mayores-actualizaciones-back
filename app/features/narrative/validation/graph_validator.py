@@ -14,8 +14,11 @@ from app.features.narrative.constants import (
     COLL_V2_EVENTOS_ESPECIALES,
     COLL_V2_EVENTS,
 )
+from app.features.narrative.schemas.rules_schemas import PrimitivaOperacionEnum
 
 TIPOS_VALIDOS = ("evento", "conversacion", "evento_especial")
+
+_PRIMITIVAS_VALIDAS = {p.value for p in PrimitivaOperacionEnum}
 
 _COLECCION_POR_TIPO = {
     "evento": COLL_V2_EVENTS,
@@ -25,6 +28,17 @@ _COLECCION_POR_TIPO = {
 
 _DIRECCIONES_VALIDAS = {"lealtad", "traicion"}
 _MODOS_BLOQUEO_VALIDOS = {"deshabilitada", "oculta"}
+_TIPOS_DESENLACE_VALIDOS = {"positivo", "negativo", "neutro"}
+
+# Eventos que el motor despacha por nombre, sin depender del catálogo de frecuencias.
+_EVENTOS_MOTOR = {
+    "al_obtener",
+    "cada_mes",
+    "inicio_mes",
+    "al_desenlace",
+    "en_evento_positivo",
+    "en_evento_negativo",
+}
 
 
 @dataclass(frozen=True)
@@ -85,6 +99,31 @@ def _destinos(opt: Dict[str, Any]) -> List[str]:
     return destinos
 
 
+def _crudo(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    return str(value.value if hasattr(value, "value") else value)
+
+
+def _primitiva_de(accion_id: str, catalogo_acciones: Optional[Dict[str, Any]]) -> str:
+    item = (catalogo_acciones or {}).get(accion_id)
+    if item:
+        return _crudo(item.get("primitiva") or item.get("tipo_accion")) or accion_id
+    return accion_id
+
+
+def _recurso_exigido(primitiva: str, params: Dict[str, Any]) -> Optional[str]:
+    """Recurso que la primitiva necesita que exista en la partida; None si no depende de uno."""
+    if primitiva in ("modificar_recurso", "amortiguar_danio"):
+        return _crudo(params.get("clave"))
+    if primitiva == "mutar_estado":
+        ruta = _crudo(params.get("ruta")) or ""
+        for prefijo in ("recursos.", "limites."):
+            if ruta.startswith(prefijo):
+                return _crudo(ruta[len(prefijo):].split(".")[0]) or None
+    return None
+
+
 def _detectar_ciclo(nodos: Dict[str, Dict[str, Any]], raiz: str) -> Optional[str]:
     """Devuelve el id de un nodo involucrado en un ciclo alcanzable, o None."""
     estado: Dict[str, int] = {}
@@ -122,8 +161,88 @@ def _alcanzables(nodos: Dict[str, Dict[str, Any]], raiz: str) -> Set[str]:
     return visitados
 
 
-def validar_grafo(grafo: Any, tipo: str = "evento") -> ResultadoValidacion:
-    """Valida la estructura de un evento, conversación o evento especial V2."""
+def hallazgos_de_efectos(
+    efectos: Sequence[Any],
+    *,
+    recursos_validos: Optional[Set[str]] = None,
+    catalogo_acciones: Optional[Dict[str, Any]] = None,
+    catalogo_frecuencias: Optional[Dict[str, Any]] = None,
+    nodo_id: Optional[str] = None,
+) -> List[Hallazgo]:
+    """
+    Errores de efectos ECA declarados en un nodo, una carta o un personaje.
+    Replica el orden de resolución del motor para detectar lo que nunca se ejecuta.
+    Sin catálogos pasados sólo controla lo estructural; con ellos, también la referencia.
+    """
+    hallazgos: List[Hallazgo] = []
+
+    for indice, crudo in enumerate(efectos or []):
+        efecto = _as_dict(crudo)
+        etiqueta = efecto.get("id") or f"índice {indice}"
+
+        def error(codigo: str, mensaje: str) -> None:
+            hallazgos.append(Hallazgo(codigo, mensaje, nodo_id))
+
+        evento = _crudo(efecto.get("frecuencia_id") or efecto.get("disparador"))
+        if not evento:
+            error("efecto_sin_evento", f"El efecto '{etiqueta}' no declara frecuencia ni disparador.")
+        elif catalogo_frecuencias is not None and evento not in _EVENTOS_MOTOR \
+                and not catalogo_frecuencias.get(evento):
+            error(
+                "evento_no_despachado",
+                f"El efecto '{etiqueta}' usa '{evento}': el motor no lo emite y no está activo en el catálogo de frecuencias.",
+            )
+
+        acciones = [_as_dict(a) for a in (efecto.get("acciones") or [])]
+        if efecto.get("accion"):
+            acciones.append(_as_dict(efecto["accion"]))
+        if not acciones:
+            error("efecto_sin_acciones", f"El efecto '{etiqueta}' no ejecuta ninguna acción.")
+
+        for accion in acciones:
+            accion_id = _crudo(accion.get("accion_id") or accion.get("tipo"))
+            if not accion_id:
+                error("accion_sin_id", f"El efecto '{etiqueta}' tiene una acción sin identificador.")
+                continue
+            primitiva = _primitiva_de(accion_id, catalogo_acciones)
+            if primitiva not in _PRIMITIVAS_VALIDAS:
+                error(
+                    "accion_desconocida",
+                    f"El efecto '{etiqueta}' referencia '{accion_id}', que no es acción del catálogo ni primitiva del motor.",
+                )
+                continue
+            params = _as_dict(accion.get("parametros")) or accion
+            recurso = _recurso_exigido(primitiva, params)
+            if recurso and recursos_validos is not None and recurso.lower() not in recursos_validos:
+                error(
+                    "recurso_inexistente",
+                    f"El efecto '{etiqueta}' ({accion_id}) opera sobre '{recurso}', que no es un recurso del universo.",
+                )
+            if primitiva == "modificar_afinidad" and params.get("destino") == "personaje" \
+                    and not params.get("personaje_id"):
+                error(
+                    "afinidad_sin_personaje",
+                    f"El efecto '{etiqueta}' modifica afinidad de un personaje sin decir cuál.",
+                )
+
+    return hallazgos
+
+
+def validar_grafo(
+    grafo: Any,
+    tipo: str = "evento",
+    *,
+    recursos_validos: Optional[Set[str]] = None,
+    catalogo_acciones: Optional[Dict[str, Any]] = None,
+    catalogo_frecuencias: Optional[Dict[str, Any]] = None,
+) -> ResultadoValidacion:
+    """
+    Valida la estructura de un evento, conversación o evento especial V2.
+
+    Los tres catálogos son opcionales: sin ellos la validación es puramente estructural.
+    Con ellos, además se rechaza contenido que el motor ejecutaría en silencio
+    (recursos inexistentes, acciones o frecuencias fuera del catálogo del universo).
+    """
     doc = _as_dict(grafo)
     grafo_id = doc.get("_id") or doc.get("id")
     resultado = ResultadoValidacion(tipo=tipo, grafo_id=grafo_id)
@@ -186,6 +305,38 @@ def validar_grafo(grafo: Any, tipo: str = "evento") -> ResultadoValidacion:
             error("nodo_sin_opciones", "Un nodo no final debe ofrecer al menos una opción.", nodo_id=clave)
         if es_final and not (nodo.get("resultado_texto") or "").strip():
             advertencia("nodo_final_sin_texto", "El nodo final no tiene resultado_texto.", nodo_id=clave)
+
+        for impacto in (_as_dict(i) for i in (nodo.get("impactos_recursos") or [])):
+            recurso = _crudo(impacto.get("recurso"))
+            if recurso and recursos_validos is not None and recurso.lower() not in recursos_validos:
+                error(
+                    "recurso_inexistente",
+                    f"'{recurso}' no es un recurso del universo; el motor descarta el impacto.",
+                    nodo_id=clave,
+                )
+
+        desenlace = _crudo(nodo.get("tipo_desenlace"))
+        if desenlace is not None and desenlace not in _TIPOS_DESENLACE_VALIDOS:
+            error(
+                "tipo_desenlace_invalido",
+                f"tipo_desenlace '{desenlace}' desconocido; esperado uno de {sorted(_TIPOS_DESENLACE_VALIDOS)}.",
+                nodo_id=clave,
+            )
+
+        efectos = [_as_dict(e) for e in (nodo.get("efectos") or [])]
+        if efectos and not es_final:
+            error(
+                "efectos_en_nodo_no_final",
+                "Los efectos sólo se despachan en el nodo final; acá quedarían inactivos.",
+                nodo_id=clave,
+            )
+        resultado.errores.extend(hallazgos_de_efectos(
+            efectos,
+            recursos_validos=recursos_validos,
+            catalogo_acciones=catalogo_acciones,
+            catalogo_frecuencias=catalogo_frecuencias,
+            nodo_id=clave,
+        ))
 
         for opt in opciones:
             opcion_id = opt.get("id")
@@ -273,6 +424,57 @@ def validar_grafo(grafo: Any, tipo: str = "evento") -> ResultadoValidacion:
     return resultado
 
 
+async def validar_grafo_para_guardado(
+    grafo: Any,
+    tipo: str = "evento",
+    db=None,
+) -> ResultadoValidacion:
+    """
+    Valación completa de un grafo antes de persistirlo: estructura más catálogo del universo.
+    Sin este contexto el motor ejecutaría en silencio recursos o frecuencias inexistentes.
+    """
+    doc = _as_dict(grafo)
+    if db is None:
+        from app.core.database import get_database
+
+        db = get_database()
+
+    contexto = await _cargar_contexto_universo(str(doc.get("universo_id") or "corte_medieval"), db)
+    return validar_grafo(doc, tipo, **contexto)
+
+
+async def validar_efectos_almacenables(
+    efectos: Sequence[Any],
+    universo_id: str,
+    db=None,
+) -> List[Hallazgo]:
+    """
+    Barato de pasar en cada guardado de carta o personaje: usa los mismos catálogos
+    que el motor carga en la partida, así que lo que se rechoca acá es lo que en el
+    juego se ejecutaría en silencio.
+    """
+    if db is None:
+        from app.core.database import get_database
+
+        db = get_database()
+
+    contexto = await _cargar_contexto_universo(str(universo_id), db)
+    return hallazgos_de_efectos(efectos, **contexto)
+
+
+async def _cargar_contexto_universo(universo_id: str, db) -> Dict[str, Any]:
+    from app.features.narrative.game.universe_resources import obtener_mapa_recursos_universo
+    from app.features.narrative.engine.catalog_loader import obtener_catalogos_universo
+
+    recursos_mapa = await obtener_mapa_recursos_universo(universo_id)
+    acciones, frecuencias = await obtener_catalogos_universo(universo_id, db)
+    return {
+        "recursos_validos": {str(clave).lower() for clave in recursos_mapa},
+        "catalogo_acciones": acciones,
+        "catalogo_frecuencias": frecuencias,
+    }
+
+
 async def validar_grafos_almacenados(
     db=None,
     *,
@@ -293,6 +495,7 @@ async def validar_grafos_almacenados(
         raise ValueError(f"Tipos de grafo inválidos: {invalidos}")
 
     resultados: List[ResultadoValidacion] = []
+    contextos: Dict[str, Dict[str, Any]] = {}
     for tipo in tipos_a_validar:
         query: Dict[str, Any] = {}
         if grafo_id:
@@ -301,5 +504,8 @@ async def validar_grafos_almacenados(
             query["universo_id"] = universo_id
         cursor = db[_COLECCION_POR_TIPO[tipo]].find(query).limit(limite)
         async for documento in cursor:
-            resultados.append(validar_grafo(documento, tipo))
+            universo = str(documento.get("universo_id") or "corte_medieval")
+            if universo not in contextos:
+                contextos[universo] = await _cargar_contexto_universo(universo, db)
+            resultados.append(validar_grafo(documento, tipo, **contextos[universo]))
     return resultados

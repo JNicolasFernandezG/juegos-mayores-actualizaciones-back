@@ -6177,7 +6177,7 @@
         "tags": [
           "Narrativo - Administración"
         ],
-        "summary": "Validar grafos V2 (referencias, hojas, pesos y ciclos)",
+        "summary": "Validar grafos V2 (estructura, catálogo y ejecutabilidad de los desenlaces)",
         "description": "Valida un grafo inline, uno almacenado o todos los grafos de un universo.",
         "operationId": "endpoint_validar_grafos_v2_api_narrative_admin_v2_validar_post",
         "requestBody": {
@@ -9256,6 +9256,14 @@
             "title": "Peso",
             "description": "Peso relativo del desenlace para el sorteo ponderado",
             "default": 1.0
+          },
+          "modificadores_probabilidad": {
+            "items": {
+              "$ref": "#/components/schemas/ModificadorProbabilidadSchema"
+            },
+            "type": "array",
+            "title": "Modificadores Probabilidad",
+            "description": "Deltas de peso aplicados sólo si la condición se cumple en la partida; un peso anulado deja de sortearse."
           }
         },
         "type": "object",
@@ -9279,6 +9287,7 @@
           "cada_mes",
           "en_evento_positivo",
           "en_evento_negativo",
+          "al_desenlace",
           "al_final_partida"
         ],
         "title": "DisparadorEnum"
@@ -11198,6 +11207,25 @@
             "type": "array",
             "title": "Impactos Tags",
             "description": "Tags permanentes otorgados al reino si es_final=True"
+          },
+          "tipo_desenlace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TipoResultadoEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Semantica del desenlace (positivo/negativo/neutro). Si viene vacia, el motor la infiere del delta total aplicado."
+          },
+          "efectos": {
+            "items": {
+              "$ref": "#/components/schemas/EfectoSchema"
+            },
+            "type": "array",
+            "title": "Efectos",
+            "description": "Efectos ECA del desenlace, despachados contra el catalogo de acciones/frecuencias del universo. Quedan del lado del servidor: no se envian al cliente para no revelar el desenlace."
           }
         },
         "type": "object",

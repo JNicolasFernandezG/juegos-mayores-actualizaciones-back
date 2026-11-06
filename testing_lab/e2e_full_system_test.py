@@ -325,18 +325,18 @@ if guest_cred:
             except Exception as e:
                 runner.record("Narrative", "POST /api/narrative/v2/partida/elegir-carta-mes", False, str(e))
 
-        # 5.7 Rechazo de endpoints V1 sobre partida V2
+        # 5.7 Rechazo de endpoints V1 sobre partida V2 (409 Conflict)
         try:
             runner.request(
                 "POST",
                 "/api/narrative/v2/partida/decidir-evento",
                 data={"date": TODAY, "opcion_id": "cualquiera"},
                 headers=g_headers,
-                expected_status=400
+                expected_status=409
             )
-            runner.record("Narrative", "Endpoints Legacy V1 rechazan partida V2 (400)", True)
+            runner.record("Narrative", "Endpoints Legacy V1 rechazan partida V2 (409)", True)
         except Exception as e:
-            runner.record("Narrative", "Endpoints Legacy V1 rechazan partida V2 (400)", False, str(e))
+            runner.record("Narrative", "Endpoints Legacy V1 rechazan partida V2 (409)", False, str(e))
 
         # 5.8 Reiniciar partida y comprobar archivado
         try:

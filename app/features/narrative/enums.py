@@ -5,6 +5,7 @@ class DisparadorEnum(str, Enum):
     CADA_MES = "cada_mes"
     EN_EVENTO_POSITIVO = "en_evento_positivo"
     EN_EVENTO_NEGATIVO = "en_evento_negativo"
+    AL_DESENLACE = "al_desenlace"
     AL_FINAL_PARTIDA = "al_final_partida"
 
 class OperadorEnum(str, Enum):

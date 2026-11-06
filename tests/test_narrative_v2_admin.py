@@ -4,6 +4,7 @@ from httpx import AsyncClient, ASGITransport
 
 from app.main import app
 from app.core.database import connect_to_mongo, get_database
+from app.features.narrative.constants import COLL_CARDS, COLL_CHARACTERS
 
 def test_narrative_v2_admin_crud(admin_override):
     asyncio.run(_ejecutar_tests_admin())
@@ -100,9 +101,23 @@ async def _ejecutar_tests_admin():
                     "id": "inicio",
                     "hablante_id": "pj_canciller_elena",
                     "texto": "Majestad, debemos revisar el censo.",
+                    "es_final": False,
+                    "opciones": [
+                        {
+                            "id": "opt_aprobar",
+                            "texto": "Aprobar el censo",
+                            "siguiente_nodo": "final_aprobado"
+                        }
+                    ]
+                },
+                "final_aprobado": {
+                    "id": "final_aprobado",
+                    "hablante_id": "pj_canciller_elena",
+                    "texto": "El censo avanza.",
                     "es_final": True,
                     "opciones": [],
                     "resultado_texto": "Aprobaste el nuevo censo.",
+                    "tipo_desenlace": "positivo",
                     "impactos_recursos": [{"recurso": "oro", "delta": 15}],
                     "impactos_afinidad": [{"personaje_id": "pj_canciller_elena", "delta": 10}]
                 }
@@ -115,5 +130,113 @@ async def _ejecutar_tests_admin():
         # 6. Eliminar conversación
         resp_conv_del = await client.delete(f"/api/narrative/admin/v2/conversaciones/{test_conv_id}")
         assert resp_conv_del.status_code == 200
+
+
+def test_barrera_efectos_al_guardar_carta_y_personaje(admin_override):
+    asyncio.run(_ejecutar_barrera_efectos())
+
+
+def _carta_payload(efectos) -> dict:
+    return {
+        "_id": "carta_test_barrera_efectos",
+        "universo_id": "corte_medieval",
+        "categoria": "item",
+        "nombre": "Carta de prueba",
+        "descripcion": "Descripción de prueba",
+        "efectos": efectos,
+    }
+
+
+async def _ejecutar_barrera_efectos():
+    await connect_to_mongo()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        db = get_database()
+        await db[COLL_CARDS].delete_one({"_id": "carta_test_barrera_efectos"})
+        await db[COLL_CHARACTERS].delete_one({"_id": "pj_test_barrera_efectos"})
+
+        try:
+            resp_ok = await client.post(
+                "/api/narrative/admin/cartas",
+                json=_carta_payload([
+                    {
+                        "id": "efecto_ok",
+                        "disparador": "al_obtener",
+                        "acciones": [
+                            {"accion_id": "modificar_recurso", "parametros": {"clave": "oro", "valor": 5}}
+                        ],
+                    }
+                ]),
+            )
+            assert resp_ok.status_code == 200, resp_ok.text
+
+            resp_recurso = await client.post(
+                "/api/narrative/admin/cartas",
+                json=_carta_payload([
+                    {
+                        "id": "efecto_mal_recurso",
+                        "disparador": "al_obtener",
+                        "acciones": [
+                            {"accion_id": "modificar_recurso", "parametros": {"clave": "uranio", "valor": 5}}
+                        ],
+                    }
+                ]),
+            )
+            assert resp_recurso.status_code == 422, resp_recurso.text
+            assert {h["codigo"] for h in resp_recurso.json()["detail"]["errores"]} == {"recurso_inexistente"}
+
+            resp_evento = await client.post(
+                "/api/narrative/admin/cartas",
+                json=_carta_payload([
+                    {
+                        "id": "efecto_mal_evento",
+                        "frecuencia_id": "frecuencia_inventada_xyz",
+                        "acciones": [
+                            {"accion_id": "modificar_recurso", "parametros": {"clave": "oro", "valor": 5}}
+                        ],
+                    }
+                ]),
+            )
+            assert resp_evento.status_code == 422, resp_evento.text
+            assert "evento_no_despachado" in {h["codigo"] for h in resp_evento.json()["detail"]["errores"]}
+
+            resp_vacio = await client.post(
+                "/api/narrative/admin/cartas",
+                json=_carta_payload([{"id": "efecto_sin_acciones", "disparador": "al_obtener"}]),
+            )
+            assert resp_vacio.status_code == 422, resp_vacio.text
+            assert "efecto_sin_acciones" in {h["codigo"] for h in resp_vacio.json()["detail"]["errores"]}
+
+            guardada = await db[COLL_CARDS].find_one({"_id": "carta_test_barrera_efectos"})
+            assert guardada is not None, "un rechazo no debe pisar la carta válida ya guardada"
+            assert guardada["efectos"][0]["id"] == "efecto_ok"
+
+            resp_pj = await client.post(
+                "/api/narrative/admin/personajes",
+                json={
+                    "_id": "pj_test_barrera_efectos",
+                    "universo_id": "corte_medieval",
+                    "nombre": "Personaje de prueba",
+                    "titulo": "Conde",
+                    "descripcion": "Descripción",
+                    "efectos": [
+                        {
+                            "id": "efecto_mal_primitiva",
+                            "disparador": "al_desenlace",
+                            "acciones": [
+                                {"accion_id": "invocar_dragon", "parametros": {"clave": "oro", "valor": 5}}
+                            ],
+                        }
+                    ],
+                },
+            )
+            assert resp_pj.status_code == 422, resp_pj.text
+            assert "accion_desconocida" in {h["codigo"] for h in resp_pj.json()["detail"]["errores"]}
+            assert await db[COLL_CHARACTERS].find_one({"_id": "pj_test_barrera_efectos"}) is None
+        finally:
+            await db[COLL_CARDS].delete_one({"_id": "carta_test_barrera_efectos"})
+            await db[COLL_CHARACTERS].delete_one({"_id": "pj_test_barrera_efectos"})
+
 
 pytestmark = pytest.mark.integration

@@ -5,9 +5,11 @@ del catálogo narrativo (Universos, Personajes, Cartas, Resultados, Eventos, Con
 """
 
 from typing import TypeVar, Type, Optional, List
+from fastapi import HTTPException
 from pydantic import BaseModel
 
 from app.core.database import get_database
+from app.features.narrative.validation import validar_efectos_almacenables, validar_grafo_para_guardado
 from app.features.narrative.constants import (
     COLL_SETTINGS,
     COLL_CHARACTERS,
@@ -59,6 +61,45 @@ async def guardar_item_catalogo(
     doc = data.model_dump(by_alias=True)
     await db[collection_name].replace_one({"_id": item_id}, doc, upsert=True)
     return response_cls(**doc)
+
+async def guardar_grafo_v2(
+    collection_name: str,
+    tipo: str,
+    req: BaseModel,
+    response_cls: Type[T]
+) -> T:
+    """
+    Guarda un grafo V2 sólo si el motor puede ejecutar todo lo que declara.
+    Un grafo con recursos, acciones o frecuencias inexistentes se guarda igual y
+    falla en silencio recién en la partida, así que el guardado es la última barrera barata.
+    """
+    resultado = await validar_grafo_para_guardado(req, tipo)
+    if not resultado.valido:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "mensaje": f"El {tipo} declara contenido que el motor no puede ejecutar.",
+                "errores": [h.as_dict() for h in resultado.errores],
+            },
+        )
+    return await guardar_item_catalogo(collection_name, req.id, req, response_cls)
+
+async def guardar_item_con_efectos(
+    collection_name: str,
+    req: BaseModel,
+    response_cls: Type[T]
+) -> T:
+    """Guarda una carta o personaje sólo si cada efecto es ejecutable por el motor."""
+    hallazgos = await validar_efectos_almacenables(getattr(req, "efectos", None) or [], req.universo_id)
+    if hallazgos:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "mensaje": "Los efectos declaran contenido que el motor no puede ejecutar.",
+                "errores": [h.as_dict() for h in hallazgos],
+            },
+        )
+    return await guardar_item_catalogo(collection_name, req.id, req, response_cls)
 
 async def listar_items_catalogo(
     collection_name: str,
@@ -120,7 +161,7 @@ async def eliminar_universo(universo_id: str) -> bool:
 
 # Personajes
 async def crear_o_actualizar_personaje(req: PersonajeCreateRequest) -> PersonajeResponse:
-    return await guardar_item_catalogo(COLL_CHARACTERS, req.id, req, PersonajeResponse)
+    return await guardar_item_con_efectos(COLL_CHARACTERS, req, PersonajeResponse)
 
 async def obtener_personajes(universo_id: Optional[str] = None, limit: Optional[int] = None, skip: int = 0) -> List[PersonajeResponse]:
     return await listar_items_catalogo(COLL_CHARACTERS, PersonajeResponse, universo_id, limit, skip)
@@ -133,7 +174,7 @@ async def eliminar_personaje(personaje_id: str) -> bool:
 
 # Cartas
 async def crear_o_actualizar_carta(req: CartaCreateRequest) -> CartaResponse:
-    return await guardar_item_catalogo(COLL_CARDS, req.id, req, CartaResponse)
+    return await guardar_item_con_efectos(COLL_CARDS, req, CartaResponse)
 
 async def obtener_cartas(universo_id: Optional[str] = None, limit: Optional[int] = None, skip: int = 0) -> List[CartaResponse]:
     return await listar_items_catalogo(COLL_CARDS, CartaResponse, universo_id, limit, skip)
@@ -224,7 +265,7 @@ async def eliminar_finalizacion(finalizacion_id: str) -> bool:
 
 # Eventos V2
 async def crear_o_actualizar_evento_v2(req: EventoV2GrafoSchema) -> EventoV2GrafoSchema:
-    return await guardar_item_catalogo(COLL_V2_EVENTS, req.id, req, EventoV2GrafoSchema)
+    return await guardar_grafo_v2(COLL_V2_EVENTS, "evento", req, EventoV2GrafoSchema)
 
 async def obtener_eventos_v2(universo_id: Optional[str] = None, limit: Optional[int] = None, skip: int = 0) -> List[EventoV2GrafoSchema]:
     return await listar_items_catalogo(COLL_V2_EVENTS, EventoV2GrafoSchema, universo_id, limit, skip)
@@ -237,7 +278,7 @@ async def eliminar_evento_v2(evento_id: str) -> bool:
 
 # Conversaciones V2
 async def crear_o_actualizar_conversacion_v2(req: ConversacionV2GrafoSchema) -> ConversacionV2GrafoSchema:
-    return await guardar_item_catalogo(COLL_V2_CONVERSATIONS, req.id, req, ConversacionV2GrafoSchema)
+    return await guardar_grafo_v2(COLL_V2_CONVERSATIONS, "conversacion", req, ConversacionV2GrafoSchema)
 
 async def obtener_conversaciones_v2(universo_id: Optional[str] = None, limit: Optional[int] = None, skip: int = 0) -> List[ConversacionV2GrafoSchema]:
     return await listar_items_catalogo(COLL_V2_CONVERSATIONS, ConversacionV2GrafoSchema, universo_id, limit, skip)
@@ -250,7 +291,7 @@ async def eliminar_conversacion_v2(conversacion_id: str) -> bool:
 
 # Eventos Especiales V2 (lealtad/traición por umbral de afinidad)
 async def crear_o_actualizar_evento_especial_v2(req: EventoEspecialV2GrafoSchema) -> EventoEspecialV2GrafoSchema:
-    return await guardar_item_catalogo(COLL_V2_EVENTOS_ESPECIALES, req.id, req, EventoEspecialV2GrafoSchema)
+    return await guardar_grafo_v2(COLL_V2_EVENTOS_ESPECIALES, "evento_especial", req, EventoEspecialV2GrafoSchema)
 
 async def obtener_eventos_especiales_v2(universo_id: Optional[str] = None, limit: Optional[int] = None, skip: int = 0) -> List[EventoEspecialV2GrafoSchema]:
     return await listar_items_catalogo(COLL_V2_EVENTOS_ESPECIALES, EventoEspecialV2GrafoSchema, universo_id, limit, skip)
