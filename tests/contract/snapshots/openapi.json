@@ -11991,7 +11991,7 @@
           "racha": {
             "type": "integer",
             "title": "Racha",
-            "description": "Días consecutivos con al menos un desafío diario completado",
+            "description": "Días consecutivos en que el usuario abrió la aplicación con sesión válida",
             "default": 0
           },
           "racha_ultima_fecha": {
@@ -12004,12 +12004,12 @@
               }
             ],
             "title": "Racha Ultima Fecha",
-            "description": "Último día jugado en formato YYYY-MM-DD"
+            "description": "Último día con ingreso registrado en formato YYYY-MM-DD"
           },
-          "racha_hoy_jugada": {
+          "racha_hoy_ingresada": {
             "type": "boolean",
-            "title": "Racha Hoy Jugada",
-            "description": "Indica si ya completó un desafío diario hoy (ART)",
+            "title": "Racha Hoy Ingresada",
+            "description": "Indica si el usuario ya abrió la aplicación hoy (ART)",
             "default": false
           },
           "suscripcion": {

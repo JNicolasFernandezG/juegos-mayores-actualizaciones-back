@@ -163,23 +163,25 @@ Al excederlo: `429` con header `Retry-After` (segundos) y body `{ "success": fal
 
 ### 2.10 Racha diaria
 
-La racha no se envía desde el cliente ni se guarda como contador: el backend la deriva de `user_attempts`.
+La racha no se envía desde el cliente ni se guarda como contador: el backend la deriva de `user_presence`, un documento por usuario y día con índice único.
 
-- Un día cuenta si tiene al menos un intento `mode: "daily"`, `status: "completed"` y no rechazado por validación. Varios juegos el mismo día suman un solo día.
-- El día se decide en zona ART. Si el último día jugado es hoy, `racha_hoy_jugada` es `true`; si es ayer, la racha sigue viva; si es anterior a ayer, `racha` vale `0`.
-- No hay endpoint nuevo ni campos nuevos en el request de intentos: se sigue usando `POST /api/games/attempts` y el `user_id` sale del Bearer. El cliente no puede inflar la racha.
+- Un día cuenta si el usuario abrió la aplicación con sesión válida (cookie HttpOnly o Bearer). El primer ingreso del día suma 1; los repetidos no suman. Completar desafíos ya no cuenta.
+- El día se decide en zona ART y cambia a las 00:00. Si pasó un día sin abrir, la racha arranca de nuevo en `1` al volver.
+- `GET /api/economy/me` y `GET /api/auth/session` registran el ingreso del día y devuelven la racha actualizada: no hay endpoint nuevo ni request nuevo que el cliente pueda inflar.
+- Desde el 2026-11-11 la racha arranca de cero: no se backfillearon los días con desafíos completados.
 
-`GET /api/economy/me` agrega:
+Los dos endpoints agregan:
 
 ```json
 {
   "racha": 4,
-  "racha_ultima_fecha": "2026-11-03",
-  "racha_hoy_jugada": false
+  "racha_ultima_fecha": "2026-11-11",
+  "racha_hoy_ingresada": true
 }
 ```
 
-- Acción en el frontend: `recargarEconomia` hoy copia vidas, puntos, suscripción y días desbloqueados al snapshot `usuario`; agregar `racha` y `racha_hoy_jugada` al slice y a ese snapshot para que el header muestre el valor real. El invitado sigue con su valor local: no hay racha en servidor.
+- Acción en el frontend: al arrancar con sesión, llamar `GET /api/auth/session` (funciona con cookie persistida) o mantener el `GET /api/economy/me` actual. Copiar `racha` y `racha_hoy_ingresada` al slice y al snapshot `usuario` para que el header muestre el valor real. El invitado sigue con su valor local: no hay racha en servidor.
+- `racha_hoy_jugada` se reemplazó por `racha_hoy_ingresada`.
 - Esta racha es la base para acreditar puntos por hitos en el futuro; ese día la acreditación se hará con el ledger existente y tampoco requerirá cambios en el request.
 - Detalle de integración y checklist del header: [GUIA_RACHA_FRONTEND.md](GUIA_RACHA_FRONTEND.md).
 
@@ -364,7 +366,7 @@ Requerido para corregir bugs actuales:
 - [ ] Intentos: mostrar `puntos_totales_usuario` en vez de sumar `score` local.
 - [ ] Manejar `pista: null` y `puntos_descontados: 0` como respuesta válida.
 - [ ] Manejar `429` respetando `Retry-After`.
-- [ ] Racha: leer `racha` y `racha_hoy_jugada` de `/api/economy/me` y copiarlos al snapshot `usuario` (hoy el header usa un valor local).
+- [ ] Racha: leer `racha` y `racha_hoy_ingresada` de `/api/economy/me` o `/api/auth/session` y copiarlos al snapshot `usuario` (hoy el header usa un valor local). Llamar a `/api/auth/session` al arrancar cubre la sesión persistida por cookie.
 - [ ] En `409` del narrativo, recargar `estado` antes de reintentar.
 
 Opcional / cuando se migre por universo:

@@ -170,6 +170,13 @@ async def init_indexes():
             [("user_id", ASCENDING), ("mode", ASCENDING), ("status", ASCENDING), ("date", -1)]
         )
 
+        # Presencia diaria: un documento por usuario y día, base de la racha por ingreso.
+        user_presence = db["user_presence"]
+        await user_presence.create_index(
+            [("user_id", ASCENDING), ("date", ASCENDING)], unique=True
+        )
+        await user_presence.create_index([("date", ASCENDING)])
+
         # Ledger de puntos: una acreditación por clave de negocio
         await db["economy_ledger"].create_index(
             [("idempotency_key", ASCENDING)], unique=True

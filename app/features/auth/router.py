@@ -11,6 +11,7 @@ from app.features.auth.service import (
     login_sistemas, login_codigo, verificar_token, register_usuario,
     emitir_credencial_invitado, format_user_response
 )
+from app.shared.streak import registrar_ingreso_y_racha
 
 router = APIRouter(tags=["Autenticación"])
 
@@ -63,10 +64,16 @@ async def endpoint_logout(response: Response):
 async def endpoint_check_session(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
+    # Verificar la sesión es el otro punto de arranque de la app: registra el ingreso del día
+    # aunque la sesión persista por cookie y el cliente no vuelva a pedir credenciales.
+    racha = await registrar_ingreso_y_racha(int(current_user["id"]))
     return {
         "success": True,
         "authenticated": True,
-        "user": format_user_response(current_user)
+        "user": format_user_response(current_user),
+        "racha": racha.actual,
+        "racha_ultima_fecha": racha.ultima_fecha,
+        "racha_hoy_ingresada": racha.hoy_ingresada,
     }
 
 
