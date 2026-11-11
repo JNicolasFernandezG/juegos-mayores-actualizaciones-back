@@ -18,12 +18,13 @@ def _limpiar_limiter():
 
 
 @pytest.mark.asyncio
-async def test_economy_devuelve_429_al_exceder_limite(client, monkeypatch):
+async def test_economy_devuelve_429_al_exceder_limite(client, monkeypatch, seeded_user, make_token):
     monkeypatch.setattr(settings, "RATE_LIMIT_ECONOMY_PER_MINUTE", 1)
-    token = f"Bearer {uuid.uuid4().hex}"
+    user = await seeded_user()
+    token = f"Bearer {make_token(user['id'])}"
 
-    primera = await client.get("/api/economy/config", headers={"Authorization": token})
-    segunda = await client.get("/api/economy/config", headers={"Authorization": token})
+    primera = await client.get("/api/economy/me", headers={"Authorization": token})
+    segunda = await client.get("/api/economy/me", headers={"Authorization": token})
 
     assert primera.status_code == 200
     assert primera.headers["X-RateLimit-Limit"] == "1"

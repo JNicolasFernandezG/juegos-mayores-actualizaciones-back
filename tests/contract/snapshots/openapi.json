@@ -1649,28 +1649,6 @@
         }
       }
     },
-    "/api/economy/config": {
-      "get": {
-        "tags": [
-          "Economía, Vidas y Mini-Tienda"
-        ],
-        "summary": "Obtener catálogo de precios de la mini-tienda y puntos por juego (Público)",
-        "description": "Retorna la configuración económica pública para que el frontend dibuje la tienda y recompensas.",
-        "operationId": "endpoint_get_economy_config_api_economy_config_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EconomyConfigResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/economy/me": {
       "get": {
         "tags": [

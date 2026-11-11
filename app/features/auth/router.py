@@ -78,8 +78,15 @@ async def endpoint_check_session(
 
 
 @router.post("/api/auth/verificar-token", summary="Verificar validez de token JWT y estado activo")
-async def endpoint_verificar_token(req: VerificarTokenRequest):
-    return await verificar_token(req)
+async def endpoint_verificar_token(
+    req: VerificarTokenRequest,
+    request: Request,
+    response: Response,
+):
+    result = await verificar_token(req)
+    if result.get("token"):
+        set_auth_cookie(response, request, result["token"])
+    return result
 
 
 @router.post(
@@ -87,9 +94,16 @@ async def endpoint_verificar_token(req: VerificarTokenRequest):
     dependencies=[Depends(rate_limit(max_requests=5, window_seconds=60))],
     summary="Registrar nuevo usuario alumno delegando al Autenticador Central"
 )
-async def endpoint_register(req: RegisterRequest):
+async def endpoint_register(
+    req: RegisterRequest,
+    request: Request,
+    response: Response,
+):
     # Registro público siempre crea cuentas de alumno (is_admin_creation=False)
-    return await register_usuario(req, is_admin_creation=False)
+    result = await register_usuario(req, is_admin_creation=False)
+    if result.get("token"):
+        set_auth_cookie(response, request, result["token"])
+    return result
 
 
 @router.post(

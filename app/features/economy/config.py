@@ -30,11 +30,6 @@ DEFAULT_ECONOMY_CONFIG: Dict[str, Any] = {
     },
     "guest_migration_max_points": 1000,
     "escalas_tiempo_por_juego": DEFAULT_ESCALAS_TIEMPO,
-    "paquetes_tienda": [
-        {"id": "pack_1", "vidas": 1, "puntos": 50, "popular": False, "badge": None, "descuento": None},
-        {"id": "pack_3", "vidas": 3, "puntos": 120, "popular": True, "badge": "Popular", "descuento": "Ahorrá 30 pts"},
-        {"id": "pack_5", "vidas": 5, "puntos": 180, "popular": False, "badge": "Mejor valor", "descuento": "Ahorrá 70 pts"},
-    ],
     "puntos_por_juego": {
         "wordle": 50,
         "sopa_letras": 50,
