@@ -140,6 +140,27 @@ async def get_current_user(
 
     return user
 
+
+async def get_optional_user(
+    request: Request,
+    response: Response,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer),
+) -> Optional[Dict[str, Any]]:
+    """
+    Resuelve la sesión actual sin exigir autenticación obligatoria (ej. GET /api/auth/session).
+    Si no hay credencial o el token expiró/es inválido (401), limpia la cookie vencida si existía
+    y devuelve None para evitar falsos errores HTTP 401 en visitantes invitados.
+    """
+    try:
+        return await get_current_user(request=request, credentials=credentials)
+    except HTTPException as exc:
+        if exc.status_code != status.HTTP_401_UNAUTHORIZED:
+            raise
+        if request and request.cookies.get("access_token"):
+            clear_auth_cookie(response)
+        return None
+
+
 async def get_current_admin(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ) -> Dict[str, Any]:

@@ -108,7 +108,7 @@
         "tags": [
           "Autenticación"
         ],
-        "summary": "Verificar sesión actual desde cookie protegida o Bearer token",
+        "summary": "Consultar estado de sesión actual desde cookie protegida o Bearer token (devuelve authenticated=false para invitados)",
         "operationId": "endpoint_check_session_api_auth_session_get",
         "responses": {
           "200": {
