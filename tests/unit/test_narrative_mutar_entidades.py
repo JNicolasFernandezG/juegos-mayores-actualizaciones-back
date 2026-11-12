@@ -1,4 +1,3 @@
-import pytest
 from app.features.narrative.engine.rule_engine import ejecutar_accion
 from app.features.narrative.schemas.rules_schemas import PrimitivaOperacionEnum
 

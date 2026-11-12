@@ -24,7 +24,6 @@ from app.features.narrative.schemas.catalog_schemas import (
     ResultadoPosibleSchema,
     OpcionEventoSchema,
     EventoCreateRequest,
-    EventoResponse,
     ConversacionFraseSchema,
     ConversacionDecisionSchema,
     ConversacionRequisitoSchema,
@@ -38,17 +37,11 @@ from app.features.narrative.schemas.catalog_schemas import (
 )
 
 from app.features.narrative.schemas.game_schemas import (
-    NarrativeDailyChallengeConfig,
-    TurnoSnapshot,
     HistorialMes,
-    NarrativeRunSchema,
     IniciarPartidaRequest,
     ElegirCartaMesRequest,
-    DecidirEventoRequest,
-    ResponderConversacionRequest,
     AvanzarMesRequest,
     ReiniciarPartidaRequest,
-    ConversacionesPosiblesRequest,
     SetupDesafioResponse,
     ProbabilidadDesenlaceCalculada,
     OpcionEventoCalculadaResponse,
@@ -61,8 +54,6 @@ from app.features.narrative.schemas.game_schemas import (
     EstadoTurnoResponse,
     IniciarPartidaV2Response,
     ElegirCartaMesV2Response,
-    DecidirEventoV2Response,
-    ResponderConversacionV2Response,
     AvanzarMesV2Response
 )
 
@@ -100,7 +91,6 @@ __all__ = [
     "ResultadoPosibleSchema",
     "OpcionEventoSchema",
     "EventoCreateRequest",
-    "EventoResponse",
     "ConversacionFraseSchema",
     "ConversacionDecisionSchema",
     "ConversacionRequisitoSchema",
@@ -109,17 +99,11 @@ __all__ = [
     "FinalizacionCreateRequest",
     "FinalizacionResponse",
     # Game
-    "NarrativeDailyChallengeConfig",
-    "TurnoSnapshot",
     "HistorialMes",
-    "NarrativeRunSchema",
     "IniciarPartidaRequest",
     "ElegirCartaMesRequest",
-    "DecidirEventoRequest",
-    "ResponderConversacionRequest",
     "AvanzarMesRequest",
     "ReiniciarPartidaRequest",
-    "ConversacionesPosiblesRequest",
     "SetupDesafioResponse",
     "ProbabilidadDesenlaceCalculada",
     "OpcionEventoCalculadaResponse",
@@ -132,7 +116,5 @@ __all__ = [
     "EstadoTurnoResponse",
     "IniciarPartidaV2Response",
     "ElegirCartaMesV2Response",
-    "DecidirEventoV2Response",
-    "ResponderConversacionV2Response",
     "AvanzarMesV2Response",
 ]

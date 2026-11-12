@@ -23,14 +23,13 @@ from app.features.narrative.constants import (
     AFINIDAD_UMBRAL_LEALTAD,
     AFINIDAD_UMBRAL_TRAICION
 )
-from app.features.narrative.enums import RunPhaseEnum, DisparadorEnum, TipoResultadoEnum
+from app.features.narrative.enums import RunPhaseEnum, DisparadorEnum
 from app.features.narrative.schemas.rules_schemas import EfectoSchema
 from app.features.narrative.engine.tag_state import personajes_activos, sincronizar_personajes
 from app.features.narrative.engine.rule_engine import despachar_efectos, aplicar_delta_recurso
 from app.features.narrative.engine.catalog_loader import obtener_catalogos_universo
 from app.features.narrative.schemas.v2_graph_schemas import (
     NodoNarrativoSchema,
-    NodoClienteSchema,
     DesenlaceNodoSchema,
     EstadoGrafoV2Response
 )

@@ -155,9 +155,6 @@ class EventoCreateRequest(BaseModel):
 
     model_config = {"populate_by_name": True}
 
-class EventoResponse(EventoCreateRequest):
-    pass
-
 # ============================================================================
 # 6. CONVERSACIONES DE CORTE (narrative_conversations)
 # ============================================================================

@@ -39,7 +39,6 @@ from app.features.narrative.game.command_protocol import (
     verificar_propiedad,
 )
 from app.features.narrative.game.economy_obligation import (
-    ESTADO_LIQUIDADA,
     ESTADO_PENDIENTE,
     aplicar_liquidacion,
     construir_obligacion,

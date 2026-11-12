@@ -30,7 +30,6 @@ from app.features.narrative.schemas.catalog_schemas import (
     FinalizacionCreateRequest,
     FinalizacionResponse,
     TagCreateRequest,
-    TagUpdateRequest,
     TagResponse
 )
 from app.features.narrative.schemas.v2_graph_schemas import (

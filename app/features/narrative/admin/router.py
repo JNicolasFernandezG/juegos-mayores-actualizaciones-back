@@ -6,7 +6,7 @@ gestión de colecciones estáticas y generador procedural mensual.
 """
 
 from fastapi import APIRouter, Query, Path, HTTPException, File, Request, UploadFile, Depends
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 
 from app.features.narrative.admin.actions_router import actions_admin_router
 from app.features.narrative.schemas import (

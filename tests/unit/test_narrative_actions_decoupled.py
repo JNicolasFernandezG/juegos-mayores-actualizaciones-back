@@ -1,11 +1,9 @@
-import pytest
 from app.features.narrative.enums import DisparadorEnum, TipoCondicionEnum, OperadorEnum, TipoCalculoEnum
 from app.features.narrative.schemas.rules_schemas import (
     EfectoSchema,
     CondicionSchema,
     AccionReferenciadaSchema,
     ParametrosAccionSchema,
-    PrimitivaOperacionEnum,
 )
 from app.features.narrative.engine.rule_engine import (
     ejecutar_accion,

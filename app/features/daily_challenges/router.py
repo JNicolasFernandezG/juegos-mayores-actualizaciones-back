@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, Query, Path
 from app.core.dependencies import get_current_admin
-from typing import Optional
 from app.features.daily_challenges.schemas import (
     DailyChallengeCreateRequest,
     DailyChallengeResponse,

@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import HTTPException, status
 from pymongo import ReturnDocument

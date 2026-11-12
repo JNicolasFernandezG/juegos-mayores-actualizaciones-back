@@ -253,7 +253,9 @@ async def test_defecto_seleccion_inicial_acepta_duplicados_y_colapsa_contenido(m
     monkeypatch.setattr(setup_service, "verificar_colapso_recursos", sin_colapso)
     monkeypatch.setattr(setup_service, "crear_run", capturar_creacion)
     monkeypatch.setattr(
-        setup_service.random, "sample", lambda population, k: list(population)[:k]
+        setup_service,
+        "sortear_cartas_draft",
+        lambda candidatas, cartas_docs_map=None: list(candidatas)[:3],
     )
 
     response = await setup_service.iniciar_partida(
@@ -329,7 +331,7 @@ async def test_pasivos_mensuales_de_corte_y_carta_aplican_perdida_y_colapso(monk
     monkeypatch.setattr(transition_service, "obtener_mapa_recursos_universo", recursos_mapa)
     monkeypatch.setattr(transition_service, "persistir_run", persistir)
     monkeypatch.setattr(transition_service, "sincronizar_intento_usuario", sincronizar)
-    monkeypatch.setattr(transition_service.random, "sample", no_debe_sortear_draft)
+    monkeypatch.setattr(transition_service, "sortear_cartas_draft", no_debe_sortear_draft)
 
     response = await transition_service.avanzar_mes(75, AvanzarMesRequest(date="2099-01-01"))
 
@@ -385,7 +387,9 @@ async def test_defecto_copias_posteriores_en_mano_ejecutan_pasivo_una_sola_vez(m
     monkeypatch.setattr(transition_service, "verificar_colapso_recursos", sin_colapso)
     monkeypatch.setattr(transition_service, "persistir_run", persistir)
     monkeypatch.setattr(
-        transition_service.random, "sample", lambda population, k: list(population)[:k]
+        transition_service,
+        "sortear_cartas_draft",
+        lambda candidatas, cartas_docs_map=None: list(candidatas)[:3],
     )
 
     response = await transition_service.avanzar_mes(75, AvanzarMesRequest(date="2099-01-01"))
@@ -437,7 +441,7 @@ async def test_mes_12_cierra_sin_pasivos_sin_draft_y_sin_mes_13(monkeypatch):
     monkeypatch.setattr(
         transition_service, "obtener_mapa_recursos_universo", no_debe_aplicar_pasivos
     )
-    monkeypatch.setattr(transition_service.random, "sample", no_debe_sortear)
+    monkeypatch.setattr(transition_service, "sortear_cartas_draft", no_debe_sortear)
     monkeypatch.setattr(transition_service, "persistir_run", persistir)
     monkeypatch.setattr(transition_service, "sincronizar_intento_usuario", sincronizar)
 

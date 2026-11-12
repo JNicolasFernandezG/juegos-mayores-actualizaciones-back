@@ -2,7 +2,6 @@ import logging
 from typing import List, Dict, Any, Optional, Union
 
 from app.features.narrative.enums import (
-    DisparadorEnum,
     OperadorEnum,
     TipoCondicionEnum,
     TipoAccionEnum,

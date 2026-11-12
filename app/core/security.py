@@ -1,4 +1,3 @@
-import bcrypt
 import jwt
 import re
 import secrets
@@ -8,28 +7,6 @@ from app.core.config import settings
 
 GUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 GUEST_CREDENTIAL_TYPE = "guest"
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    Verifica una contraseña en texto plano contra un hash BCrypt.
-    Totalmente compatible con los hashes generados por Spring Security ($2a$10$...).
-    """
-    if not plain_password or not hashed_password:
-        return False
-    try:
-        # En caso de hash con prefijo $2a$, bcrypt de python lo acepta perfectamente
-        return bcrypt.checkpw(
-            plain_password.encode("utf-8"),
-            hashed_password.encode("utf-8")
-        )
-    except Exception:
-        return False
-
-def get_password_hash(password: str) -> str:
-    """Genera un hash BCrypt con salt."""
-    salt = bcrypt.gensalt(rounds=10)
-    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
-    return hashed.decode("utf-8")
 
 def create_access_token(user: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
     """

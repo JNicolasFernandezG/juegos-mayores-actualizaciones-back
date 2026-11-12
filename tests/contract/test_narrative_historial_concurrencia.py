@@ -4,7 +4,6 @@ import pytest
 from fastapi import HTTPException
 
 from app.features.narrative.constants import (
-    COLL_CHALLENGES,
     COLL_RUNS,
     COLL_V2_EVENTOS_ESPECIALES,
 )

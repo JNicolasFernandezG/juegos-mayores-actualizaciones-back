@@ -12,7 +12,6 @@ Verifica:
 import pytest
 
 import asyncio
-import datetime
 from unittest.mock import patch
 from httpx import AsyncClient, ASGITransport
 

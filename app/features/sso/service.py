@@ -1,5 +1,5 @@
 import httpx
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from fastapi import HTTPException, status
 from app.core.config import settings
 from app.features.auth.service import sync_local_user_from_auth_service, format_user_response

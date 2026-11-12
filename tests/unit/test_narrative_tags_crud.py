@@ -1,5 +1,5 @@
 import pytest
-from app.features.narrative.schemas.catalog_schemas import TagCreateRequest, TagUpdateRequest
+from app.features.narrative.schemas.catalog_schemas import TagCreateRequest
 from app.features.narrative.admin.crud_service import (
     crear_o_actualizar_tag,
     obtener_tags,

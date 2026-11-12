@@ -1,5 +1,5 @@
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
-from pymongo import ReturnDocument, ASCENDING
+from pymongo import ASCENDING
 import logging
 from urllib.parse import unquote, urlsplit
 from app.core.config import settings
@@ -101,33 +101,6 @@ async def close_mongo_connection():
     if db_instance.client:
         db_instance.client.close()
         logger.info("Conexión a MongoDB cerrada.")
-
-async def get_next_sequence_value(sequence_name: str) -> int:
-    """
-    Genera un ID secuencial numérico atómico (1, 2, 3...)
-    equivalente a AUTO_INCREMENT de MySQL usando la colección 'counters'.
-    Auto-sincroniza preventivamente contra el ID máximo existente para evitar DuplicateKeyError.
-    """
-    db = get_database()
-    if sequence_name == "usuario_id":
-        max_user = await db["usuarios"].find_one(sort=[("id", -1)])
-        max_id = max_user["id"] if (max_user and isinstance(max_user.get("id"), int)) else 0
-        counter_doc = await db["counters"].find_one({"_id": sequence_name})
-        current_seq = counter_doc.get("seq", 0) if counter_doc else 0
-        if max_id >= current_seq:
-            await db["counters"].update_one(
-                {"_id": sequence_name},
-                {"$set": {"seq": max_id}},
-                upsert=True
-            )
-
-    counter = await db["counters"].find_one_and_update(
-        {"_id": sequence_name},
-        {"$inc": {"seq": 1}},
-        upsert=True,
-        return_document=ReturnDocument.AFTER
-    )
-    return counter["seq"]
 
 async def set_sequence_value(sequence_name: str, value: int):
     """Establece el contador a un valor específico (útil tras migración)."""

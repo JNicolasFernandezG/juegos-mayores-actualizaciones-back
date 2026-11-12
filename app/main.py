@@ -22,10 +22,8 @@ from app.features.narrative.game.router import (
 from app.features.narrative.admin.router import router as narrative_admin_router
 from app.features.sso.router import router as sso_router
 from app.features.economy.router import router as economy_router
-from app.scripts.seed_challenges import (
-    seed_wordle_challenges,
-    seed_sopa_letras_challenges,
-)
+from app.scripts.seed_challenges import seed_wordle_challenges
+from app.scripts.seed_sopa_letras import seed_sopa_letras_challenges
 from app.scripts.seed_sudoku import seed_sudoku_challenges
 from app.features.daily_challenges.service import ensure_current_and_next_month_generated
 

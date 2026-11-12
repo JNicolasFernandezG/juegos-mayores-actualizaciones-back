@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
-from typing import Optional, Any, Dict
+from typing import Optional
 
 
 class LoginSistemasRequest(BaseModel):
@@ -32,34 +32,8 @@ class RegisterRequest(BaseModel):
     activo: Optional[bool] = None
 
 
-class LoginSistemasResponse(BaseModel):
-    success: bool = True
-    message: str = "Inicio de sesión exitoso"
-    token: str
-    user: Dict[str, Any]
-
-
-class RegistroResponse(BaseModel):
-    success: bool = True
-    message: str = "Acceso concedido exitosamente."
-    token: str
-    user: Dict[str, Any]
-
-
-class TokenVerifyResponse(BaseModel):
-    success: bool = True
-    valid: bool = True
-    user: Optional[Dict[str, Any]] = None
-    message: str = "Token verificado con éxito"
-
-
 class GuestCredentialResponse(BaseModel):
     success: bool = True
     guest_id: str
     credential: str
     expires_in_days: int
-
-
-class GenericMessageResponse(BaseModel):
-    message: str
-    success: bool = True

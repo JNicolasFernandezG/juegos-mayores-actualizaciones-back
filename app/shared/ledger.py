@@ -8,7 +8,7 @@ cuando la request original alcanzó a acreditar pero no a marcar el asiento.
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Protocol
+from typing import Any
 
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
@@ -44,14 +44,6 @@ class LedgerResult:
     applied: bool
     puntos: int
     saldo: int | None = None
-
-
-class PointsLedger(Protocol):
-    async def credit(
-        self, key: LedgerKey, puntos: int, *, metadata: dict | None = None
-    ) -> LedgerResult: ...
-
-    async def saldo(self, user_id: int) -> int: ...
 
 
 class MongoPointsLedger:

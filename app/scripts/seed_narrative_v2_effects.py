@@ -21,10 +21,8 @@ from app.features.narrative.constants import (
 )
 from app.features.narrative.enums import (
     CategoriaCartaEnum,
-    DisparadorEnum,
     OperadorEnum,
     TipoCondicionEnum,
-    TipoAccionEnum,
     OperacionMatematicaEnum,
 )
 from app.features.narrative.schemas.rules_schemas import (

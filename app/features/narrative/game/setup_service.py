@@ -6,7 +6,6 @@ Fase 0 del motor narrativo V2:
 - Reinicio de la partida del día.
 """
 
-import random
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Any

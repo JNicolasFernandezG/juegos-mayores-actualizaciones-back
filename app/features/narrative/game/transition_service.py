@@ -9,10 +9,8 @@ Gestión común de la Fase 4 (Balance y Transición Mensual), compartida por V1 
 - Sorteo de las 3 cartas para el nuevo draft.
 """
 
-import random
 import logging
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
 from fastapi import HTTPException
 
 from app.core.database import get_database

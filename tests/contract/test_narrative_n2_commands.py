@@ -30,7 +30,6 @@ from app.features.narrative.game.economy_obligation import (
     ESTADO_LIQUIDADA,
     ESTADO_LOCAL,
     ESTADO_PENDIENTE,
-    aplicar_liquidacion,
     reconciliar_liquidaciones_pendientes,
 )
 from app.features.narrative.game.run_repository import persistir_run

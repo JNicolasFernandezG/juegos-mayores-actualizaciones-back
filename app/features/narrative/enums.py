@@ -42,8 +42,6 @@ class OperacionMatematicaEnum(str, Enum):
     FIJAR = "fijar"
 
 class RunPhaseEnum(str, Enum):
-    SETUP_CORTE = "SETUP_CORTE"
-    SETUP_CARTAS = "SETUP_CARTAS"
     DRAFT_MENSUAL = "DRAFT_MENSUAL"
     TOMA_DECISION_EVENTO = "TOMA_DECISION_EVENTO"
     RESOLVER_CONVERSACION = "RESOLVER_CONVERSACION"
@@ -63,7 +61,7 @@ class CategoriaCartaEnum(str, Enum):
 class TipoFinalizacionEnum(str, Enum):
     DERROTA_RECURSO = "derrota_recurso"
     VICTORIA_TIEMPO = "victoria_tiempo"
-    DERROTA_GENERAL = "derrota_general"
+    DERROTA_GENERAL = "derrota_general"  # contrato publicado
 
 class DireccionEventoEspecialEnum(str, Enum):
     LEALTAD = "lealtad"

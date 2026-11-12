@@ -22,7 +22,7 @@ import threading
 import urllib.request
 import urllib.parse
 import urllib.error
-from typing import Dict, Any, List, Optional
+from typing import Dict, List, Optional
 
 from app.core.config import settings
 
@@ -342,6 +342,3 @@ def get_masked_definition(word: str) -> Optional[str]:
     """Obtiene la definición de la RAE con la palabra tapada mediante '___' (ideal para juegos y desafíos)."""
     return fetch_rae_definition(word, mask_spoiler=True)
 
-def get_definition(word: str) -> Optional[str]:
-    """Obtiene la definición de la RAE limpia en texto claro (ideal para glosarios y diccionarios educativos)."""
-    return fetch_rae_definition(word, mask_spoiler=False)

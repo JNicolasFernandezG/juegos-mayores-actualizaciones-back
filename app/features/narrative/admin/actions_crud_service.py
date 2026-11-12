@@ -16,7 +16,6 @@ from app.features.narrative.schemas.rules_schemas import (
     AccionCatalogoResponse,
     FrecuenciasUniversoDocument,
     FrecuenciasUniversoUpdateRequest,
-    ItemFrecuenciaSchema,
     PrimitivaOperacionEnum,
 )
 

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, model_validator
-from typing import Optional, List, Union, Dict, Any
+from typing import Optional, List, Union
 from enum import Enum
 
 from app.features.narrative.enums import (
@@ -23,15 +23,6 @@ class PrimitivaOperacionEnum(str, Enum):
     AMORTIGUAR_DANIO = "amortiguar_danio"
     MUTAR_ESTADO = "mutar_estado"
     MUTAR_ESTADO_ENTIDAD = "mutar_estado_entidad"
-
-class DestinoAfinidadEnum(str, Enum):
-    PORTADOR = "portador"
-    PERSONAJE = "personaje"
-
-class PermitidoEnEnum(str, Enum):
-    CARTA = "carta"
-    PERSONAJE = "personaje"
-    AMBOS = "ambos"
 
 class CondicionSchema(BaseModel):
     tipo: TipoCondicionEnum

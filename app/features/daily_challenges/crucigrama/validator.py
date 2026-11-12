@@ -19,7 +19,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from app.features.daily_challenges.crucigrama.solver import (
     MAX_WORD_LEN,
-    MIN_WORD_LEN,
     _parse_template_slots,
     _solve_crucigrama_backtracking,
     normalize_preassigned,

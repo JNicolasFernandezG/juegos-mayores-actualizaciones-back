@@ -6,7 +6,7 @@ Controladores FastAPI del módulo de Juego Narrativo V2:
 """
 
 from fastapi import APIRouter, Query, Depends
-from typing import Optional, List
+from typing import Optional
 
 from app.features.narrative.schemas.game_schemas import (
     IniciarPartidaRequest,

@@ -6,7 +6,7 @@ posteriores. El día se decide en zona ART, igual que los desafíos diarios.
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Optional
 
 from pymongo.errors import DuplicateKeyError

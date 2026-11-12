@@ -7,14 +7,9 @@ e integra consultas a la API de la RAE con caché local y máscara de spoilers.
 
 import os
 import logging
-from typing import Dict, Any, Set, List, Optional
+from typing import Dict, Any, Set, List
 
-from app.core.rae_client import (
-    fetch_rae_definition,
-    clean_and_mask_definition,
-    get_masked_definition,
-    get_definition,
-)
+from app.core.rae_client import fetch_rae_definition
 
 logger = logging.getLogger(__name__)
 

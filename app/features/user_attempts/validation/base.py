@@ -43,16 +43,6 @@ def coerce_int(value: Any, default: Optional[int] = None) -> Optional[int]:
         return default
 
 
-def reject(reason: str, submission: Submission) -> ValidationResult:
-    return ValidationResult(
-        valid=False,
-        reason=reason,
-        attempts=submission.attempts,
-        errors=submission.errors,
-        completed=False,
-    )
-
-
 def accept(attempts: Optional[int], errors: Optional[int]) -> ValidationResult:
     return ValidationResult(
         valid=True,

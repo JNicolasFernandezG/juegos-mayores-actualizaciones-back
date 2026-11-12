@@ -44,7 +44,6 @@ from app.features.narrative.enums import (
     OperadorEnum,
     TipoCondicionEnum,
     TipoAccionEnum,
-    TipoCalculoEnum,
     CategoriaCartaEnum,
     TipoResultadoEnum
 )
