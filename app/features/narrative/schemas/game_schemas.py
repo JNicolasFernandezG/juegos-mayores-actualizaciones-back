@@ -21,8 +21,17 @@ class HistorialMes(BaseModel):
     opcion_elegida_id: Optional[str] = None
     resultado_id: Optional[str] = None
     conversacion_id: Optional[str] = None
-    decision_conversacion_opcion: Optional[int] = None
+    decision_conversacion_opcion: Optional[Union[int, str]] = None
     recursos_fin_mes: Dict[str, int]
+    carta_nombre: Optional[str] = None
+    evento_titulo: Optional[str] = None
+    opcion_texto: Optional[str] = None
+    resultado: Optional[str] = None
+    resultado_texto: Optional[str] = None
+    conversacion_titulo: Optional[str] = None
+    decision_texto: Optional[str] = None
+    decision_resultado_texto: Optional[str] = None
+    impacto_afinidad: Optional[List[Dict[str, Any]]] = None
 
 # ============================================================================
 # 2. DTOs DE ENTRADA (REQUESTS DEL JUGADOR)
