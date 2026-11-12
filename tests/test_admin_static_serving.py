@@ -61,3 +61,18 @@ async def test_admin_conserva_test_narrativo():
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
+
+@pytest.mark.asyncio
+async def test_narrative_asset_aliases_sirven_archivos_en_espanol_e_ingles():
+    async with _client() as client:
+        for path in [
+            "/assets/narrative/characters/default.webp",
+            "/assets/narrative/personajes/default.webp",
+            "/assets/narrative/conversations/default.webp",
+            "/assets/narrative/conversaciones/default.webp",
+            "/assets/narrative/events/default.webp",
+            "/assets/narrative/eventos/default.webp",
+        ]:
+            res = await client.get(path)
+            assert res.status_code == 200, f"Fallo al servir {path}: {res.status_code}"
+            assert res.headers["content-type"].startswith("image/")

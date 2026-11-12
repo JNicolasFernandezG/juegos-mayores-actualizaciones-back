@@ -295,12 +295,25 @@ async def admin_panel():
 
 app.mount("/admin", SPAStaticFiles(directory=static_admin_dir, html=True), name="admin")
 
-# Montar carpeta de assets estáticos de narrativa (universos, personajes, cartas, eventos, etc.)
-static_narrative_dir = os.path.join(os.path.dirname(__file__), "static", "narrative")
-os.makedirs(static_narrative_dir, exist_ok=True)
-static_personajes_dir = os.path.join(static_narrative_dir, "personajes")
-os.makedirs(static_personajes_dir, exist_ok=True)
-app.mount("/assets/narrative/characters", StaticFiles(directory=static_personajes_dir), name="narrative_characters_alias")
+# Montar carpeta de assets estáticos de narrativa (universos, personajes, cartas, eventos, etc.)
+static_narrative_dir = os.path.join(os.path.dirname(__file__), "static", "narrative")
+os.makedirs(static_narrative_dir, exist_ok=True)
+
+# Alias en inglés para compatibilidad con semillas históricas y colecciones existentes
+NARRATIVE_CATEGORY_ALIASES = {
+    "characters": "personajes",
+    "conversations": "conversaciones",
+    "events": "eventos",
+    "cards": "cartas",
+    "results": "resultados",
+    "endings": "finalizaciones",
+    "universes": "universos",
+}
+for alias, real_folder in NARRATIVE_CATEGORY_ALIASES.items():
+    real_path = os.path.join(static_narrative_dir, real_folder)
+    os.makedirs(real_path, exist_ok=True)
+    app.mount(f"/assets/narrative/{alias}", StaticFiles(directory=real_path), name=f"narrative_{alias}_alias")
+
 app.mount("/assets/narrative", StaticFiles(directory=static_narrative_dir), name="narrative_assets")
 
 if __name__ == "__main__":
