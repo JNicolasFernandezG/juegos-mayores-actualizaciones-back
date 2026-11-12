@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
+from typing import Optional, List, Dict, Any, Literal
 
 
 class EscalaCalificacionTiempo(BaseModel):
@@ -38,6 +38,58 @@ DEFAULT_ESCALAS_TIEMPO: Dict[str, List[Dict[str, Any]]] = {
 }
 
 
+class TramoBonusRacha(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    dias: int = Field(..., ge=1, le=3650, description="Días de racha necesarios para que aplique el tramo")
+    valor: int = Field(
+        ...,
+        ge=0,
+        le=10000,
+        description="Boost del tramo: porcentaje sobre el puntaje base o puntos fijos según el modo",
+    )
+
+
+DEFAULT_BONUS_RACHA: Dict[str, Any] = {
+    "activo": False,
+    "modo": "porcentaje",
+    "tramos": [
+        {"dias": 10, "valor": 10},
+        {"dias": 15, "valor": 20},
+        {"dias": 20, "valor": 30},
+    ],
+}
+
+
+class BonusRachaConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    activo: bool = Field(False, description="Habilita el boost de puntos por racha")
+    modo: Literal["porcentaje", "puntos_fijos"] = Field(
+        "porcentaje", description="'porcentaje' del puntaje base o 'puntos_fijos' por tramo"
+    )
+    tramos: List[TramoBonusRacha] = Field(
+        default_factory=list,
+        description="Umbrales de racha; se aplica solo el tramo de mayor 'dias' alcanzado",
+    )
+
+    @field_validator("tramos")
+    @classmethod
+    def _dias_sin_duplicados(cls, tramos: List[TramoBonusRacha]) -> List[TramoBonusRacha]:
+        dias = [tramo.dias for tramo in tramos]
+        if len(set(dias)) != len(dias):
+            raise ValueError("Los tramos de racha no pueden repetir días.")
+        return tramos
+
+    @model_validator(mode="after")
+    def _coherencia_del_bonus(self) -> "BonusRachaConfig":
+        if self.activo and not self.tramos:
+            raise ValueError("El bonus por racha activo requiere al menos un tramo.")
+        if self.modo == "porcentaje" and any(tramo.valor > 500 for tramo in self.tramos):
+            raise ValueError("En modo porcentaje el boost máximo por tramo es 500%.")
+        return self
+
+
 class EconomyConfigResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -74,6 +126,10 @@ class EconomyConfigResponse(BaseModel):
     guest_migration_max_points: int = Field(
         1000, ge=0, description="Tope de puntos de invitado que una cuenta puede reclamar al registrarse"
     )
+    bonus_racha: BonusRachaConfig = Field(
+        default_factory=lambda: BonusRachaConfig(**DEFAULT_BONUS_RACHA),
+        description="Boost de puntos aplicado al completar desafíos con una racha activa",
+    )
     updated_at: Optional[str] = None
 
 
@@ -90,6 +146,9 @@ class EconomyConfigUpdateRequest(BaseModel):
     puntos_por_juego: Optional[Dict[str, int]] = None
     guest_migration_max_points: Optional[int] = Field(
         None, ge=0, description="Tope de puntos de invitado reclamables por cuenta"
+    )
+    bonus_racha: Optional[BonusRachaConfig] = Field(
+        None, description="Boost de puntos por racha; omitirlo conserva la configuración actual"
     )
 
 

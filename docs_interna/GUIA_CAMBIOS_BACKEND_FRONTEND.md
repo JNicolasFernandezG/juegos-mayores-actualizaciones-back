@@ -18,6 +18,7 @@
 | Recarga de vidas | La recarga de las 4 vidas daba 403 | Nueva ruta `POST /api/economy/refill-lives` | Reemplazar la llamada al endpoint admin | Activo |
 | Puntos de invitado | El invitado no veía los puntos del narrativo | Nueva ruta `POST /api/economy/guest-migration` | Llamarla una vez al crear la cuenta | Activo |
 | Puntos narrativos | El invitado no recibía puntos; la cuenta no los veía | `puntos_ganados` en las respuestas del ciclo V2 | Sumar en local solo si es invitado | Activo |
+| Bonus por racha | Completar desafíos con racha no premiaba | `bonus_racha` en la config; `puntos_ganados` incluye el boost | Ninguna: ya lee `puntos_ganados` | Activo (inactivo por defecto) |
 | Aislamiento de invitado | Todos los invitados compartían `run_0_<fecha>` | Header opcional `X-Guest-Id` | Enviar un id persistente por dispositivo | Activo |
 | Motor narrativo | V1 es el operativo; V2 es el objetivo | El motor se elige por universo y se informa en `motor` | Hoy operar V1; dejar la UI lista para V2 | Actual/futuro |
 | Discriminador de motor | El frontend debía inferir V1/V2 | Campo `motor` en `iniciar`, `elegir-carta-mes` y `estado` | Opcional, para enrutar la UI | Activo |
@@ -182,8 +183,33 @@ Los dos endpoints agregan:
 
 - Acción en el frontend: al arrancar con sesión, llamar `GET /api/auth/session` (funciona con cookie persistida) o mantener el `GET /api/economy/me` actual. Copiar `racha` y `racha_hoy_ingresada` al slice y al snapshot `usuario` para que el header muestre el valor real. El invitado sigue con su valor local: no hay racha en servidor.
 - `racha_hoy_jugada` se reemplazó por `racha_hoy_ingresada`.
-- Esta racha es la base para acreditar puntos por hitos en el futuro; ese día la acreditación se hará con el ledger existente y tampoco requerirá cambios en el request.
+- Esta racha es la base de la acreditación de puntos por racha (§2.11); la acreditación usa el ledger existente y no requiere cambios en el request.
 - Detalle de integración y checklist del header: [GUIA_RACHA_FRONTEND.md](GUIA_RACHA_FRONTEND.md).
+
+### 2.11 Bonus de puntos por racha
+
+El operador configura tramos de racha que agregan puntos extra al completar un desafío diario. La configuración vive en `GET /api/economy/config` y se edita con `PUT /api/admin/economy/config`:
+
+```json
+{
+  "bonus_racha": {
+    "activo": true,
+    "modo": "porcentaje",
+    "tramos": [
+      { "dias": 10, "valor": 10 },
+      { "dias": 15, "valor": 20 },
+      { "dias": 20, "valor": 30 }
+    ]
+  }
+}
+```
+
+- `modo: "porcentaje"` calcula `puntos_base * valor // 100`; `modo: "puntos_fijos"` acredita `valor` puntos.
+- Se aplica **solo el tramo de mayor `dias` alcanzado**, nunca la suma de varios.
+- Aplica a los desafíos diarios completados y validados (Wordle, Sudoku, Sopa, Crucigrama). El narrativo paga por su propio ciclo y no recibe este bonus.
+- Por defecto `activo` es `false`: sin cambios de comportamiento hasta que el operador lo habilite.
+- La respuesta de `POST /api/games/attempts` agrega `bonus_racha_puntos` y `bonus_racha_dias`, y `puntos_ganados` ahora incluye el bonus. El replay sigue respondiendo `puntos_ganados: 0`.
+- El front no necesita cambios para cobrar el bonus: ya muestra `puntos_ganados` y `puntos_totales_usuario` del servidor. La UI de configuración en el panel admin queda a cargo del dueño del front.
 
 ---
 

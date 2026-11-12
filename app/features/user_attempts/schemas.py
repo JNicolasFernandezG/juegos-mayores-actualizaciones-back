@@ -1,10 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 
-class GuessEvaluationItem(BaseModel):
-    word: str
-    statuses: Optional[List[str]] = None
-
 class UserAttemptCreateRequest(BaseModel):
     user_id: Optional[int] = Field(None, description="ID del usuario (opcional si se envía Bearer token)")
     game_id: str = Field("wordle", description="Identificador del juego")
@@ -41,6 +37,8 @@ class UserAttemptResponse(BaseModel):
     remaining_attempts: int = 0
     time_taken_seconds: Optional[int] = None
     puntos_ganados: int = 0
+    bonus_racha_puntos: int = Field(0, description="Puntos extra acreditados por racha en este intento")
+    bonus_racha_dias: int = Field(0, description="Días de racha que activaron el tramo del bonus")
     puntos_totales_usuario: Optional[int] = None
     guesses: List[Any] = []
     game_data: Optional[Dict[str, Any]] = None

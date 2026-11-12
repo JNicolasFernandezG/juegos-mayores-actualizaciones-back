@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from typing import Dict, Any
 
 from app.core.dependencies import get_current_user, get_current_admin

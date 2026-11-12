@@ -8,6 +8,7 @@ from pymongo import ASCENDING
 from pymongo.errors import DuplicateKeyError
 
 from app.core.database import get_database
+from app.features.economy.streak_bonus import SIN_BONUS, resolver_bonus_racha
 from app.features.user_attempts.schemas import (
     UserAttemptCreateRequest,
     UserAttemptResponse,
@@ -19,6 +20,7 @@ from app.features.user_attempts.validation import (
     validate_submission,
 )
 from app.shared.ledger import LedgerKey, get_points_ledger
+from app.shared.streak import registrar_ingreso_y_racha
 
 logger = logging.getLogger(__name__)
 
@@ -322,6 +324,8 @@ def _serialize_attempt(
         remaining_attempts=int(doc.get("remaining_attempts", 0)),
         time_taken_seconds=doc.get("time_taken_seconds"),
         puntos_ganados=puntos_ganados,
+        bonus_racha_puntos=int(doc.get("bonus_racha_puntos", 0)),
+        bonus_racha_dias=int(doc.get("bonus_racha_dias", 0)),
         puntos_totales_usuario=puntos_totales_usuario,
         guesses=doc.get("guesses", []),
         game_data=doc.get("game_data"),
@@ -496,6 +500,21 @@ async def save_user_attempt(
         final_status = "failed"
         grade, score, stars = "F", 0, 0
 
+    # Boost por racha: solo desafíos diarios completados y validados (el narrativo paga aparte).
+    bonus_racha = SIN_BONUS
+    if (
+        econ_config is not None
+        and game_id != "narrativo"
+        and final_status == "completed"
+        and validation_status != "rejected"
+        and score > 0
+    ):
+        try:
+            racha = await registrar_ingreso_y_racha(user_id)
+            bonus_racha = resolver_bonus_racha(econ_config.bonus_racha, racha.actual, int(score))
+        except Exception as e:
+            logger.warning(f"No se pudo calcular el bonus por racha de {user_id}: {e}")
+
     doc = {
         "user_id": user_id,
         "game_id": game_id,
@@ -514,6 +533,9 @@ async def save_user_attempt(
         "time_taken_seconds": time_taken,
         "updated_at": now,
     }
+    if bonus_racha.puntos > 0:
+        doc["bonus_racha_puntos"] = bonus_racha.puntos
+        doc["bonus_racha_dias"] = bonus_racha.dias_tramo
     if started_at is not None:
         doc["started_at"] = started_at
     if server_elapsed is not None:
@@ -579,6 +601,7 @@ async def save_user_attempt(
     puntos_totales_usuario: Optional[int] = None
 
     if final_status == "completed" and validation_status != "rejected":
+        puntos_a_acreditar = int(score) + bonus_racha.puntos
         ledger_result = await ledger.credit(
             LedgerKey(
                 user_id=user_id,
@@ -587,15 +610,21 @@ async def save_user_attempt(
                 date=date,
                 difficulty=difficulty,
             ),
-            score,
-            metadata={"grade": grade, "difficulty": difficulty},
+            puntos_a_acreditar,
+            metadata={
+                "grade": grade,
+                "difficulty": difficulty,
+                "score_base": int(score),
+                "bonus_racha": bonus_racha.puntos,
+                "racha_dias": bonus_racha.dias_tramo,
+            },
         )
         if ledger_result.applied:
-            puntos_ganados = score
+            puntos_ganados = puntos_a_acreditar
             logger.info(
                 f"[PUNTOS] Usuario {user_id} ganó {puntos_ganados} pts "
-                f"(calificación {grade}, dificultad {difficulty}) en {game_id}. "
-                f"Saldo: {ledger_result.saldo}"
+                f"(calificación {grade}, dificultad {difficulty}, bonus racha {bonus_racha.puntos}) "
+                f"en {game_id}. Saldo: {ledger_result.saldo}"
             )
         else:
             logger.info(

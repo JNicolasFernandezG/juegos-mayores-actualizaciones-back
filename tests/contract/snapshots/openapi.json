@@ -6594,6 +6594,36 @@
         ],
         "title": "Body_endpoint_subir_imagen_narrativa_api_narrative_admin_upload_imagen_post"
       },
+      "BonusRachaConfig": {
+        "properties": {
+          "activo": {
+            "type": "boolean",
+            "title": "Activo",
+            "description": "Habilita el boost de puntos por racha",
+            "default": false
+          },
+          "modo": {
+            "type": "string",
+            "enum": [
+              "porcentaje",
+              "puntos_fijos"
+            ],
+            "title": "Modo",
+            "description": "'porcentaje' del puntaje base o 'puntos_fijos' por tramo",
+            "default": "porcentaje"
+          },
+          "tramos": {
+            "items": {
+              "$ref": "#/components/schemas/TramoBonusRacha"
+            },
+            "type": "array",
+            "title": "Tramos",
+            "description": "Umbrales de racha; se aplica solo el tramo de mayor 'dias' alcanzado"
+          }
+        },
+        "type": "object",
+        "title": "BonusRachaConfig"
+      },
       "CambiarSuscripcionRequest": {
         "properties": {
           "suscripcion": {
@@ -8297,6 +8327,10 @@
             "description": "Tope de puntos de invitado que una cuenta puede reclamar al registrarse",
             "default": 1000
           },
+          "bonus_racha": {
+            "$ref": "#/components/schemas/BonusRachaConfig",
+            "description": "Boost de puntos aplicado al completar desafíos con una racha activa"
+          },
           "updated_at": {
             "anyOf": [
               {
@@ -8412,6 +8446,17 @@
             ],
             "title": "Guest Migration Max Points",
             "description": "Tope de puntos de invitado reclamables por cuenta"
+          },
+          "bonus_racha": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BonusRachaConfig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Boost de puntos por racha; omitirlo conserva la configuración actual"
           }
         },
         "type": "object",
@@ -11278,6 +11323,30 @@
         ],
         "title": "TipoResultadoEnum"
       },
+      "TramoBonusRacha": {
+        "properties": {
+          "dias": {
+            "type": "integer",
+            "maximum": 3650.0,
+            "minimum": 1.0,
+            "title": "Dias",
+            "description": "Días de racha necesarios para que aplique el tramo"
+          },
+          "valor": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Valor",
+            "description": "Boost del tramo: porcentaje sobre el puntaje base o puntos fijos según el modo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dias",
+          "valor"
+        ],
+        "title": "TramoBonusRacha"
+      },
       "UniversoCreateRequest": {
         "properties": {
           "_id": {
@@ -11862,6 +11931,18 @@
           "puntos_ganados": {
             "type": "integer",
             "title": "Puntos Ganados",
+            "default": 0
+          },
+          "bonus_racha_puntos": {
+            "type": "integer",
+            "title": "Bonus Racha Puntos",
+            "description": "Puntos extra acreditados por racha en este intento",
+            "default": 0
+          },
+          "bonus_racha_dias": {
+            "type": "integer",
+            "title": "Bonus Racha Dias",
+            "description": "Días de racha que activaron el tramo del bonus",
             "default": 0
           },
           "puntos_totales_usuario": {

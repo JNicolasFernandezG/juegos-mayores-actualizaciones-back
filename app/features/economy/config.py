@@ -4,9 +4,13 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
+from pydantic import ValidationError
+
 from app.core.database import get_database
 from app.features.economy.schemas import (
+    DEFAULT_BONUS_RACHA,
     DEFAULT_ESCALAS_TIEMPO,
+    BonusRachaConfig,
     EconomyConfigResponse,
     EconomyConfigUpdateRequest,
     EscalaCalificacionTiempo,
@@ -29,12 +33,8 @@ DEFAULT_ECONOMY_CONFIG: Dict[str, Any] = {
         "F": 0,
     },
     "guest_migration_max_points": 1000,
+    "bonus_racha": DEFAULT_BONUS_RACHA,
     "escalas_tiempo_por_juego": DEFAULT_ESCALAS_TIEMPO,
-    "paquetes_tienda": [
-        {"id": "pack_1", "vidas": 1, "puntos": 50, "popular": False, "badge": None, "descuento": None},
-        {"id": "pack_3", "vidas": 3, "puntos": 120, "popular": True, "badge": "Popular", "descuento": "Ahorrá 30 pts"},
-        {"id": "pack_5", "vidas": 5, "puntos": 180, "popular": False, "badge": "Mejor valor", "descuento": "Ahorrá 70 pts"},
-    ],
     "puntos_por_juego": {
         "wordle": 50,
         "sopa_letras": 50,
@@ -79,7 +79,22 @@ async def get_economy_config() -> EconomyConfigResponse:
         guest_migration_max_points=int(
             doc.get("guest_migration_max_points", DEFAULT_ECONOMY_CONFIG["guest_migration_max_points"])
         ),
+        bonus_racha=_normalizar_bonus_racha(doc.get("bonus_racha")),
         updated_at=str(doc.get("updated_at", "")),
+    )
+
+
+def _normalizar_bonus_racha(raw: Any) -> BonusRachaConfig:
+    """Normaliza el bonus guardado; ante datos inválidos cae a los defaults inactivos."""
+    if not isinstance(raw, dict):
+        raw = DEFAULT_BONUS_RACHA
+    try:
+        bonus = BonusRachaConfig(**raw)
+    except (ValidationError, TypeError):
+        logger.warning("[ECONOMIA] bonus_racha inválido en la base; se usan los defaults inactivos.")
+        bonus = BonusRachaConfig(**DEFAULT_BONUS_RACHA)
+    return bonus.model_copy(
+        update={"tramos": sorted(bonus.tramos, key=lambda tramo: tramo.dias)}
     )
 
 
@@ -107,6 +122,11 @@ async def update_economy_config(req: EconomyConfigUpdateRequest) -> EconomyConfi
         update_fields["puntos_por_juego"] = req.puntos_por_juego
     if req.guest_migration_max_points is not None:
         update_fields["guest_migration_max_points"] = max(0, req.guest_migration_max_points)
+    if req.bonus_racha is not None:
+        tramos = sorted(req.bonus_racha.tramos, key=lambda tramo: tramo.dias)
+        update_fields["bonus_racha"] = req.bonus_racha.model_copy(
+            update={"tramos": tramos}
+        ).model_dump()
 
     update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
 

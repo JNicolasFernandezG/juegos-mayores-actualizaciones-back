@@ -43,7 +43,7 @@ Desde el 2026-11-11 la racha mide **ingresos a la aplicación**, no desafíos co
 | `racha_ultima_fecha` | `string \| null` | Último día con ingreso registrado (`YYYY-MM-DD`). `null` si nunca ingresó. |
 | `racha_hoy_ingresada` | `bool` | `true` si ya registró el ingreso de hoy (zona ART). |
 
-El cálculo está en [app/shared/streak.py](file:///C:/Users/nmonti/Desktop/proyectos/backend/mayores_actualizacionesSIPI-BACK/app/shared/streak.py#L49) sobre la colección `user_presence`, y se expone desde [lives.py](file:///C:/Users/nmonti/Desktop/proyectos/backend/mayores_actualizacionesSIPI-BACK/app/features/economy/lives.py#L52) y [router.py del auth](file:///C:/Users/nmonti/Desktop/proyectos/backend/mayores_actualizacionesSIPI-BACK/app/features/auth/router.py#L64). El schema está en [schemas.py](file:///C:/Users/nmonti/Desktop/proyectos/backend/mayores_actualizacionesSIPI-BACK/app/features/economy/schemas.py#L102).
+El cálculo está en [app/shared/streak.py](file:///C:/Users/nmonti/Desktop/proyectos/backend/mayores_actualizacionesSIPI-BACK/app/shared/streak.py#L49) sobre la colección `user_presence`, y se expone desde [lives.py](file:///C:/Users/nmonti/Desktop/proyectos/backend/mayores_actualizacionesSIPI-BACK/app/features/economy/lives.py#L52) y [router.py del auth](file:///C:/Users/nmonti/Desktop/proyectos/backend/mayores_actualizacionesSIPI-BACK/app/features/auth/router.py#L64). El schema está en [schemas.py](file:///C:/Users/nmonti/Desktop/proyectos/backend/mayores_actualizacionesSIPI-BACK/app/features/economy/schemas.py#L155).
 
 ---
 
@@ -56,15 +56,15 @@ El cálculo está en [app/shared/streak.py](file:///C:/Users/nmonti/Desktop/proy
 - **Zona horaria**: el "hoy" es `America/Argentina/Buenos_Aires`; el día cambia a las **00:00 ART**.
 - **Sesión persistente**: funciona igual con cookie HttpOnly que con Bearer. No hace falta que el usuario vuelva a escribir credenciales.
 - **Leer la economía cuenta como ingreso**: si el front consulta `/api/economy/me` en el arranque, la apertura ya queda registrada. Lo mismo con `/api/auth/session`.
-- **Completar desafíos no suma racha**. Esa señal dejó de usarse el 2026-11-11.
+- **Completar desafíos no suma racha por sí mismo**. Esa señal dejó de usarse el 2026-11-11; lo que cuenta es el ingreso del día, que `POST /api/games/attempts` registra si aún no existía.
 - **Invitados**: siguen con el valor local del front; no hay racha en servidor.
 
 ---
 
 ## 3. Qué NO cambia
 
-- `POST /api/games/attempts` no cambia: el backend toma `user_id` de la sesión. **La respuesta no incluye la racha**.
-- No hay endpoint nuevo: se agregaron campos a dos endpoints existentes.
+- `POST /api/games/attempts` sigue tomando `user_id` de la sesión y **no devuelve `racha`**.
+- No hay endpoint nuevo para jugar: el bonus se aplica dentro del mismo `POST /api/games/attempts`.
 - `racha_hoy_jugada` **se reemplazó** por `racha_hoy_ingresada`; el nombre viejo ya no se devuelve.
 
 ---
@@ -109,10 +109,15 @@ Casos para probar desde el front:
 | Ingresó ayer y hoy | `2` | `true` | hoy |
 | No ingresó ayer, vuelve hoy | `1` | `true` | hoy |
 | Dos pestañas a la vez | `1` | `true` | hoy |
-| Completar desafíos sin abrir la app | sin cambio | sin cambio | sin cambio |
+| Completar un desafío sin haber ingresado antes hoy | `+1` (igual que abrir la app) | `true` | hoy |
 
 ---
 
-## 6. Puntos por racha (futuro, sin trabajo en el front)
+## 6. Puntos por racha (implementado, sin trabajo en el front)
 
-Cuando se habiliten puntos por hitos de racha, la acreditación se hará en el mismo `POST /api/games/attempts` o en el registro de ingreso con el ledger idempotente por `(usuario, "racha", fecha)`. El front no cambia: sigue leyendo `puntos` y `racha` de `/api/economy/me`.
+El operador configura tramos de racha (`bonus_racha` en `GET /api/economy/config`, editable por `PUT /api/admin/economy/config`) y el backend acredita el boost al completar un desafío diario, usando el ledger idempotente existente.
+
+- **Porcentaje** (`modo: "porcentaje"`): `puntos_base * valor // 100`; **puntos fijos** (`modo: "puntos_fijos"`): `valor` puntos.
+- Se aplica solo el tramo de mayor `dias` alcanzado; Wordle, Sudoku, Sopa y Crucigrama; el narrativo no lo recibe.
+- `POST /api/games/attempts` agrega `bonus_racha_puntos` y `bonus_racha_dias`; `puntos_ganados` ya incluye el boost. El replay sigue en `puntos_ganados: 0`.
+- El front no cambia: sigue leyendo `puntos_ganados`/`puntos_totales_usuario` del intento y `puntos`/`racha` de `/api/economy/me`. La racha que decide el tramo incluye el ingreso del día que se registra al completar el desafío.
