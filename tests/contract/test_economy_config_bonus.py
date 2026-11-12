@@ -25,13 +25,13 @@ async def config_limpia(test_db, cleanup):
 
 
 async def _get_config(client) -> dict:
-    response = await client.get("/api/economy/config")
+    response = await client.get("/api/admin/economy/config")
     assert response.status_code == 200
     return response.json()
 
 
 @pytest.mark.asyncio
-async def test_default_inactivo_con_tres_tramos(client, config_limpia):
+async def test_default_inactivo_con_tres_tramos(client, admin_override, config_limpia):
     bonus = (await _get_config(client))["bonus_racha"]
 
     assert bonus["activo"] is False
@@ -109,7 +109,7 @@ async def test_bonus_invalido_devuelve_422(client, admin_override, config_limpia
 
 
 @pytest.mark.asyncio
-async def test_bonus_corrupto_en_base_cae_a_defaults(client, config_limpia):
+async def test_bonus_corrupto_en_base_cae_a_defaults(client, admin_override, config_limpia):
     await config_limpia["configuracion_economia"].insert_one(
         {"_id": "global_economy", "bonus_racha": {"activo": "sí", "modo": "x"}}
     )

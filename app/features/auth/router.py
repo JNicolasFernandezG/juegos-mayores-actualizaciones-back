@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any
 
 from fastapi import APIRouter, Depends, Header, Request, Response
 from app.core.rate_limit import rate_limit
-from app.core.dependencies import get_current_user, set_auth_cookie, clear_auth_cookie
+from app.core.dependencies import get_optional_user, set_auth_cookie, clear_auth_cookie
 from app.features.auth.schemas import (
     LoginSistemasRequest, LoginCodigoRequest, VerificarTokenRequest,
     RegisterRequest, GuestCredentialResponse
@@ -59,11 +59,21 @@ async def endpoint_logout(response: Response):
 
 @router.get(
     "/api/auth/session",
-    summary="Verificar sesión actual desde cookie protegida o Bearer token"
+    summary="Consultar estado de sesión actual desde cookie protegida o Bearer token (devuelve authenticated=false para invitados)"
 )
 async def endpoint_check_session(
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Optional[Dict[str, Any]] = Depends(get_optional_user)
 ):
+    if not current_user:
+        return {
+            "success": True,
+            "authenticated": False,
+            "user": None,
+            "racha": 0,
+            "racha_ultima_fecha": None,
+            "racha_hoy_ingresada": False,
+        }
+
     # Verificar la sesión es el otro punto de arranque de la app: registra el ingreso del día
     # aunque la sesión persista por cookie y el cliente no vuelva a pedir credenciales.
     racha = await registrar_ingreso_y_racha(int(current_user["id"]))
@@ -78,8 +88,15 @@ async def endpoint_check_session(
 
 
 @router.post("/api/auth/verificar-token", summary="Verificar validez de token JWT y estado activo")
-async def endpoint_verificar_token(req: VerificarTokenRequest):
-    return await verificar_token(req)
+async def endpoint_verificar_token(
+    req: VerificarTokenRequest,
+    request: Request,
+    response: Response,
+):
+    result = await verificar_token(req)
+    if result.get("token"):
+        set_auth_cookie(response, request, result["token"])
+    return result
 
 
 @router.post(
@@ -87,9 +104,16 @@ async def endpoint_verificar_token(req: VerificarTokenRequest):
     dependencies=[Depends(rate_limit(max_requests=5, window_seconds=60))],
     summary="Registrar nuevo usuario alumno delegando al Autenticador Central"
 )
-async def endpoint_register(req: RegisterRequest):
+async def endpoint_register(
+    req: RegisterRequest,
+    request: Request,
+    response: Response,
+):
     # Registro público siempre crea cuentas de alumno (is_admin_creation=False)
-    return await register_usuario(req, is_admin_creation=False)
+    result = await register_usuario(req, is_admin_creation=False)
+    if result.get("token"):
+        set_auth_cookie(response, request, result["token"])
+    return result
 
 
 @router.post(

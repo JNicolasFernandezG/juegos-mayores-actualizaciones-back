@@ -115,7 +115,7 @@ Casos para probar desde el front:
 
 ## 6. Puntos por racha (implementado, sin trabajo en el front)
 
-El operador configura tramos de racha (`bonus_racha` en `GET /api/economy/config`, editable por `PUT /api/admin/economy/config`) y el backend acredita el boost al completar un desafío diario, usando el ledger idempotente existente.
+El operador configura tramos de racha (`bonus_racha` en `GET /api/admin/economy/config`, editable por `PUT /api/admin/economy/config`) y el backend acredita el boost al completar un desafío diario, usando el ledger idempotente existente.
 
 - **Porcentaje** (`modo: "porcentaje"`): `puntos_base * valor // 100`; **puntos fijos** (`modo: "puntos_fijos"`): `valor` puntos.
 - Se aplica solo el tramo de mayor `dias` alcanzado; Wordle, Sudoku, Sopa y Crucigrama; el narrativo no lo recibe.

@@ -108,7 +108,7 @@
         "tags": [
           "Autenticación"
         ],
-        "summary": "Verificar sesión actual desde cookie protegida o Bearer token",
+        "summary": "Consultar estado de sesión actual desde cookie protegida o Bearer token (devuelve authenticated=false para invitados)",
         "operationId": "endpoint_check_session_api_auth_session_get",
         "responses": {
           "200": {
@@ -1642,28 +1642,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/economy/config": {
-      "get": {
-        "tags": [
-          "Economía, Vidas y Mini-Tienda"
-        ],
-        "summary": "Obtener catálogo de precios de la mini-tienda y puntos por juego (Público)",
-        "description": "Retorna la configuración económica pública para que el frontend dibuje la tienda y recompensas.",
-        "operationId": "endpoint_get_economy_config_api_economy_config_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EconomyConfigResponse"
                 }
               }
             }

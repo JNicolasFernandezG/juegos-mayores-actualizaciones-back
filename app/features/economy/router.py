@@ -38,18 +38,8 @@ router = APIRouter(tags=["Economía, Vidas y Mini-Tienda"])
 
 
 # ==============================================================================
-# Endpoints de Jugador y Consulta Pública
+# Endpoints de Jugador
 # ==============================================================================
-
-@router.get(
-    "/api/economy/config",
-    response_model=EconomyConfigResponse,
-    summary="Obtener catálogo de precios de la mini-tienda y puntos por juego (Público)",
-)
-async def endpoint_get_economy_config():
-    """Retorna la configuración económica pública para que el frontend dibuje la tienda y recompensas."""
-    return await get_economy_config()
-
 
 @router.get(
     "/api/economy/me",

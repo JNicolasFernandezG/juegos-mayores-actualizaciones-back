@@ -148,7 +148,7 @@ Flujo sugerido: al crear la cuenta, llamar una vez, reemplazar el saldo local po
 
 - `POST /api/economy/buy-lives` conserva la vía por `package_id`; el servidor define vidas y costo. La vía directa `{ "vidas": N }` ya no se usa: sin `package_id` se compra 1 vida al precio base, y se aplica `vidas_maximas`.
 - `POST /api/economy/unlock-day` conserva request y response.
-- `GET /api/economy/config` y `GET /api/economy/me` conservan su forma. Se agregó `guest_migration_max_points` a la configuración y `/me` ahora expone la racha real (§2.10).
+- `GET /api/economy/me` conserva su forma y ahora expone la racha real (§2.10). `GET /api/economy/config` se eliminó: el front ya no consume precios desde el servidor y la configuración completa queda en `GET /api/admin/economy/config` para el panel.
 
 ### 2.9 Límite de tasa
 
@@ -188,7 +188,7 @@ Los dos endpoints agregan:
 
 ### 2.11 Bonus de puntos por racha
 
-El operador configura tramos de racha que agregan puntos extra al completar un desafío diario. La configuración vive en `GET /api/economy/config` y se edita con `PUT /api/admin/economy/config`:
+El operador configura tramos de racha que agregan puntos extra al completar un desafío diario. La configuración vive en `GET /api/admin/economy/config` (endpoint admin; el público se eliminó) y se edita con `PUT /api/admin/economy/config`:
 
 ```json
 {

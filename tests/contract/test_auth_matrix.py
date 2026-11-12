@@ -15,9 +15,6 @@ async def test_public_endpoints_work_without_token(client, seeded_challenge):
     )
     assert response.status_code == 200
 
-    response = await client.get("/api/economy/config")
-    assert response.status_code == 200
-
 
 @pytest.mark.asyncio
 async def test_upsert_challenge_is_public_without_token(client, cleanup):
