@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any, Union
+from typing import Literal, Optional, List, Dict, Any, Union
 
 from app.features.narrative.schemas.catalog_schemas import (
     PersonajeResponse,
@@ -41,6 +41,10 @@ class IniciarPartidaRequest(BaseModel):
     date: str
     corte_elegida_ids: List[str]
     cartas_iniciales_ids: List[str]
+    dificultad: Literal["normal", "facil"] = Field(
+        "normal",
+        description="'facil' amortigua las pérdidas de recursos con el factor configurado en el universo.",
+    )
 
 class ElegirCartaMesRequest(BaseModel):
     date: str

@@ -8,12 +8,13 @@ Fase 0 del motor narrativo V2:
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from fastapi import HTTPException
 
 from app.core.database import get_database
 from app.features.narrative.constants import (
+    DIFICULTAD_FACIL_REDUCCION_DEFAULT,
     COLL_SETTINGS,
     COLL_CHARACTERS,
     COLL_CARDS,
@@ -50,6 +51,19 @@ from app.features.narrative.game.identity import filtro_run, id_run, resolver_id
 from app.features.narrative.game.universe_resources import obtener_mapa_recursos_universo
 
 logger = logging.getLogger(__name__)
+
+
+def _reduccion_por_dificultad(dificultad: str, universo_doc: Optional[Dict[str, Any]]) -> int:
+    """Amortiguación de pérdidas del modo fácil; 0 en normal. Se clampea para no invertir el signo."""
+    if dificultad != "facil":
+        return 0
+    raw = (universo_doc or {}).get(
+        "dificultad_facil_reduccion", DIFICULTAD_FACIL_REDUCCION_DEFAULT
+    )
+    try:
+        return max(0, min(90, int(raw)))
+    except (TypeError, ValueError):
+        return DIFICULTAD_FACIL_REDUCCION_DEFAULT
 
 
 async def _proxima_generacion(user_id: int, date: str) -> int:
@@ -159,6 +173,7 @@ async def iniciar_partida(user_id: int, req: IniciarPartidaRequest) -> IniciarPa
 
         universo_doc = await db[COLL_SETTINGS].find_one({"_id": universo_id})
         motor = universo_doc.get("motor", "v2") if universo_doc else "v2"
+        reduccion_dificultad = _reduccion_por_dificultad(req.dificultad, universo_doc)
 
         if len(req.corte_elegida_ids) != 3:
             raise HTTPException(status_code=400, detail="Debes seleccionar exactamente 3 personajes para la corte.")
@@ -204,6 +219,8 @@ async def iniciar_partida(user_id: int, req: IniciarPartidaRequest) -> IniciarPa
             "generation": generation,
             "universo_id": universo_id,
             "motor": motor,
+            "dificultad": req.dificultad,
+            "dificultad_reduccion": reduccion_dificultad,
             "mes_actual": 1,
             "fase_actual": RunPhaseEnum.DRAFT_MENSUAL.value,
             "status": "in_progress",

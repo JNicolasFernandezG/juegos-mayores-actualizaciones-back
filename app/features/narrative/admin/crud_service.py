@@ -19,6 +19,7 @@ from app.features.narrative.constants import (
     COLL_V2_EVENTS,
     COLL_V2_CONVERSATIONS,
     COLL_V2_EVENTOS_ESPECIALES,
+    DIFICULTAD_FACIL_REDUCCION_DEFAULT,
 )
 from app.features.narrative.schemas.catalog_schemas import (
     UniversoCreateRequest,
@@ -147,7 +148,18 @@ async def eliminar_item_catalogo_por_id(
 
 # Universos
 async def crear_o_actualizar_universo(req: UniversoCreateRequest) -> UniversoResponse:
-    return await guardar_item_catalogo(COLL_SETTINGS, req.id, req, UniversoResponse)
+    """El panel no conoce el factor de dificultad: si no lo envía, se conserva el guardado."""
+    db = get_database()
+    doc = req.model_dump(by_alias=True)
+    if req.dificultad_facil_reduccion is None:
+        existente = await db[COLL_SETTINGS].find_one(
+            {"_id": req.id}, {"dificultad_facil_reduccion": 1}
+        )
+        doc["dificultad_facil_reduccion"] = (existente or {}).get(
+            "dificultad_facil_reduccion", DIFICULTAD_FACIL_REDUCCION_DEFAULT
+        )
+    await db[COLL_SETTINGS].replace_one({"_id": req.id}, doc, upsert=True)
+    return UniversoResponse(**doc)
 
 async def obtener_universos() -> List[UniversoResponse]:
     return await listar_items_catalogo(COLL_SETTINGS, UniversoResponse)

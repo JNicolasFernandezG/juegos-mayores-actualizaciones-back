@@ -210,10 +210,10 @@ def aplicar_delta_recurso(
     """
     Único punto de mutación de un recurso vivo de la partida.
 
-    Amortigua las pérdidas con los modificadores pasivos, reclama contra los límites
-    dinámicos y descarta la operación si la clave no es un recurso de la partida, para
-    que una acción mal configurada no cree recursos fantasma en cero (que el colapso
-    interpretaría como derrota).
+    Amortigua las pérdidas con el modo fácil y los modificadores pasivos, reclama contra
+    los límites dinámicos y descarta la operación si la clave no es un recurso de la
+    partida, para que una acción mal configurada no cree recursos fantasma en cero (que
+    el colapso interpretaría como derrota).
     """
     recursos = run_data.setdefault("recursos", {})
     if clave not in recursos:
@@ -225,6 +225,9 @@ def aplicar_delta_recurso(
     actual = float(recursos[clave])
     delta_efectivo = float(delta)
     if delta_efectivo < 0:
+        reduccion_dificultad = float(run_data.get("dificultad_reduccion") or 0)
+        if 0 < reduccion_dificultad <= 100:
+            delta_efectivo *= 1.0 - (reduccion_dificultad / 100.0)
         for mod in run_data.get("modificadores_pasivos", []):
             if mod.get("tipo") == "amortiguar_danio" and (
                 not mod.get("clave") or mod.get("clave") == clave

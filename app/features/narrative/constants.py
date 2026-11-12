@@ -26,6 +26,9 @@ COLL_V2_EVENTOS_ESPECIALES = "narrative_v2_eventos_especiales"
 AFINIDAD_UMBRAL_LEALTAD = 95
 AFINIDAD_UMBRAL_TRAICION = 15
 
+# Amortiguación por defecto de las pérdidas en modo fácil (porcentaje).
+DIFICULTAD_FACIL_REDUCCION_DEFAULT = 35
+
 # Marca de protocolo de comandos (recibos + obligación económica embebidos).
 # Las rutas legacy no pueden mutar runs con esta marca.
 PROTOCOLO_V3 = "v3"

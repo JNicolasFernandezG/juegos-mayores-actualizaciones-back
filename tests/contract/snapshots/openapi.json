@@ -9752,6 +9752,16 @@
             },
             "type": "array",
             "title": "Cartas Iniciales Ids"
+          },
+          "dificultad": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "facil"
+            ],
+            "title": "Dificultad",
+            "description": "'facil' amortigua las pérdidas de recursos con el factor configurado en el universo.",
+            "default": "normal"
           }
         },
         "type": "object",
@@ -11468,6 +11478,20 @@
             "description": "V2: al agotar los eventos elegibles, libera el historial para poder cerrar los 12 meses",
             "default": false
           },
+          "dificultad_facil_reduccion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 90.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dificultad Facil Reduccion",
+            "description": "Porcentaje que amortigua las pérdidas de recursos en modo fácil. Si se omite al guardar, se conserva el valor existente."
+          },
           "recursos": {
             "items": {
               "$ref": "#/components/schemas/RecursoDefinicionSchema"
@@ -11517,6 +11541,14 @@
             "type": "boolean",
             "title": "Reciclaje Eventos V2",
             "default": false
+          },
+          "dificultad_facil_reduccion": {
+            "type": "integer",
+            "maximum": 90.0,
+            "minimum": 0.0,
+            "title": "Dificultad Facil Reduccion",
+            "description": "Amortiguación de pérdidas en modo fácil (porcentaje)",
+            "default": 35
           },
           "recursos": {
             "items": {

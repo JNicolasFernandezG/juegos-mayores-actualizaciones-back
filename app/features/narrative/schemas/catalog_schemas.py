@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
+from app.features.narrative.constants import DIFICULTAD_FACIL_REDUCCION_DEFAULT
 from app.features.narrative.enums import (
     CategoriaCartaEnum,
     TipoResultadoEnum,
@@ -34,6 +35,15 @@ class UniversoCreateRequest(BaseModel):
         False,
         description="V2: al agotar los eventos elegibles, libera el historial para poder cerrar los 12 meses",
     )
+    dificultad_facil_reduccion: Optional[int] = Field(
+        None,
+        ge=0,
+        le=90,
+        description=(
+            "Porcentaje que amortigua las pérdidas de recursos en modo fácil. "
+            "Si se omite al guardar, se conserva el valor existente."
+        ),
+    )
     recursos: List[RecursoDefinicionSchema]
 
     model_config = {"populate_by_name": True}
@@ -46,6 +56,12 @@ class UniversoResponse(BaseModel):
     imagen: str = "/assets/narrative/universos/default.webp"
     motor: str = "v2"
     reciclaje_eventos_v2: bool = False
+    dificultad_facil_reduccion: int = Field(
+        DIFICULTAD_FACIL_REDUCCION_DEFAULT,
+        ge=0,
+        le=90,
+        description="Amortiguación de pérdidas en modo fácil (porcentaje)",
+    )
     recursos: List[RecursoDefinicionSchema]
 
     model_config = {"populate_by_name": True}
