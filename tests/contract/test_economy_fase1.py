@@ -265,3 +265,21 @@ async def test_pending_ledger_is_reconciled_once(test_db, seeded_user):
     await reconcile_pending_ledger(older_than_seconds=0)
     second = await test_db["usuarios"].find_one({"id": user["id"]})
     assert second["puntos"] == 25
+
+
+@pytest.mark.asyncio
+async def test_user_economy_publica_el_costo_de_desbloqueo_configurado(
+    client, test_db, seeded_user, make_token, admin_override, cleanup
+):
+    await test_db["configuracion_economia"].delete_one({"_id": "global_economy"})
+    cleanup.add("configuracion_economia", {"_id": "global_economy"})
+    update = await client.put(
+        "/api/admin/economy/config", json={"costo_desbloqueo_dia_puntos": 80}
+    )
+    assert update.status_code == 200
+
+    user = await seeded_user(puntos=100)
+    response = await client.get("/api/economy/me", headers=_auth(make_token(user["id"])))
+
+    assert response.status_code == 200
+    assert response.json()["costo_desbloqueo_dia_puntos"] == 80

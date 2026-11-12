@@ -64,6 +64,7 @@ async def get_user_economy(user_id: int) -> UserEconomyResponse:
         suscripcion=suscripcion,
         dias_desbloqueados=dias_desbloqueados,
         costo_pista_puntos=int(config.costo_pista_puntos or 20),
+        costo_desbloqueo_dia_puntos=int(config.costo_desbloqueo_dia_puntos or 100),
     )
 
 

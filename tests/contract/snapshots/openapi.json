@@ -12091,6 +12091,13 @@
             "description": "Costo en puntos para solicitar una pista",
             "default": 20
           },
+          "costo_desbloqueo_dia_puntos": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Costo Desbloqueo Dia Puntos",
+            "description": "Costo en puntos para desbloquear un día histórico",
+            "default": 100
+          },
           "updated_at": {
             "anyOf": [
               {
