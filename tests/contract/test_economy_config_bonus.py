@@ -44,6 +44,28 @@ async def test_default_inactivo_con_tres_tramos(client, admin_override, config_l
 
 
 @pytest.mark.asyncio
+async def test_economia_del_jugador_expone_los_hitos_vigentes(
+    client, admin_override, make_token, seeded_user, config_limpia
+):
+    user = await seeded_user()
+    await client.put("/api/admin/economy/config", json={"bonus_racha": BONUS_ACTIVO})
+
+    response = await client.get(
+        "/api/economy/me", headers={"Authorization": f"Bearer {make_token(user['id'])}"}
+    )
+
+    assert response.status_code == 200
+    bonus = response.json()["bonus_racha"]
+    assert bonus["activo"] is True
+    assert bonus["modo"] == "porcentaje"
+    assert [(t["dias"], t["valor"]) for t in bonus["tramos"]] == [
+        (10, 10),
+        (15, 20),
+        (20, 30),
+    ]
+
+
+@pytest.mark.asyncio
 async def test_admin_guarda_y_lee_el_bonus_ordenado(client, admin_override, config_limpia):
     response = await client.put(
         "/api/admin/economy/config",

@@ -165,6 +165,10 @@ class UserEconomyResponse(BaseModel):
     dias_desbloqueados: List[str] = Field(default_factory=list, description="Días históricos desbloqueados ej: ['crucigrama:2026-10-15']")
     costo_pista_puntos: int = Field(20, description="Costo en puntos para solicitar una pista")
     costo_desbloqueo_dia_puntos: int = Field(100, ge=0, description="Costo en puntos para desbloquear un día histórico")
+    bonus_racha: BonusRachaConfig = Field(
+        default_factory=lambda: BonusRachaConfig(**DEFAULT_BONUS_RACHA),
+        description="Hitos y recompensa del bonus por racha vigente",
+    )
     updated_at: Optional[str] = None
 
 
