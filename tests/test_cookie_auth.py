@@ -78,3 +78,22 @@ async def test_session_clears_invalid_cookie_without_401(client):
     # Los endpoints privados sí siguen exigiendo autenticación con 401
     eco_res = await client.get("/api/economy/me")
     assert eco_res.status_code == 401
+
+
+async def test_session_authenticated_omits_codigo_acceso(client, seeded_user, test_db):
+    user = await seeded_user(tipo_usuario=1, name="Usuario Sesion")
+    await test_db["usuarios"].update_one(
+        {"id": user["id"]},
+        {"$set": {"codigo_acceso": "654321"}},
+    )
+    token = create_access_token(
+        {"id": user["id"], "tipo_usuario": 1, "name": "Usuario Sesion", "email": user["email"]}
+    )
+    client.cookies.set("access_token", token)
+
+    res = await client.get("/api/auth/session")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["authenticated"] is True
+    assert data["user"]["email"] == user["email"]
+    assert "codigoAcceso" not in data["user"]
