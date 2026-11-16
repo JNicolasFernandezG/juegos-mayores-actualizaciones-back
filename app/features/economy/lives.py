@@ -15,6 +15,7 @@ from app.features.economy.schemas import (
     UserEconomyResponse,
 )
 from app.shared.streak import registrar_ingreso_y_racha
+from app.shared.streak_rewards import tramos_puntos_diarios
 
 logger = logging.getLogger("EconomyService")
 
@@ -50,7 +51,10 @@ async def get_user_economy(user_id: int) -> UserEconomyResponse:
     puntos = int(user.get("puntos", 0))
     # Leer la economía es parte del arranque de la app: deja registrado el ingreso del día.
     racha = await registrar_ingreso_y_racha(user_id)
-
+    # El ingreso puede haber acreditado los puntos diarios: se relee el saldo ya actualizado.
+    actualizado = await db["usuarios"].find_one({"id": user_id}, {"puntos": 1})
+    if actualizado:
+        puntos = int(actualizado.get("puntos", puntos))
     suscripcion = str(user.get("suscripcion", "basica")).lower()
     dias_desbloqueados = user.get("dias_desbloqueados", [])
 
@@ -61,6 +65,8 @@ async def get_user_economy(user_id: int) -> UserEconomyResponse:
         racha=racha.actual,
         racha_ultima_fecha=racha.ultima_fecha,
         racha_hoy_ingresada=racha.hoy_ingresada,
+        racha_puntos_dia=racha.puntos_dia,
+        racha_tramos_diarios=tramos_puntos_diarios(),
         suscripcion=suscripcion,
         dias_desbloqueados=dias_desbloqueados,
         costo_pista_puntos=int(config.costo_pista_puntos or 20),
