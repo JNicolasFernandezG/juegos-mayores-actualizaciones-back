@@ -15,7 +15,7 @@ from app.features.auth.schemas import (
     RegisterRequest
 )
 
-def format_user_response(user: dict) -> dict:
+def format_user_response(user: dict, include_access_code: bool = True) -> dict:
     """Formatea el documento de MongoDB al contrato JSON esperado por el frontend."""
     date_start = user.get("date_start")
     if isinstance(date_start, datetime):
@@ -41,11 +41,10 @@ def format_user_response(user: dict) -> dict:
         else:
             estado_codigo = "SUSPENDIDO"
 
-    return {
+    payload = {
         "id": user.get("id"),
         "name": user.get("name", ""),
         "email": user.get("email", ""),
-        "codigoAcceso": user.get("codigo_acceso", ""),
         "tipoUsuario": user.get("tipo_usuario", 1),
         "black": bool(user.get("black", False)),
         "activo": bool(user.get("activo", True)),
@@ -54,6 +53,9 @@ def format_user_response(user: dict) -> dict:
         "dateStart": date_start_str,
         "dateEnd": date_end_str
     }
+    if include_access_code:
+        payload["codigoAcceso"] = user.get("codigo_acceso", "")
+    return payload
 
 async def sync_local_user_from_auth_service(remote_user: dict) -> dict:
     """

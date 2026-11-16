@@ -44,7 +44,20 @@
         reverse_proxy backend:8087
     }
 
-    # 6. Servir archivos estáticos compilados del Frontend (SPA) desde /srv/dist
+    # 6. Redirigir la antigua ruta /menu hacia la portada / (301 permanente, conservando query si existe)
+    @menu_query {
+        path /menu /menu/
+        not query ""
+    }
+    redir @menu_query /?{query} 301
+
+    @menu_plain {
+        path /menu /menu/
+        query ""
+    }
+    redir @menu_plain / 301
+
+    # 7. Servir archivos estáticos compilados del Frontend (SPA) desde /srv/dist
     handle {
         root * /srv/dist
         try_files {path} /index.html

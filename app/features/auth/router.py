@@ -80,7 +80,7 @@ async def endpoint_check_session(
     return {
         "success": True,
         "authenticated": True,
-        "user": format_user_response(current_user),
+        "user": format_user_response(current_user, include_access_code=False),
         "racha": racha.actual,
         "racha_ultima_fecha": racha.ultima_fecha,
         "racha_hoy_ingresada": racha.hoy_ingresada,
