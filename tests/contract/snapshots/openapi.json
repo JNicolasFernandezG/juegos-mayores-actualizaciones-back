@@ -2103,6 +2103,302 @@
         }
       }
     },
+    "/api/profile/summary": {
+      "get": {
+        "tags": [
+          "Perfil"
+        ],
+        "summary": "Obtener medallas, rendimiento y actividad del usuario autenticado",
+        "operationId": "endpoint_perfil_resumen_api_profile_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerfilResumenResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/subscription/plans": {
+      "get": {
+        "tags": [
+          "Suscripciones"
+        ],
+        "summary": "Listar los planes visibles y si el cobro anual está disponible",
+        "operationId": "endpoint_planes_visibles_api_subscription_plans_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogoPlanes"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/subscription/plans": {
+      "get": {
+        "tags": [
+          "Suscripciones - Administración"
+        ],
+        "summary": "Listar todos los planes de suscripción, incluidos los ocultos (Solo Admin)",
+        "operationId": "endpoint_admin_planes_api_admin_subscription_plans_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlanSuscripcion"
+                  },
+                  "type": "array",
+                  "title": "Response Endpoint Admin Planes Api Admin Subscription Plans Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Suscripciones - Administración"
+        ],
+        "summary": "Crear un plan de suscripción (Solo Admin)",
+        "operationId": "endpoint_admin_crear_plan_api_admin_subscription_plans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanSuscripcion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/subscription/settings": {
+      "get": {
+        "tags": [
+          "Suscripciones - Administración"
+        ],
+        "summary": "Leer la configuración global de suscripciones (Solo Admin)",
+        "operationId": "endpoint_admin_config_api_admin_subscription_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigSuscripcion"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Suscripciones - Administración"
+        ],
+        "summary": "Activar o desactivar las membresías anuales (Solo Admin)",
+        "operationId": "endpoint_admin_actualizar_config_api_admin_subscription_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigSuscripcionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigSuscripcion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/subscription/plans/{codigo}": {
+      "put": {
+        "tags": [
+          "Suscripciones - Administración"
+        ],
+        "summary": "Editar un plan, incluidos los flags de visibilidad y compra (Solo Admin)",
+        "operationId": "endpoint_admin_actualizar_plan_api_admin_subscription_plans__codigo__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "codigo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Codigo"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanSuscripcion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Suscripciones - Administración"
+        ],
+        "summary": "Eliminar un plan de suscripción (Solo Admin)",
+        "operationId": "endpoint_admin_eliminar_plan_api_admin_subscription_plans__codigo__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "codigo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Codigo"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/narrative/partida/setup": {
       "get": {
         "tags": [
@@ -6794,6 +7090,25 @@
         ],
         "title": "CartaResponse"
       },
+      "CatalogoPlanes": {
+        "properties": {
+          "anual_habilitado": {
+            "type": "boolean",
+            "title": "Anual Habilitado",
+            "description": "El jugador puede elegir el cobro anual en el catálogo",
+            "default": false
+          },
+          "planes": {
+            "items": {
+              "$ref": "#/components/schemas/PlanSuscripcion"
+            },
+            "type": "array",
+            "title": "Planes"
+          }
+        },
+        "type": "object",
+        "title": "CatalogoPlanes"
+      },
       "CategoriaCartaEnum": {
         "type": "string",
         "enum": [
@@ -6920,6 +7235,41 @@
           "tipo"
         ],
         "title": "CondicionSchema"
+      },
+      "ConfigSuscripcion": {
+        "properties": {
+          "anual_habilitado": {
+            "type": "boolean",
+            "title": "Anual Habilitado",
+            "default": false
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "title": "ConfigSuscripcion"
+      },
+      "ConfigSuscripcionUpdate": {
+        "properties": {
+          "anual_habilitado": {
+            "type": "boolean",
+            "title": "Anual Habilitado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "anual_habilitado"
+        ],
+        "title": "ConfigSuscripcionUpdate"
       },
       "ConsumeLifeRequest": {
         "properties": {
@@ -9991,6 +10341,34 @@
         ],
         "title": "LoginSistemasRequest"
       },
+      "MedallasBloque": {
+        "properties": {
+          "mes_actual": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Mes Actual",
+            "description": "Conteo de calificaciones del mes por juego: {juego: {S,A,B,C,F}}"
+          },
+          "historico": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Historico",
+            "description": "Conteo histórico de calificaciones por juego: {juego: {S,A,B,C,F}}"
+          }
+        },
+        "type": "object",
+        "title": "MedallasBloque"
+      },
       "ModificadorProbabilidadSchema": {
         "properties": {
           "condicion": {
@@ -10520,6 +10898,64 @@
         "type": "object",
         "title": "ParametrosAccionSchema"
       },
+      "PerfilResumenResponse": {
+        "properties": {
+          "periodo": {
+            "$ref": "#/components/schemas/PeriodoPerfil"
+          },
+          "medallas": {
+            "$ref": "#/components/schemas/MedallasBloque"
+          },
+          "rendimiento": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RendimientoJuego"
+            },
+            "type": "object",
+            "title": "Rendimiento",
+            "description": "Métricas por juego para los juegos con calificación"
+          },
+          "actividad": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Actividad",
+            "description": "Días con ingreso registrado dentro de la ventana, ordenados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "periodo",
+          "medallas"
+        ],
+        "title": "PerfilResumenResponse"
+      },
+      "PeriodoPerfil": {
+        "properties": {
+          "mes": {
+            "type": "string",
+            "title": "Mes",
+            "description": "Mes consultado en formato YYYY-MM"
+          },
+          "desde": {
+            "type": "string",
+            "title": "Desde",
+            "description": "Primer día de la ventana de actividad (YYYY-MM-DD)"
+          },
+          "hasta": {
+            "type": "string",
+            "title": "Hasta",
+            "description": "Último día con datos considerados (YYYY-MM-DD)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mes",
+          "desde",
+          "hasta"
+        ],
+        "title": "PeriodoPerfil"
+      },
       "PersonajeConversacionProbabilidad": {
         "properties": {
           "idConversacion": {
@@ -10737,6 +11173,274 @@
         ],
         "title": "PersonajeResponse"
       },
+      "PlanCreateRequest": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{1,31}$",
+            "title": "Codigo",
+            "description": "Slug en minúsculas, sin espacios"
+          },
+          "nombre": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 2,
+            "title": "Nombre"
+          },
+          "descripcion": {
+            "type": "string",
+            "maxLength": 240,
+            "title": "Descripcion",
+            "default": ""
+          },
+          "precio": {
+            "$ref": "#/components/schemas/PrecioPlan"
+          },
+          "descuento_anual_pct": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Descuento Anual Pct",
+            "default": 0
+          },
+          "beneficios": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Beneficios"
+          },
+          "orden": {
+            "type": "integer",
+            "maximum": 999.0,
+            "minimum": 0.0,
+            "title": "Orden",
+            "default": 0
+          },
+          "visible": {
+            "type": "boolean",
+            "title": "Visible",
+            "default": true
+          },
+          "habilitado": {
+            "type": "boolean",
+            "title": "Habilitado",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "nombre"
+        ],
+        "title": "PlanCreateRequest"
+      },
+      "PlanSuscripcion": {
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "title": "Codigo",
+            "description": "Identificador estable del plan"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "descripcion": {
+            "type": "string",
+            "title": "Descripcion",
+            "default": ""
+          },
+          "precio": {
+            "$ref": "#/components/schemas/PrecioPlan",
+            "description": "Precio del cobro mensual"
+          },
+          "descuento_anual_pct": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Descuento Anual Pct",
+            "description": "Descuento aplicado al total de doce meses",
+            "default": 0
+          },
+          "precio_anual": {
+            "$ref": "#/components/schemas/PrecioPlan",
+            "description": "Precio anual derivado del mensual y el descuento; solo lectura"
+          },
+          "beneficios": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Beneficios"
+          },
+          "orden": {
+            "type": "integer",
+            "title": "Orden",
+            "default": 0
+          },
+          "visible": {
+            "type": "boolean",
+            "title": "Visible",
+            "description": "Se muestra en la sección de planes del jugador",
+            "default": true
+          },
+          "habilitado": {
+            "type": "boolean",
+            "title": "Habilitado",
+            "description": "El botón de compra del plan está activo",
+            "default": false
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "codigo",
+          "nombre"
+        ],
+        "title": "PlanSuscripcion"
+      },
+      "PlanUpdateRequest": {
+        "properties": {
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 240
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "precio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PrecioPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "descuento_anual_pct": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descuento Anual Pct"
+          },
+          "beneficios": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beneficios"
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 999.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          },
+          "visible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visible"
+          },
+          "habilitado": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Habilitado"
+          }
+        },
+        "type": "object",
+        "title": "PlanUpdateRequest"
+      },
+      "PrecioPlan": {
+        "properties": {
+          "monto": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monto",
+            "description": "Importe mensual en la moneda del plan; nulo si todavía no se definió"
+          },
+          "moneda": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Moneda",
+            "description": "Código ISO de la moneda",
+            "default": "ARS"
+          }
+        },
+        "type": "object",
+        "title": "PrecioPlan"
+      },
       "PrimitivaOperacionEnum": {
         "type": "string",
         "enum": [
@@ -10947,6 +11651,55 @@
           "date"
         ],
         "title": "ReiniciarPartidaRequest"
+      },
+      "RendimientoJuego": {
+        "properties": {
+          "completadas": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Completadas",
+            "description": "Días con desafío completado",
+            "default": 0
+          },
+          "mejor_tiempo_segundos": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mejor Tiempo Segundos",
+            "description": "Mejor tiempo registrado en segundos"
+          },
+          "promedio_tiempo_segundos": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Promedio Tiempo Segundos",
+            "description": "Tiempo promedio en segundos"
+          },
+          "ultima_fecha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultima Fecha",
+            "description": "Último día jugado (YYYY-MM-DD)"
+          }
+        },
+        "type": "object",
+        "title": "RendimientoJuego"
       },
       "ResultadoResponse": {
         "properties": {
@@ -12422,6 +13175,15 @@
     },
     {
       "name": "Economía, Vidas y Mini-Tienda"
+    },
+    {
+      "name": "Perfil"
+    },
+    {
+      "name": "Suscripciones"
+    },
+    {
+      "name": "Suscripciones - Administración"
     },
     {
       "name": "Narrativo - Flujo de Juego"

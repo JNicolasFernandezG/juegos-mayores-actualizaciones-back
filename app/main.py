@@ -22,6 +22,11 @@ from app.features.narrative.game.router import (
 from app.features.narrative.admin.router import router as narrative_admin_router
 from app.features.sso.router import router as sso_router
 from app.features.economy.router import router as economy_router
+from app.features.profile.router import router as profile_router
+from app.features.subscriptions.router import (
+    router as subscriptions_router,
+    admin_router as subscriptions_admin_router,
+)
 from app.scripts.seed_challenges import seed_wordle_challenges
 from app.scripts.seed_sopa_letras import seed_sopa_letras_challenges
 from app.scripts.seed_sudoku import seed_sudoku_challenges
@@ -161,6 +166,9 @@ openapi_tags = [
     {"name": "Desafíos Diarios - Administración de Crucigramas"},
     {"name": "Partidas e Intentos de Usuarios"},
     {"name": "Economía, Vidas y Mini-Tienda"},
+    {"name": "Perfil"},
+    {"name": "Suscripciones"},
+    {"name": "Suscripciones - Administración"},
     {"name": "Narrativo - Flujo de Juego"},
     {"name": "Narrativo - Administración"},
     {"name": "Narrativo - CRUD Universos"},
@@ -231,6 +239,9 @@ app.include_router(daily_challenges_router)
 app.include_router(crucigrama_admin_router)
 app.include_router(user_attempts_router)
 app.include_router(economy_router)
+app.include_router(profile_router)
+app.include_router(subscriptions_router)
+app.include_router(subscriptions_admin_router)
 app.include_router(narrative_router)
 app.include_router(narrative_v2_router)
 app.include_router(narrative_admin_router)

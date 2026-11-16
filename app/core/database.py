@@ -158,6 +158,9 @@ async def init_indexes():
             [("status", ASCENDING), ("created_at", ASCENDING)]
         )
 
+        # Planes de suscripción: el código es el identificador estable del catálogo
+        await db["planes_suscripcion"].create_index([("codigo", ASCENDING)], unique=True)
+
         # Pistas entregadas: una sola entrega/cobro por usuario, juego, fecha, dificultad y pista
         await db["user_hints"].create_index(
             [("user_id", ASCENDING), ("game_id", ASCENDING), ("date", ASCENDING),
