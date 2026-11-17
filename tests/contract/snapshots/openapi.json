@@ -2129,6 +2129,180 @@
         ]
       }
     },
+    "/api/admin/profile/tips": {
+      "get": {
+        "tags": [
+          "Perfil - Administración"
+        ],
+        "summary": "Listar los consejos del perfil, incluidos los inactivos (Solo Admin)",
+        "operationId": "endpoint_admin_consejos_api_admin_profile_tips_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConsejoAdmin"
+                  },
+                  "type": "array",
+                  "title": "Response Endpoint Admin Consejos Api Admin Profile Tips Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Perfil - Administración"
+        ],
+        "summary": "Crear un consejo del perfil (Solo Admin)",
+        "operationId": "endpoint_admin_crear_consejo_api_admin_profile_tips_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsejoUpsert"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsejoAdmin"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/profile/tips/{consejo_id}": {
+      "put": {
+        "tags": [
+          "Perfil - Administración"
+        ],
+        "summary": "Editar un consejo, su orden o su visibilidad (Solo Admin)",
+        "operationId": "endpoint_admin_actualizar_consejo_api_admin_profile_tips__consejo_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consejo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Consejo Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsejoUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsejoAdmin"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Perfil - Administración"
+        ],
+        "summary": "Eliminar un consejo del perfil (Solo Admin)",
+        "operationId": "endpoint_admin_eliminar_consejo_api_admin_profile_tips__consejo_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consejo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Consejo Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/subscription/plans": {
       "get": {
         "tags": [
@@ -7271,6 +7445,187 @@
         ],
         "title": "ConfigSuscripcionUpdate"
       },
+      "ConsejoAdmin": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Identificador estable del consejo"
+          },
+          "texto": {
+            "type": "string",
+            "title": "Texto",
+            "description": "Mensaje del consejo"
+          },
+          "fuente": {
+            "type": "string",
+            "title": "Fuente",
+            "description": "Referencia bibliográfica corta"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Enlace a la fuente"
+          },
+          "situacion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "eje_desequilibrado",
+                  "racha_reanudada",
+                  "mes_en_mejora"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Situacion",
+            "description": "Situación del progreso con la que se empareja el consejo; vacío significa que sirve para cualquier momento"
+          },
+          "orden": {
+            "type": "integer",
+            "title": "Orden",
+            "description": "Orden de aparición; menor primero",
+            "default": 0
+          },
+          "activo": {
+            "type": "boolean",
+            "title": "Activo",
+            "description": "Si se muestra en el perfil",
+            "default": true
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "Última edición (ISO 8601)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "texto",
+          "fuente",
+          "url"
+        ],
+        "title": "ConsejoAdmin"
+      },
+      "ConsejoPerfil": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Identificador estable del consejo"
+          },
+          "texto": {
+            "type": "string",
+            "title": "Texto",
+            "description": "Mensaje del consejo"
+          },
+          "fuente": {
+            "type": "string",
+            "title": "Fuente",
+            "description": "Referencia bibliográfica corta"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Enlace a la fuente"
+          },
+          "situacion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "eje_desequilibrado",
+                  "racha_reanudada",
+                  "mes_en_mejora"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Situacion",
+            "description": "Situación del progreso con la que se empareja el consejo; vacío significa que sirve para cualquier momento"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "texto",
+          "fuente",
+          "url"
+        ],
+        "title": "ConsejoPerfil"
+      },
+      "ConsejoUpsert": {
+        "properties": {
+          "texto": {
+            "type": "string",
+            "maxLength": 280,
+            "minLength": 1,
+            "title": "Texto"
+          },
+          "fuente": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Fuente"
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 8,
+            "pattern": "^https?://\\S+$",
+            "title": "Url"
+          },
+          "orden": {
+            "type": "integer",
+            "maximum": 9999.0,
+            "minimum": 0.0,
+            "title": "Orden",
+            "default": 0
+          },
+          "activo": {
+            "type": "boolean",
+            "title": "Activo",
+            "default": true
+          },
+          "situacion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "eje_desequilibrado",
+                  "racha_reanudada",
+                  "mes_en_mejora"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Situacion",
+            "description": "Situación del progreso a la que responde; vacío = consejo general"
+          }
+        },
+        "type": "object",
+        "required": [
+          "texto",
+          "fuente",
+          "url"
+        ],
+        "title": "ConsejoUpsert"
+      },
       "ConsumeLifeRequest": {
         "properties": {
           "game_id": {
@@ -10369,6 +10724,31 @@
         "type": "object",
         "title": "MedallasBloque"
       },
+      "MedallasMes": {
+        "properties": {
+          "mes": {
+            "type": "string",
+            "title": "Mes",
+            "description": "Mes en formato YYYY-MM"
+          },
+          "juegos": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Juegos",
+            "description": "Conteo por juego: {juego: {S,A,B,C,F}}"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mes"
+        ],
+        "title": "MedallasMes"
+      },
       "ModificadorProbabilidadSchema": {
         "properties": {
           "condicion": {
@@ -10906,6 +11286,14 @@
           "medallas": {
             "$ref": "#/components/schemas/MedallasBloque"
           },
+          "meses": {
+            "items": {
+              "$ref": "#/components/schemas/MedallasMes"
+            },
+            "type": "array",
+            "title": "Meses",
+            "description": "Conteos por mes de los últimos doce, incluido el mes actual con ceros"
+          },
           "rendimiento": {
             "additionalProperties": {
               "$ref": "#/components/schemas/RendimientoJuego"
@@ -10921,6 +11309,22 @@
             "type": "array",
             "title": "Actividad",
             "description": "Días con ingreso registrado dentro de la ventana, ordenados"
+          },
+          "completadas_por_dia": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Completadas Por Dia",
+            "description": "Desafíos completados por día dentro de la ventana, incluido el narrativo"
+          },
+          "consejos": {
+            "items": {
+              "$ref": "#/components/schemas/ConsejoPerfil"
+            },
+            "type": "array",
+            "title": "Consejos",
+            "description": "Consejos activos del perfil, ordenados"
           }
         },
         "type": "object",
@@ -13178,6 +13582,9 @@
     },
     {
       "name": "Perfil"
+    },
+    {
+      "name": "Perfil - Administración"
     },
     {
       "name": "Suscripciones"
