@@ -208,3 +208,19 @@ def freeze_today(monkeypatch):
         return fixed.date()
 
     return _freeze
+
+
+@pytest.fixture(autouse=True)
+def _sin_puntos_diarios_de_racha(request, monkeypatch):
+    """Aísla los saldos de los tests de partidas de los puntos por ingreso diario.
+
+    Los tests que verifican esos puntos usan ``@pytest.mark.puntos_diarios`` para
+    ejecutar la acreditación real.
+    """
+    if request.node.get_closest_marker("puntos_diarios"):
+        return
+
+    async def _noop(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("app.shared.streak._acreditar_puntos_del_dia", _noop)

@@ -161,6 +161,11 @@ class UserEconomyResponse(BaseModel):
     racha: int = Field(0, description="Días consecutivos en que el usuario abrió la aplicación con sesión válida")
     racha_ultima_fecha: Optional[str] = Field(None, description="Último día con ingreso registrado en formato YYYY-MM-DD")
     racha_hoy_ingresada: bool = Field(False, description="Indica si el usuario ya abrió la aplicación hoy (ART)")
+    racha_puntos_dia: int = Field(0, description="Puntos diarios que entrega el día de racha en que se encuentra el usuario")
+    racha_tramos_diarios: List[Dict[str, int]] = Field(
+        default_factory=list,
+        description="Tramos de puntos diarios por racha: [{'dias': 1, 'puntos': 40}, ...]",
+    )
     suscripcion: str = Field("basica", description="'basica' | 'premium'")
     dias_desbloqueados: List[str] = Field(default_factory=list, description="Días históricos desbloqueados ej: ['crucigrama:2026-10-15']")
     costo_pista_puntos: int = Field(20, description="Costo en puntos para solicitar una pista")

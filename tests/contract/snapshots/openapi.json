@@ -13366,6 +13366,23 @@
             "description": "Indica si el usuario ya abrió la aplicación hoy (ART)",
             "default": false
           },
+          "racha_puntos_dia": {
+            "type": "integer",
+            "title": "Racha Puntos Dia",
+            "description": "Puntos diarios que entrega el día de racha en que se encuentra el usuario",
+            "default": 0
+          },
+          "racha_tramos_diarios": {
+            "items": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Racha Tramos Diarios",
+            "description": "Tramos de puntos diarios por racha: [{'dias': 1, 'puntos': 40}, ...]"
+          },
           "suscripcion": {
             "type": "string",
             "title": "Suscripcion",
