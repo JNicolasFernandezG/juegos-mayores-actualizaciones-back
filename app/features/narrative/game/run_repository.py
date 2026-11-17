@@ -10,14 +10,12 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Optional
 
 from fastapi import HTTPException
-from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from app.core.database import get_database
 from app.features.narrative.constants import (
     COLL_RUNS,
     COLL_RUNS_ARCHIVE,
-    PROTOCOLO_V3,
 )
 
 CONFLICTO_DETALLE = (
@@ -32,18 +30,6 @@ class RunAlreadyExistsError(Exception):
     def __init__(self, run_id: str):
         super().__init__(f"La partida '{run_id}' ya existe.")
         self.run_id = run_id
-
-
-def asegurar_run_legacy(run: Dict[str, Any]) -> None:
-    """Una run del protocolo v3 no admite mutaciones por las rutas legacy."""
-    if run.get("protocolo") == PROTOCOLO_V3:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "La partida usa el protocolo de comandos v3; "
-                "no admite mutaciones legacy."
-            ),
-        )
 
 
 def _filtro_version(run: Dict[str, Any]) -> Dict[str, Any]:
@@ -75,7 +61,6 @@ async def crear_run(run: Dict[str, Any]) -> None:
 
 async def archivar_run(run: Dict[str, Any], expected_version: Optional[int] = None) -> None:
     """Mueve una generación a archivo y solo entonces libera su slot activo."""
-    asegurar_run_legacy(run)
     version = int(run.get("version") or 0)
     if expected_version is not None and version != expected_version:
         raise HTTPException(status_code=409, detail=CONFLICTO_DETALLE)
@@ -96,7 +81,6 @@ async def persistir_run(
     campos: Optional[Iterable[str]] = None
 ) -> None:
     """Guarda la partida y sube la versión; 409 si otra escritura se adelantó."""
-    asegurar_run_legacy(run)
     db = get_database()
     version_actual = int(run.get("version") or 0)
     cambios = _proyectar(run, campos)
@@ -123,42 +107,3 @@ async def obtener_run_por_id(run_id: str) -> Optional[Dict[str, Any]]:
     if run is not None:
         return run
     return await get_database()[COLL_RUNS_ARCHIVE].find_one({"_id": run_id})
-
-
-async def confirmar_comando(
-    run_id: str,
-    *,
-    generation: int,
-    expected_version: int,
-    cambios: Dict[str, Any],
-    recibo: Dict[str, Any],
-    liquidacion: Optional[Dict[str, Any]] = None,
-) -> Optional[Dict[str, Any]]:
-    """Confirma estado + recibo + obligación en una sola escritura atómica.
-
-    Devuelve el documento posterior si esta petición ganó el CAS; ``None`` si
-    otra escritura se adelantó (el llamador debe recuperar el recibo ganador).
-    """
-    db = get_database()
-    campos = {
-        clave: valor
-        for clave, valor in cambios.items()
-        if clave not in ("_id", "version", "generation", "recibos", "liquidacion")
-    }
-    update: Dict[str, Any] = {
-        "$set": {**campos, "version": expected_version + 1},
-        "$push": {"recibos": recibo},
-    }
-    if liquidacion is not None:
-        update["$set"]["liquidacion"] = liquidacion
-
-    return await db[COLL_RUNS].find_one_and_update(
-        {
-            "_id": run_id,
-            "protocolo": PROTOCOLO_V3,
-            "generation": generation,
-            "version": expected_version,
-        },
-        update,
-        return_document=ReturnDocument.AFTER,
-    )

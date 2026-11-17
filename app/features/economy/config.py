@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 from pydantic import ValidationError
 
 from app.core.database import get_database
+from app.shared.economy_points import DEFAULT_PUNTOS_POR_CALIFICACION
 from app.features.economy.schemas import (
     DEFAULT_BONUS_RACHA,
     DEFAULT_ESCALAS_TIEMPO,
@@ -25,13 +26,7 @@ DEFAULT_ECONOMY_CONFIG: Dict[str, Any] = {
     "vidas_iniciales": 5,
     "costo_desbloqueo_dia_puntos": 100,
     "costo_pista_puntos": 20,
-    "puntos_por_calificacion": {
-        "S": 100,
-        "A": 90,
-        "B": 75,
-        "C": 50,
-        "F": 0,
-    },
+    "puntos_por_calificacion": dict(DEFAULT_PUNTOS_POR_CALIFICACION),
     "guest_migration_max_points": 1000,
     "bonus_racha": DEFAULT_BONUS_RACHA,
     "escalas_tiempo_por_juego": DEFAULT_ESCALAS_TIEMPO,

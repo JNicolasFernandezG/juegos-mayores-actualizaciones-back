@@ -123,7 +123,7 @@ class ImpactoAfinidadSchema(BaseModel):
     personaje_id: str = Field(..., description="ID del personaje de corte afectado (ej: pj_canciller_elena)")
     delta: int = Field(..., description="Variación entera de afinidad (+15, -10)")
 
-class ResultadoCreateRequest(BaseModel):
+class ResultadoResponse(BaseModel):
     id: str = Field(..., alias="_id")
     universo_id: str
     titulo: str
@@ -135,41 +135,14 @@ class ResultadoCreateRequest(BaseModel):
 
     model_config = {"populate_by_name": True}
 
-class ResultadoResponse(ResultadoCreateRequest):
-    pass
-
 # ============================================================================
-# 5. EVENTOS MENSUALES (narrative_events)
+# 5. MODIFICADORES DE PROBABILIDAD (usados por desenlaces V2)
 # ============================================================================
 
 class ModificadorProbabilidadSchema(BaseModel):
     condicion: CondicionSchema
     delta_peso: float
     explicacion: Optional[str] = None
-
-class ResultadoPosibleSchema(BaseModel):
-    resultado_id: str
-    peso_base: float = 50.0
-    modificadores_probabilidad: List[ModificadorProbabilidadSchema] = []
-
-class OpcionEventoSchema(BaseModel):
-    id: str
-    texto: str
-    es_secreta: bool = False
-    condiciones: List[CondicionSchema] = []
-    resultados_posibles: List[ResultadoPosibleSchema]
-
-class EventoCreateRequest(BaseModel):
-    id: str = Field(..., alias="_id")
-    universo_id: str
-    titulo: str
-    descripcion: str
-    imagen: str = "/assets/narrative/eventos/default.webp"
-    tags_tematicos: List[str] = []
-    peso_base: float = 100.0
-    opciones: List[OpcionEventoSchema]
-
-    model_config = {"populate_by_name": True}
 
 # ============================================================================
 # 6. CONVERSACIONES DE CORTE (narrative_conversations)
@@ -189,7 +162,7 @@ class ConversacionDecisionSchema(BaseModel):
 class ConversacionRequisitoSchema(BaseModel):
     personajeId: str
 
-class ConversacionCreateRequest(BaseModel):
+class ConversacionResponse(BaseModel):
     id: str = Field(..., alias="_id")
     universo_id: str
     titulo: str
@@ -199,9 +172,6 @@ class ConversacionCreateRequest(BaseModel):
     decisiones: List[ConversacionDecisionSchema]
 
     model_config = {"populate_by_name": True}
-
-class ConversacionResponse(ConversacionCreateRequest):
-    pass
 
 # ============================================================================
 # 7. FINALIZACIONES Y DERROTAS (narrative_endings)

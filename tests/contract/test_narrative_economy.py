@@ -1,5 +1,7 @@
 """Acreditación de puntos del narrativo para cuentas e invitados (D4/D6)."""
 
+from datetime import datetime
+
 import pytest
 
 from app.features.narrative.constants import COLL_RUNS, COLL_USER_ATTEMPTS
@@ -47,6 +49,7 @@ async def test_cuenta_acredita_puntos_una_sola_vez(test_db, cleanup, seeded_user
     assert intento["status"] == "completed"
     assert intento["grade"] == "S"
     assert intento["difficulty"] == "normal"
+    assert isinstance(intento.get("completed_at"), datetime)
 
     asiento = await test_db["economy_ledger"].find_one(
         {"_id": f"attempt:{user_id}:narrativo:{DATE}:normal"}
@@ -77,6 +80,7 @@ async def test_derrota_no_acredita_ni_consume_clave(test_db, cleanup, seeded_use
     assert intento["status"] == "failed"
     assert intento["score"] == 0
     assert intento["stars"] == 0
+    assert "completed_at" not in intento
 
 
 @pytest.mark.asyncio

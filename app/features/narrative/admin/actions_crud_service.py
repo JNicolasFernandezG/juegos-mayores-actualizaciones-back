@@ -1,157 +1,31 @@
+"""
+actions_crud_service.py
+Servicios CRUD con OCC para el catálogo de acciones y frecuencias del motor narrativo.
+"""
+
 import logging
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
 from app.core.database import get_database
-from app.features.narrative.constants import (
-    COLL_ACTIONS,
-    COLL_FREQUENCIES,
-    COLL_CARDS,
-    COLL_CHARACTERS,
+from app.features.narrative.admin.actions_catalog_meta import (
+    CATALOGO_PRIMITIVAS,
+    EVENTOS_MOTOR,
+    _frecuencias_default,
+    obtener_usos_accion,
+    obtener_usos_frecuencia,
 )
+from app.features.narrative.constants import COLL_ACTIONS, COLL_FREQUENCIES
 from app.features.narrative.schemas.rules_schemas import (
     AccionCatalogoCreateRequest,
-    AccionCatalogoUpdateRequest,
     AccionCatalogoResponse,
+    AccionCatalogoUpdateRequest,
     FrecuenciasUniversoDocument,
     FrecuenciasUniversoUpdateRequest,
-    PrimitivaOperacionEnum,
 )
 
 logger = logging.getLogger(__name__)
-
-# Catálogo canónico de primitivas soportadas por el motor
-CATALOGO_PRIMITIVAS: List[Dict[str, Any]] = [
-    {
-        "primitiva": PrimitivaOperacionEnum.MODIFICAR_RECURSO.value,
-        "nombre": "Modificar recurso",
-        "descripcion": "Aumenta o disminuye el valor de un recurso numérico del universo (positivo suma, negativo resta).",
-        "parametros_requeridos": ["clave", "valor", "tipo_calculo"],
-        "soporta_calculo": ["fijo", "porcentual"],
-        "permitido_en": ["carta", "personaje", "nodo"],
-    },
-    {
-        "primitiva": PrimitivaOperacionEnum.MODIFICAR_AFINIDAD.value,
-        "nombre": "Modificar afinidad",
-        "descripcion": "Modifica la afinidad (0 a 100) con el personaje portador o uno específico.",
-        "parametros_requeridos": ["destino", "valor"],
-        "opciones_destino": ["portador", "personaje"],
-        "permitido_en": ["carta", "personaje", "nodo"],
-    },
-    {
-        "primitiva": PrimitivaOperacionEnum.OTORGAR_TAG.value,
-        "nombre": "Otorgar tag pasivo",
-        "descripcion": "Otorga un tag pasivo permanente al estado vivo de la partida.",
-        "parametros_requeridos": ["tag"],
-        "permitido_en": ["carta", "personaje", "nodo"],
-    },
-    {
-        "primitiva": PrimitivaOperacionEnum.REMOVER_TAG.value,
-        "nombre": "Remover tag",
-        "descripcion": "Remueve un tag activo del estado de la partida.",
-        "parametros_requeridos": ["tag"],
-        "permitido_en": ["carta", "personaje", "nodo"],
-    },
-    {
-        "primitiva": PrimitivaOperacionEnum.AMORTIGUAR_DANIO.value,
-        "nombre": "Amortiguar daño de recurso",
-        "descripcion": "Registra un modificador pasivo que reduce porcentualmente las pérdidas de un recurso.",
-        "parametros_requeridos": ["clave", "valor"],
-        "permitido_en": ["carta", "personaje", "nodo"],
-    },
-    {
-        "primitiva": PrimitivaOperacionEnum.MUTAR_ESTADO_ENTIDAD.value,
-        "nombre": "Mutar estado de entidad (Tag o Personaje)",
-        "descripcion": "Agrega o quita un tag del estado de la partida, o recluta/retira un personaje de la corte. Al retirar un personaje se eliminan sus modificadores pasivos y los tags que otorgó.",
-        "parametros_requeridos": ["entidad", "operacion", "id_entidad"],
-        "opciones_entidad": ["tag", "personaje"],
-        "opciones_operacion": ["alta", "baja"],
-        "permitido_en": ["carta", "personaje", "nodo"],
-    },
-    {
-        "primitiva": PrimitivaOperacionEnum.MUTAR_ESTADO.value,
-        "nombre": "Mutar estado genérico",
-        "descripcion": "Mutación matemática sobre recursos, límites dinámicos, afinidades o variables con soporte aditivo, multiplicativo, divisorio, porcentual o fijado.",
-        "parametros_requeridos": ["ruta", "operacion_matematica", "valor"],
-        "soporta_operaciones": ["sumar", "restar", "multiplicar", "dividir", "porcentual", "fijar"],
-        "ejemplos_rutas": [
-            "recursos.<clave>",
-            "limites.<clave>.max",
-            "limites.<clave>.min",
-            "afinidad.<target>",
-            "variables.<clave>"
-        ],
-        "permitido_en": ["carta", "personaje", "nodo"],
-    },
-]
-
-# Eventos que el motor realmente despacha; el panel sólo ofrece lo ejecutable.
-EVENTOS_MOTOR: List[Dict[str, Any]] = [
-    {
-        "evento_motor": "al_obtener",
-        "nombre": "Al obtener",
-        "descripcion": "Se ejecuta de inmediato cuando la carta entra en mano o el personaje es reclutado.",
-        "soporta_intervalo": False,
-    },
-    {
-        "evento_motor": "inicio_mes",
-        "nombre": "Inicio de cada mes",
-        "descripcion": "Se evalúa al inicio de cada mes. Puede configurarse periodicidad (ej. cada 1, 2 meses) relativa a la adquisición.",
-        "soporta_intervalo": True,
-        "opciones_conteo": ["adquisicion", "inicio_partida"],
-    },
-    {
-        "evento_motor": "al_desenlace",
-        "nombre": "Al cerrar el desenlace",
-        "descripcion": "Se ejecuta sobre los efectos declarados en el nodo final del grafo, appena se aplican sus impactos.",
-        "soporta_intervalo": False,
-    },
-    {
-        "evento_motor": "en_evento_positivo",
-        "nombre": "Tras desenlace positivo",
-        "descripcion": "Reacción de cartas y corte cuando el desenlace del grafo se declara positivo.",
-        "soporta_intervalo": False,
-    },
-    {
-        "evento_motor": "en_evento_negativo",
-        "nombre": "Tras desenlace negativo",
-        "descripcion": "Reacción de cartas y corte cuando el desenlace del grafo se declara negativo.",
-        "soporta_intervalo": False,
-    },
-]
-
-
-def _frecuencias_default(universo_id: str) -> List[Dict[str, Any]]:
-    return [
-        {
-            "id": "al_obtener",
-            "nombre": "Al obtener",
-            "evento_motor": "al_obtener",
-            "cada": 1,
-            "desfase": 0,
-            "conteo_desde": "adquisicion",
-            "activo": True,
-        },
-        {
-            "id": "mensual",
-            "nombre": "Cada mes",
-            "evento_motor": "inicio_mes",
-            "cada": 1,
-            "desfase": 0,
-            "conteo_desde": "inicio_partida",
-            "activo": True,
-        },
-        {
-            "id": "cada_2_meses",
-            "nombre": "Cada 2 meses desde adquisición",
-            "evento_motor": "inicio_mes",
-            "cada": 2,
-            "desfase": 0,
-            "conteo_desde": "adquisicion",
-            "activo": True,
-        },
-    ]
 
 
 async def crear_accion(payload: AccionCatalogoCreateRequest) -> AccionCatalogoResponse:
@@ -186,21 +60,17 @@ async def crear_accion(payload: AccionCatalogoCreateRequest) -> AccionCatalogoRe
 
 async def listar_acciones(universo_id: Optional[str] = None) -> List[AccionCatalogoResponse]:
     db = get_database()
-    col = db[COLL_ACTIONS]
-    filtro: Dict[str, Any] = {}
-    if universo_id:
-        filtro["universo_id"] = universo_id
-    docs = await col.find(filtro).sort("nombre", 1).to_list(None)
+    filtro: Dict[str, Any] = {"universo_id": universo_id} if universo_id else {}
+    docs = await db[COLL_ACTIONS].find(filtro).sort("nombre", 1).to_list(None)
     return [AccionCatalogoResponse(**d) for d in docs]
 
 
 async def obtener_accion_por_id(accion_id: str, universo_id: Optional[str] = None) -> AccionCatalogoResponse:
     db = get_database()
-    col = db[COLL_ACTIONS]
     filtro: Dict[str, Any] = {"_id": accion_id}
     if universo_id:
         filtro["universo_id"] = universo_id
-    doc = await col.find_one(filtro)
+    doc = await db[COLL_ACTIONS].find_one(filtro)
     if not doc:
         raise HTTPException(status_code=404, detail=f"Acción '{accion_id}' no encontrada.")
     return AccionCatalogoResponse(**doc)
@@ -221,7 +91,6 @@ async def actualizar_accion(
     if not doc:
         raise HTTPException(status_code=404, detail=f"Acción '{accion_id}' no encontrada.")
 
-    # Control de concurrencia optimista (OCC)
     if payload.expected_version is not None and doc.get("version", 1) != payload.expected_version:
         raise HTTPException(
             status_code=409,
@@ -248,28 +117,6 @@ async def actualizar_accion(
     return AccionCatalogoResponse(**doc)
 
 
-async def obtener_usos_accion(accion_id: str) -> Dict[str, Any]:
-    db = get_database()
-    col_cartas = db[COLL_CARDS]
-    col_personajes = db[COLL_CHARACTERS]
-
-    filtro = {
-        "$or": [
-            {"efectos.acciones.accion_id": accion_id},
-            {"efectos.accion.tipo": accion_id},
-        ]
-    }
-    cartas = await col_cartas.find(filtro, {"_id": 1, "nombre": 1, "universo_id": 1}).to_list(None)
-    personajes = await col_personajes.find(filtro, {"_id": 1, "nombre": 1, "universo_id": 1}).to_list(None)
-
-    return {
-        "accion_id": accion_id,
-        "total_usos": len(cartas) + len(personajes),
-        "cartas": [{"id": str(c["_id"]), "nombre": c.get("nombre", str(c["_id"])), "universo_id": c.get("universo_id")} for c in cartas],
-        "personajes": [{"id": str(p["_id"]), "nombre": p.get("nombre", str(p["_id"])), "universo_id": p.get("universo_id")} for p in personajes],
-    }
-
-
 async def eliminar_accion(accion_id: str, universo_id: Optional[str] = None) -> Dict[str, Any]:
     db = get_database()
     col = db[COLL_ACTIONS]
@@ -281,7 +128,6 @@ async def eliminar_accion(accion_id: str, universo_id: Optional[str] = None) -> 
     if not doc:
         raise HTTPException(status_code=404, detail=f"Acción '{accion_id}' no encontrada.")
 
-    # Validar integridad referencial: bloqueo si está en uso
     usos = await obtener_usos_accion(accion_id)
     if usos["total_usos"] > 0:
         raise HTTPException(
@@ -309,41 +155,14 @@ async def obtener_frecuencias_universo(universo_id: str) -> FrecuenciasUniversoD
     return FrecuenciasUniversoDocument(**doc)
 
 
-async def actualizar_frecuencias_universo(
-    universo_id: str,
-    payload: FrecuenciasUniversoUpdateRequest,
-) -> FrecuenciasUniversoDocument:
-    db = get_database()
-    col = db[COLL_FREQUENCIES]
-    doc_id = f"frecuencias_{universo_id}"
-    doc = await col.find_one({"_id": doc_id})
-
-    if not doc:
-        doc = {
-            "_id": doc_id,
-            "universo_id": universo_id,
-            "version": 0,
-            "items": [],
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
-
-    # OCC
-    if payload.expected_version is not None and doc.get("version", 1) != payload.expected_version:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Conflicto de concurrencia: versión esperada {payload.expected_version} difiere de la actual {doc.get('version', 1)}.",
-        )
-
-    # Validar unicidad de IDs y que cada frecuencia apunte a un evento que el motor emite
+def _validar_items_frecuencias(items: List[Any]) -> List[Dict[str, Any]]:
     eventos_validos = {e["evento_motor"] for e in EVENTOS_MOTOR}
     conteos_validos = {
-        conteo
-        for evento in EVENTOS_MOTOR
-        for conteo in evento.get("opciones_conteo", [])
+        conteo for evento in EVENTOS_MOTOR for conteo in evento.get("opciones_conteo", [])
     }
     vistos = set()
-    items_dict = []
-    for item in payload.items:
+    items_dict: List[Dict[str, Any]] = []
+    for item in items:
         if item.id in vistos:
             raise HTTPException(status_code=422, detail=f"ID de frecuencia duplicado en el catálogo: '{item.id}'.")
         vistos.add(item.id)
@@ -366,7 +185,34 @@ async def actualizar_frecuencias_universo(
                 detail=f"La frecuencia '{item.id}' cuenta desde '{item.conteo_desde}', opción no soportada.",
             )
         items_dict.append(item.model_dump())
+    return items_dict
 
+
+async def actualizar_frecuencias_universo(
+    universo_id: str,
+    payload: FrecuenciasUniversoUpdateRequest,
+) -> FrecuenciasUniversoDocument:
+    db = get_database()
+    col = db[COLL_FREQUENCIES]
+    doc_id = f"frecuencias_{universo_id}"
+    doc = await col.find_one({"_id": doc_id})
+
+    if not doc:
+        doc = {
+            "_id": doc_id,
+            "universo_id": universo_id,
+            "version": 0,
+            "items": [],
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    if payload.expected_version is not None and doc.get("version", 1) != payload.expected_version:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Conflicto de concurrencia: versión esperada {payload.expected_version} difiere de la actual {doc.get('version', 1)}.",
+        )
+
+    items_dict = _validar_items_frecuencias(payload.items)
     updates = {
         "universo_id": universo_id,
         "version": doc.get("version", 1) + 1,
@@ -378,26 +224,17 @@ async def actualizar_frecuencias_universo(
     return FrecuenciasUniversoDocument(**doc)
 
 
-async def obtener_usos_frecuencia(frecuencia_id: str, universo_id: Optional[str] = None) -> Dict[str, Any]:
-    db = get_database()
-    col_cartas = db[COLL_CARDS]
-    col_personajes = db[COLL_CHARACTERS]
-
-    filtro: Dict[str, Any] = {
-        "$or": [
-            {"efectos.frecuencia_id": frecuencia_id},
-            {"efectos.disparador": frecuencia_id},
-        ]
-    }
-    if universo_id:
-        filtro["universo_id"] = universo_id
-
-    cartas = await col_cartas.find(filtro, {"_id": 1, "nombre": 1, "universo_id": 1}).to_list(None)
-    personajes = await col_personajes.find(filtro, {"_id": 1, "nombre": 1, "universo_id": 1}).to_list(None)
-
-    return {
-        "frecuencia_id": frecuencia_id,
-        "total_usos": len(cartas) + len(personajes),
-        "cartas": [{"id": str(c["_id"]), "nombre": c.get("nombre", str(c["_id"])), "universo_id": c.get("universo_id")} for c in cartas],
-        "personajes": [{"id": str(p["_id"]), "nombre": p.get("nombre", str(p["_id"])), "universo_id": p.get("universo_id")} for p in personajes],
-    }
+__all__ = [
+    "CATALOGO_PRIMITIVAS",
+    "EVENTOS_MOTOR",
+    "_frecuencias_default",
+    "obtener_usos_accion",
+    "obtener_usos_frecuencia",
+    "crear_accion",
+    "listar_acciones",
+    "obtener_accion_por_id",
+    "actualizar_accion",
+    "eliminar_accion",
+    "obtener_frecuencias_universo",
+    "actualizar_frecuencias_universo",
+]

@@ -1,6 +1,6 @@
 import httpx
 from datetime import datetime, date, timezone
-from typing import Optional
+from typing import Dict, Optional
 from fastapi import HTTPException, status
 from app.core.database import get_database
 from app.core.security import (
@@ -10,6 +10,7 @@ from app.core.security import (
     generar_guest_id,
 )
 from app.core.config import settings
+from app.features.auth.central_client import post_to_auth_service
 from app.features.auth.schemas import (
     LoginSistemasRequest, LoginCodigoRequest, VerificarTokenRequest,
     RegisterRequest
@@ -69,24 +70,16 @@ async def sync_local_user_from_auth_service(remote_user: dict) -> dict:
     db = get_database()
     user_id = int(remote_user["id"])
     email = remote_user.get("email", "").lower().strip()
-    name = remote_user.get("name") or remote_user.get("nombre") or ""
-    codigo_acceso = remote_user.get("codigoAcceso") or remote_user.get("codigo_acceso") or ""
-    tipo_usuario = int(remote_user.get("tipoUsuario") or remote_user.get("tipo_usuario") or 1)
-    black = bool(remote_user.get("black", False))
-    activo = bool(remote_user.get("activo", True))
-    estado_id = int(remote_user.get("estadoId") or remote_user.get("estado_id") or 2)
-    estado_codigo = remote_user.get("estadoCodigo") or remote_user.get("estado_codigo") or "ACTIVO"
-
     update_fields = {
         "id": user_id,
-        "name": name,
+        "name": remote_user.get("name") or remote_user.get("nombre") or "",
         "email": email,
-        "codigo_acceso": codigo_acceso,
-        "tipo_usuario": tipo_usuario,
-        "black": black,
-        "activo": activo,
-        "estado_id": estado_id,
-        "estado_codigo": estado_codigo,
+        "codigo_acceso": remote_user.get("codigoAcceso") or remote_user.get("codigo_acceso") or "",
+        "tipo_usuario": int(remote_user.get("tipoUsuario") or remote_user.get("tipo_usuario") or 1),
+        "black": bool(remote_user.get("black", False)),
+        "activo": bool(remote_user.get("activo", True)),
+        "estado_id": int(remote_user.get("estadoId") or remote_user.get("estado_id") or 2),
+        "estado_codigo": remote_user.get("estadoCodigo") or remote_user.get("estado_codigo") or "ACTIVO",
     }
 
     if email:
@@ -108,59 +101,39 @@ async def sync_local_user_from_auth_service(remote_user: dict) -> dict:
     local_user = await db["usuarios"].find_one({"id": user_id})
     return local_user or {}
 
+
 async def login_sistemas(req: LoginSistemasRequest):
     """
     Autentica al operador de sistemas delegando la verificación de credenciales
     al microservicio central de Autenticación.
     """
-    auth_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/auth/login"
-    payload = {
-        "email": req.email.lower().strip(),
-        "password": req.password,
-        "servicio": settings.SERVICE_KEY
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(auth_url, json=payload)
-    except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Servicio de autenticación central no disponible ({settings.AUTH_SERVICE_URL}): {str(exc)}"
-        )
-
-    if resp.status_code != 200:
-        error_detail = "Credenciales incorrectas"
-        try:
-            err_data = resp.json()
-            if "detail" in err_data:
-                error_detail = err_data["detail"]
-        except Exception:
-            pass
-        raise HTTPException(
-            status_code=resp.status_code,
-            detail=error_detail
-        )
-
-    data = resp.json()
-    remote_user = data.get("user") or {}
-    token = data.get("token")
-
+    data = await post_to_auth_service(
+        "/auth/login",
+        {
+            "email": req.email.lower().strip(),
+            "password": req.password,
+            "servicio": settings.SERVICE_KEY,
+        },
+        default_error="Credenciales incorrectas",
+        client_cls=httpx.AsyncClient,
+        base_url=settings.AUTH_SERVICE_URL,
+    )
+    remote_user = data.get("user") if isinstance(data.get("user"), dict) else {}
     tipo_usuario = int(remote_user.get("tipoUsuario") or remote_user.get("tipo_usuario") or 1)
     if tipo_usuario != 2:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acceso denegado: Se requieren permisos de Operador de Sistemas"
+            detail="Acceso denegado: Se requieren permisos de Operador de Sistemas",
         )
 
     local_user = await sync_local_user_from_auth_service(remote_user)
-
     return {
         "success": True,
         "message": "Inicio de sesión exitoso",
-        "token": token,
-        "user": format_user_response(local_user)
+        "token": data.get("token"),
+        "user": format_user_response(local_user),
     }
+
 
 async def login_codigo(req: LoginCodigoRequest):
     """
@@ -172,161 +145,101 @@ async def login_codigo(req: LoginCodigoRequest):
     if not email_clean:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El correo electrónico es obligatorio"
+            detail="El correo electrónico es obligatorio",
         )
     if not code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La clave de 6 dígitos es obligatoria"
+            detail="La clave de 6 dígitos es obligatoria",
         )
 
-    auth_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/auth/validar-acceso"
-    payload = {
-        "email": email_clean,
-        "codigoAcceso": code,
-        "servicio": settings.SERVICE_KEY
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(auth_url, json=payload)
-    except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Servicio de autenticación central no disponible ({settings.AUTH_SERVICE_URL}): {str(exc)}"
-        )
-
-    if resp.status_code != 200:
-        error_detail = "Correo o clave de 6 dígitos incorrecta"
-        try:
-            err_data = resp.json()
-            if "detail" in err_data:
-                error_detail = err_data["detail"]
-        except Exception:
-            pass
-        raise HTTPException(
-            status_code=resp.status_code,
-            detail=error_detail
-        )
-
-    data = resp.json()
+    data = await post_to_auth_service(
+        "/auth/validar-acceso",
+        {
+            "email": email_clean,
+            "codigoAcceso": code,
+            "servicio": settings.SERVICE_KEY,
+        },
+        default_error="Correo o clave de 6 dígitos incorrecta",
+        client_cls=httpx.AsyncClient,
+        base_url=settings.AUTH_SERVICE_URL,
+    )
     if not data.get("allowed"):
         message = data.get("message") or "Acceso denegado: correo o clave incorrecta."
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN if data.get("success") else status.HTTP_401_UNAUTHORIZED,
-            detail=message
+            detail=message,
         )
 
-    remote_user = data.get("user") or {}
-    token = data.get("token")
-
+    remote_user = data.get("user") if isinstance(data.get("user"), dict) else {}
     local_user = await sync_local_user_from_auth_service(remote_user)
-
     return {
         "success": True,
         "message": "Acceso concedido exitosamente.",
-        "token": token,
-        "user": format_user_response(local_user)
+        "token": data.get("token"),
+        "user": format_user_response(local_user),
     }
+
 
 async def verificar_token(req: VerificarTokenRequest):
     """
     Verifica la validez de un token JWT contra el microservicio central de Autenticación.
     """
-    auth_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/auth/validar-acceso"
-    payload = {
-        "token": req.token,
-        "servicio": settings.SERVICE_KEY
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(auth_url, json=payload)
-    except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Servicio de autenticación central no disponible ({settings.AUTH_SERVICE_URL}): {str(exc)}"
-        )
-
-    if resp.status_code != 200:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido o expirado"
-        )
-
-    data = resp.json()
+    data = await post_to_auth_service(
+        "/auth/validar-acceso",
+        {"token": req.token, "servicio": settings.SERVICE_KEY},
+        default_error="Token inválido o expirado",
+        client_cls=httpx.AsyncClient,
+        fixed_error_status=status.HTTP_401_UNAUTHORIZED,
+        base_url=settings.AUTH_SERVICE_URL,
+    )
     if not data.get("allowed"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=data.get("message") or "Token inválido o no autorizado para el servicio."
+            detail=data.get("message") or "Token inválido o no autorizado para el servicio.",
         )
 
-    remote_user = data.get("user") or {}
+    remote_user = data.get("user") if isinstance(data.get("user"), dict) else {}
     local_user = await sync_local_user_from_auth_service(remote_user)
-
     return {
         "success": True,
         "valid": True,
         "token": data.get("token") or req.token,
         "message": "Token verificado con éxito",
-        "user": format_user_response(local_user)
+        "user": format_user_response(local_user),
     }
+
 
 async def register_usuario(req: RegisterRequest, is_admin_creation: bool = False):
     """
     Registra un nuevo usuario delegando la creación y generación de PIN
     al microservicio central de Autenticación.
     """
-    auth_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/auth/register"
-    tipo_usuario = req.tipoUsuario if (is_admin_creation and req.tipoUsuario is not None) else 1
-    black = bool(req.black) if (is_admin_creation and req.black is not None) else False
-    activo = bool(req.activo) if (is_admin_creation and req.activo is not None) else True
-
-    payload = {
+    payload: Dict[str, object] = {
         "name": req.name.strip(),
         "email": req.email.lower().strip(),
         "password": req.password,
         "codigoAcceso": req.codigoAcceso,
         "servicioOrigen": settings.SERVICE_KEY,
-        "tipoUsuario": tipo_usuario,
-        "black": black,
-        "activo": activo,
-        "servicios": {settings.SERVICE_KEY: True, "cognijuegos": True}
+        "tipoUsuario": req.tipoUsuario if (is_admin_creation and req.tipoUsuario is not None) else 1,
+        "black": bool(req.black) if (is_admin_creation and req.black is not None) else False,
+        "activo": bool(req.activo) if (is_admin_creation and req.activo is not None) else True,
+        "servicios": {settings.SERVICE_KEY: True, "cognijuegos": True},
     }
-
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(auth_url, json=payload)
-    except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Servicio de autenticación central no disponible ({settings.AUTH_SERVICE_URL}): {str(exc)}"
-        )
-
-    if resp.status_code != 200:
-        error_detail = "Error al registrar el usuario en el Autenticador Central"
-        try:
-            err_data = resp.json()
-            if "detail" in err_data:
-                error_detail = err_data["detail"]
-        except Exception:
-            pass
-        raise HTTPException(
-            status_code=resp.status_code,
-            detail=error_detail
-        )
-
-    data = resp.json()
-    remote_user = data.get("user") or {}
-    token = data.get("token")
-
+    data = await post_to_auth_service(
+        "/auth/register",
+        payload,
+        default_error="Error al registrar el usuario en el Autenticador Central",
+        client_cls=httpx.AsyncClient,
+        base_url=settings.AUTH_SERVICE_URL,
+    )
+    remote_user = data.get("user") if isinstance(data.get("user"), dict) else {}
     local_user = await sync_local_user_from_auth_service(remote_user)
-
     return {
         "success": True,
         "message": data.get("message") or "Usuario registrado con éxito.",
-        "token": token,
-        "user": format_user_response(local_user)
+        "token": data.get("token"),
+        "user": format_user_response(local_user),
     }
 
 

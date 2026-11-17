@@ -171,6 +171,24 @@ async def registrar_intento_narrativo(
     un reinicio en el mismo día no puede quitar la racha ni bajar el score.
     """
     try:
+        ahora = datetime.now(timezone.utc)
+        campos = {
+            "user_id": user_id,
+            "game_id": "narrativo",
+            "date": date_str,
+            "difficulty": "normal",
+            "mode": "daily",
+            "status": status_str,
+            "attempts": attempts,
+            "stars": stars,
+            "score": score,
+            "grade": grade,
+            "game_data": game_data,
+            "updated_at": ahora,
+        }
+        if status_str == "completed":
+            # Cierre real de la partida: el perfil contabiliza por este momento.
+            campos["completed_at"] = ahora
         await get_database()[COLL_USER_ATTEMPTS].update_one(
             {
                 "user_id": user_id,
@@ -178,22 +196,7 @@ async def registrar_intento_narrativo(
                 "date": date_str,
                 "status": {"$ne": "completed"},
             },
-            {
-                "$set": {
-                    "user_id": user_id,
-                    "game_id": "narrativo",
-                    "date": date_str,
-                    "difficulty": "normal",
-                    "mode": "daily",
-                    "status": status_str,
-                    "attempts": attempts,
-                    "stars": stars,
-                    "score": score,
-                    "grade": grade,
-                    "game_data": game_data,
-                    "updated_at": datetime.now(timezone.utc),
-                }
-            },
+            {"$set": campos},
             upsert=True,
         )
     except DuplicateKeyError:

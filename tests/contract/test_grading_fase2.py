@@ -57,6 +57,7 @@ async def test_wordle_forged_completion_is_rejected_and_uncredited(
     )
     assert stored["validation_status"] == "rejected"
     assert stored["validation_reason"] == "solucion_no_encontrada"
+    assert "completed_at" not in stored
 
     updated = await test_db["usuarios"].find_one({"id": user["id"]})
     assert updated["puntos"] == 0
@@ -101,6 +102,7 @@ async def test_wordle_valid_submission_ignores_client_grade(
         {"user_id": user["id"], "game_id": "wordle", "date": "2099-06-02"}
     )
     assert stored["validation_status"] == "validated"
+    assert stored["completed_at"] == stored["updated_at"]
 
 
 @pytest.mark.asyncio
@@ -148,6 +150,7 @@ async def test_rejected_wordle_allows_legit_retry_once(
     )
     assert stored["validation_status"] == "validated"
     assert stored["by_difficulty"]["standard"]["validation_status"] == "validated"
+    assert stored["completed_at"] == stored["updated_at"]
 
     updated = await test_db["usuarios"].find_one({"id": user["id"]})
     assert updated["puntos"] == 100
