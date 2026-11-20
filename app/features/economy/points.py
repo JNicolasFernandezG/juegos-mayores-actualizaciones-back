@@ -1,7 +1,8 @@
-"""Puntos: migración única del saldo de invitado con auditoría."""
+"""Puntos: migración única del saldo de invitado y débito atómico compartido."""
 
 import logging
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
 from fastapi import HTTPException, status
 from pymongo import ReturnDocument
@@ -15,14 +16,34 @@ from app.shared.ledger import get_points_ledger
 logger = logging.getLogger("EconomyService")
 
 
+async def debit_user_points(
+    db: Any,
+    user_id: int,
+    cost: int,
+    *,
+    now: Optional[datetime] = None,
+    extra_update: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Descuenta puntos de forma atómica si el usuario tiene saldo suficiente."""
+    update: Dict[str, Any] = {
+        "$inc": {"puntos": -cost},
+        "$set": {"updated_at": now or datetime.now(timezone.utc)},
+    }
+    if extra_update:
+        update.update(extra_update)
+    return await db["usuarios"].find_one_and_update(
+        {"id": user_id, "puntos": {"$gte": cost}},
+        update,
+        return_document=ReturnDocument.AFTER,
+    )
+
+
 async def migrate_guest_points(user_id: int, guest_id: str, puntos_solicitados: int) -> GuestMigrationResponse:
     """
     Migra una única vez los puntos acumulados como invitado a la cuenta autenticada.
 
-    El cliente informa cuántos puntos tenía en localStorage; el servidor aplica el
-    tope configurado (``guest_migration_max_points``) y registra el movimiento en
-    el ledger para auditoría. La marca ``guest_migration_applied`` en el usuario es
-    la guarda atómica que impide reclamar dos veces con la misma cuenta.
+    El servidor aplica el tope configurado (``guest_migration_max_points``) y registra
+    el movimiento en el ledger; ``guest_migration_applied`` impide reclamar dos veces.
     """
     db = get_database()
     config = await get_economy_config()
@@ -39,23 +60,15 @@ async def migrate_guest_points(user_id: int, guest_id: str, puntos_solicitados: 
 
     if user.get("guest_migration_applied"):
         return GuestMigrationResponse(
-            success=False,
-            ya_migrado=True,
-            puntos_solicitados=solicitados,
-            puntos_migrados=0,
-            tope=tope,
-            puntos_totales=int(user.get("puntos", 0)),
+            success=False, ya_migrado=True, puntos_solicitados=solicitados,
+            puntos_migrados=0, tope=tope, puntos_totales=int(user.get("puntos", 0)),
             message="Esta cuenta ya reclamó puntos de invitado.",
         )
 
     if solicitados <= 0:
         return GuestMigrationResponse(
-            success=False,
-            ya_migrado=False,
-            puntos_solicitados=0,
-            puntos_migrados=0,
-            tope=tope,
-            puntos_totales=int(user.get("puntos", 0)),
+            success=False, ya_migrado=False, puntos_solicitados=0,
+            puntos_migrados=0, tope=tope, puntos_totales=int(user.get("puntos", 0)),
             message="No hay puntos de invitado para migrar.",
         )
 
@@ -77,12 +90,8 @@ async def migrate_guest_points(user_id: int, guest_id: str, puntos_solicitados: 
     if not resultado:
         actual = await db["usuarios"].find_one({"id": user_id}) or user
         return GuestMigrationResponse(
-            success=False,
-            ya_migrado=True,
-            puntos_solicitados=solicitados,
-            puntos_migrados=0,
-            tope=tope,
-            puntos_totales=int(actual.get("puntos", 0)),
+            success=False, ya_migrado=True, puntos_solicitados=solicitados,
+            puntos_migrados=0, tope=tope, puntos_totales=int(actual.get("puntos", 0)),
             message="Esta cuenta ya reclamó puntos de invitado.",
         )
 
@@ -93,13 +102,8 @@ async def migrate_guest_points(user_id: int, guest_id: str, puntos_solicitados: 
         puntos=aplicado,
         idempotency_key=f"guest_migration:{user_id}",
         metadata={
-            "guest_id": guest_id,
-            "game_id": "guest",
-            "date": today_str(),
-            "difficulty": "standard",
-            "solicitado": solicitados,
-            "aplicado": aplicado,
-            "tope": tope,
+            "guest_id": guest_id, "game_id": "guest", "date": today_str(),
+            "difficulty": "standard", "solicitado": solicitados, "aplicado": aplicado, "tope": tope,
         },
         status="applied",
     )
@@ -113,11 +117,6 @@ async def migrate_guest_points(user_id: int, guest_id: str, puntos_solicitados: 
         mensaje += f" Se aplicó el tope de {tope} puntos."
 
     return GuestMigrationResponse(
-        success=True,
-        ya_migrado=False,
-        puntos_solicitados=solicitados,
-        puntos_migrados=aplicado,
-        tope=tope,
-        puntos_totales=total,
-        message=mensaje,
+        success=True, ya_migrado=False, puntos_solicitados=solicitados,
+        puntos_migrados=aplicado, tope=tope, puntos_totales=total, message=mensaje,
     )

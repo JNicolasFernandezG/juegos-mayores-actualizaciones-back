@@ -9,6 +9,7 @@ from pymongo import ReturnDocument
 
 from app.core.database import get_database
 from app.features.economy.config import get_economy_config
+from app.features.economy.points import debit_user_points
 from app.features.economy.schemas import (
     ConsumeLifeResponse,
     RefillLivesResponse,
@@ -40,10 +41,7 @@ async def get_user_economy(user_id: int) -> UserEconomyResponse:
     if "vidas" not in user:
         await db["usuarios"].update_one(
             {"id": user_id},
-            {
-                "$set": {"vidas": config.vidas_iniciales},
-                "$setOnInsert": {"puntos": 0},
-            },
+            {"$set": {"vidas": config.vidas_iniciales}, "$setOnInsert": {"puntos": 0}},
         )
         user["vidas"] = config.vidas_iniciales
 
@@ -55,8 +53,6 @@ async def get_user_economy(user_id: int) -> UserEconomyResponse:
     actualizado = await db["usuarios"].find_one({"id": user_id}, {"puntos": 1})
     if actualizado:
         puntos = int(actualizado.get("puntos", puntos))
-    suscripcion = str(user.get("suscripcion", "basica")).lower()
-    dias_desbloqueados = user.get("dias_desbloqueados", [])
 
     return UserEconomyResponse(
         user_id=user_id,
@@ -67,8 +63,8 @@ async def get_user_economy(user_id: int) -> UserEconomyResponse:
         racha_hoy_ingresada=racha.hoy_ingresada,
         racha_puntos_dia=racha.puntos_dia,
         racha_tramos_diarios=tramos_puntos_diarios(),
-        suscripcion=suscripcion,
-        dias_desbloqueados=dias_desbloqueados,
+        suscripcion=str(user.get("suscripcion", "basica")).lower(),
+        dias_desbloqueados=user.get("dias_desbloqueados", []),
         costo_pista_puntos=int(config.costo_pista_puntos or 20),
         costo_desbloqueo_dia_puntos=int(config.costo_desbloqueo_dia_puntos or 100),
         bonus_racha=config.bonus_racha,
@@ -92,16 +88,12 @@ async def consume_life(
 
     result = await db["usuarios"].find_one_and_update(
         {"id": user_id, "vidas": {"$gt": 0}},
-        {
-            "$inc": {"vidas": -1},
-            "$set": {"updated_at": datetime.now(timezone.utc)},
-        },
+        {"$inc": {"vidas": -1}, "$set": {"updated_at": datetime.now(timezone.utc)}},
         return_document=ReturnDocument.AFTER,
     )
 
     if not result:
-        user_actual = await db["usuarios"].find_one({"id": user_id})
-        vidas_actuales = user_actual.get("vidas", 0) if user_actual else 0
+        await db["usuarios"].find_one({"id": user_id})
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No tienes vidas restantes. Podés recargar vidas en la mini-tienda usando tus puntos.",
@@ -133,14 +125,7 @@ async def refill_lives(user_id: int) -> RefillLivesResponse:
         {"$set": {"puntos": 0}},
     )
 
-    result = await db["usuarios"].find_one_and_update(
-        {"id": user_id, "puntos": {"$gte": REFILL_LIVES_COST}},
-        {
-            "$inc": {"puntos": -REFILL_LIVES_COST},
-            "$set": {"updated_at": datetime.now(timezone.utc)},
-        },
-        return_document=ReturnDocument.AFTER,
-    )
+    result = await debit_user_points(db, user_id, REFILL_LIVES_COST)
 
     if not result:
         user = await db["usuarios"].find_one({"id": user_id})
@@ -152,10 +137,7 @@ async def refill_lives(user_id: int) -> RefillLivesResponse:
         puntos_actuales = int(user.get("puntos", 0))
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Puntos insuficientes. Necesitás {REFILL_LIVES_COST} pts "
-                f"y tenés {puntos_actuales} pts."
-            ),
+            detail=f"Puntos insuficientes. Necesitás {REFILL_LIVES_COST} pts y tenés {puntos_actuales} pts.",
         )
 
     nuevos_puntos = int(result.get("puntos", 0))

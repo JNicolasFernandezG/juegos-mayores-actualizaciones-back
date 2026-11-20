@@ -10,10 +10,7 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 
 from app.core.database import get_database
-from app.features.narrative.constants import (
-    COLL_CARDS,
-    COLL_RUNS,
-)
+from app.features.narrative.constants import COLL_CARDS
 from app.features.narrative.enums import (
     RunPhaseEnum,
     DisparadorEnum
@@ -36,11 +33,26 @@ from app.features.narrative.game.endings_service import (
     sincronizar_intento_usuario
 )
 from app.features.narrative.game.universe_resources import obtener_mapa_recursos_universo
-from app.features.narrative.game.run_repository import persistir_run
-from app.features.narrative.game.identity import filtro_run
+from app.features.narrative.game.run_repository import obtener_run_activo_o_404, persistir_run
 from app.features.narrative.game.motor_v2.turn_service import iniciar_evento_grafo_mes
 
 logger = logging.getLogger(__name__)
+
+
+async def _aplicar_carta_elegida(run: dict, carta_id: str, mes_actual: int, db) -> None:
+    carta_doc = await db[COLL_CARDS].find_one({"_id": carta_id})
+    if not carta_doc:
+        return
+    registrar_tags(run, carta_id, carta_doc.get("tags", []))
+    recursos_mapa = await obtener_mapa_recursos_universo(run["universo_id"])
+    cat_acciones, cat_frecuencias = await obtener_catalogos_universo(run["universo_id"], db)
+    efectos_carta = [EfectoSchema(**e) for e in carta_doc.get("efectos", [])]
+    despachar_efectos(
+        DisparadorEnum.AL_OBTENER, run, efectos_carta, recursos_mapa,
+        duenio_id=carta_id, mes_actual=mes_actual,
+        catalogo_acciones=cat_acciones, catalogo_frecuencias=cat_frecuencias,
+    )
+    await sincronizar_personajes(run, personajes_activos(run), db)
 
 
 async def elegir_carta_mes(user_id: int, req: ElegirCartaMesRequest) -> ElegirCartaMesV2Response:
@@ -49,9 +61,7 @@ async def elegir_carta_mes(user_id: int, req: ElegirCartaMesRequest) -> ElegirCa
     con el motor de la partida. Retorna el evento plano (V1) o el grafo inicial (V2).
     """
     db = get_database()
-    run = await db[COLL_RUNS].find_one(filtro_run(user_id, req.date))
-    if not run:
-        raise HTTPException(status_code=404, detail="Partida no encontrada.")
+    run = await obtener_run_activo_o_404(user_id, req.date, db=db)
 
     if run.get("fase_actual") != RunPhaseEnum.DRAFT_MENSUAL.value:
         raise HTTPException(status_code=400, detail="La partida no se encuentra en fase de robo de cartas.")
@@ -60,45 +70,20 @@ async def elegir_carta_mes(user_id: int, req: ElegirCartaMesRequest) -> ElegirCa
     if req.carta_id not in turno.get("cartas_ofrecidas_ids", []):
         raise HTTPException(status_code=400, detail="La carta seleccionada no fue ofrecida en este mes.")
 
-    # 1. Agregar carta al inventario y registrar nuevos tags
     run["cartas_en_mano"].append(req.carta_id)
     mes_actual = run.get("mes_actual", 1)
     run.setdefault("adquisiciones", {})[req.carta_id] = {"mes": mes_actual, "tipo": "carta"}
-    carta_doc = await db[COLL_CARDS].find_one({"_id": req.carta_id})
-    if carta_doc:
-        registrar_tags(run, req.carta_id, carta_doc.get("tags", []))
-
-        recursos_mapa = await obtener_mapa_recursos_universo(run["universo_id"])
-        cat_acciones, cat_frecuencias = await obtener_catalogos_universo(run["universo_id"], db)
-        efectos_carta = [EfectoSchema(**e) for e in carta_doc.get("efectos", [])]
-        despachar_efectos(
-            DisparadorEnum.AL_OBTENER,
-            run,
-            efectos_carta,
-            recursos_mapa,
-            duenio_id=req.carta_id,
-            mes_actual=mes_actual,
-            catalogo_acciones=cat_acciones,
-            catalogo_frecuencias=cat_frecuencias,
-        )
-        await sincronizar_personajes(run, personajes_activos(run), db)
-
+    await _aplicar_carta_elegida(run, req.carta_id, mes_actual, db)
     turno["carta_elegida_id"] = req.carta_id
 
-    # Si la carta elegida causa el colapso inmediato de un recurso:
-    derrota = await verificar_colapso_recursos(run)
-    if derrota:
+    if await verificar_colapso_recursos(run):
         run["updated_at"] = datetime.now(timezone.utc).isoformat()
         await persistir_run(run)
         puntos_ganados = await sincronizar_intento_usuario(run)
         fin_resp = FinalizacionResponse(**run["finalizacion"]) if run.get("finalizacion") else None
         return ElegirCartaMesV2Response(
-            fase_actual=run["fase_actual"],
-            recursos=run["recursos"],
-            evento_actual=None,
-            finalizacion=fin_resp,
-            puntos_ganados=puntos_ganados,
-            motor=run.get("motor", "v2"),
+            fase_actual=run["fase_actual"], recursos=run["recursos"], evento_actual=None,
+            finalizacion=fin_resp, puntos_ganados=puntos_ganados, motor=run.get("motor", "v2"),
         )
 
     return await iniciar_evento_grafo_mes(run, turno)

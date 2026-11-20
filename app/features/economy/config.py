@@ -1,16 +1,20 @@
 """Configuración global de economía (lectura, actualización y defaults)."""
 
 import logging
+from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from pydantic import ValidationError
 
 from app.core.database import get_database
-from app.shared.economy_points import DEFAULT_PUNTOS_POR_CALIFICACION
-from app.features.economy.schemas import (
+from app.features.economy.defaults import (
     DEFAULT_BONUS_RACHA,
     DEFAULT_ESCALAS_TIEMPO,
+    DEFAULT_PUNTOS_POR_CALIFICACION,
+    DEFAULT_PUNTOS_POR_JUEGO,
+)
+from app.features.economy.schemas import (
     BonusRachaConfig,
     EconomyConfigResponse,
     EconomyConfigUpdateRequest,
@@ -28,41 +32,49 @@ DEFAULT_ECONOMY_CONFIG: Dict[str, Any] = {
     "costo_pista_puntos": 20,
     "puntos_por_calificacion": dict(DEFAULT_PUNTOS_POR_CALIFICACION),
     "guest_migration_max_points": 1000,
-    "bonus_racha": DEFAULT_BONUS_RACHA,
-    "escalas_tiempo_por_juego": DEFAULT_ESCALAS_TIEMPO,
-    "puntos_por_juego": {
-        "wordle": 50,
-        "sopa_letras": 50,
-        "sudoku": 60,
-        "crucigrama": 70,
-        "narrativo": 80,
-    },
+    "bonus_racha": deepcopy(DEFAULT_BONUS_RACHA),
+    "escalas_tiempo_por_juego": deepcopy(DEFAULT_ESCALAS_TIEMPO),
+    "puntos_por_juego": dict(DEFAULT_PUNTOS_POR_JUEGO),
     "updated_at": datetime.now(timezone.utc).isoformat(),
 }
 
 
+def _ordenar_tramos_bonus(bonus: BonusRachaConfig) -> BonusRachaConfig:
+    return bonus.model_copy(
+        update={"tramos": sorted(bonus.tramos, key=lambda tramo: tramo.dias)}
+    )
+
+
+def _normalizar_bonus_racha(raw: Any) -> BonusRachaConfig:
+    """Normaliza el bonus guardado; ante datos inválidos cae a los defaults inactivos."""
+    if not isinstance(raw, dict):
+        raw = DEFAULT_BONUS_RACHA
+    try:
+        bonus = BonusRachaConfig(**raw)
+    except (ValidationError, TypeError):
+        logger.warning("[ECONOMIA] bonus_racha inválido en la base; se usan los defaults inactivos.")
+        bonus = BonusRachaConfig(**DEFAULT_BONUS_RACHA)
+    return _ordenar_tramos_bonus(bonus)
+
+
 async def get_economy_config() -> EconomyConfigResponse:
-    """
-    Obtiene la configuración económica global de la base de datos.
-    Si no existe, la siembra automáticamente con valores predeterminados seguros.
-    """
+    """Obtiene la configuración económica global; si no existe, la siembra con defaults."""
     db = get_database()
     doc = await db[COLL_CONFIG].find_one({"_id": "global_economy"})
     if not doc:
         now_str = datetime.now(timezone.utc).isoformat()
-        initial = dict(DEFAULT_ECONOMY_CONFIG)
+        initial = deepcopy(DEFAULT_ECONOMY_CONFIG)
         initial["updated_at"] = now_str
         await db[COLL_CONFIG].update_one(
-            {"_id": "global_economy"},
-            {"$setOnInsert": initial},
-            upsert=True,
+            {"_id": "global_economy"}, {"$setOnInsert": initial}, upsert=True
         )
         doc = await db[COLL_CONFIG].find_one({"_id": "global_economy"}) or initial
 
     raw_escalas = doc.get("escalas_tiempo_por_juego") or DEFAULT_ESCALAS_TIEMPO
-    escalas_map: Dict[str, List[EscalaCalificacionTiempo]] = {}
-    for gid, items in raw_escalas.items():
-        escalas_map[gid] = [EscalaCalificacionTiempo(**item) for item in items]
+    escalas_map: Dict[str, List[EscalaCalificacionTiempo]] = {
+        gid: [EscalaCalificacionTiempo(**item) for item in items]
+        for gid, items in raw_escalas.items()
+    }
 
     return EconomyConfigResponse(
         vidas_iniciales=int(doc.get("vidas_iniciales", 5)),
@@ -79,24 +91,8 @@ async def get_economy_config() -> EconomyConfigResponse:
     )
 
 
-def _normalizar_bonus_racha(raw: Any) -> BonusRachaConfig:
-    """Normaliza el bonus guardado; ante datos inválidos cae a los defaults inactivos."""
-    if not isinstance(raw, dict):
-        raw = DEFAULT_BONUS_RACHA
-    try:
-        bonus = BonusRachaConfig(**raw)
-    except (ValidationError, TypeError):
-        logger.warning("[ECONOMIA] bonus_racha inválido en la base; se usan los defaults inactivos.")
-        bonus = BonusRachaConfig(**DEFAULT_BONUS_RACHA)
-    return bonus.model_copy(
-        update={"tramos": sorted(bonus.tramos, key=lambda tramo: tramo.dias)}
-    )
-
-
 async def update_economy_config(req: EconomyConfigUpdateRequest) -> EconomyConfigResponse:
-    """
-    Actualiza la configuración económica desde la Torre de Control (Panel Administrador).
-    """
+    """Actualiza la configuración económica desde la Torre de Control (Panel Administrador)."""
     db = get_database()
     update_fields: Dict[str, Any] = {}
 
@@ -118,17 +114,11 @@ async def update_economy_config(req: EconomyConfigUpdateRequest) -> EconomyConfi
     if req.guest_migration_max_points is not None:
         update_fields["guest_migration_max_points"] = max(0, req.guest_migration_max_points)
     if req.bonus_racha is not None:
-        tramos = sorted(req.bonus_racha.tramos, key=lambda tramo: tramo.dias)
-        update_fields["bonus_racha"] = req.bonus_racha.model_copy(
-            update={"tramos": tramos}
-        ).model_dump()
+        update_fields["bonus_racha"] = _ordenar_tramos_bonus(req.bonus_racha).model_dump()
 
     update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
-
     await db[COLL_CONFIG].update_one(
-        {"_id": "global_economy"},
-        {"$set": update_fields},
-        upsert=True,
+        {"_id": "global_economy"}, {"$set": update_fields}, upsert=True
     )
     logger.info(f"[ECONOMIA] Configuración actualizada: {list(update_fields.keys())}")
     return await get_economy_config()

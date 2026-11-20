@@ -415,7 +415,7 @@ Cliente
 
 #### Solver y validador
 
-- `solver.py`: léxico de `app/data/acentos_todas_palabras.json` (48.623 claves, longitudes 3-10), índices por longitud/posición/letra, backtracking con MRV/Degree, forward checking, tope de 150 candidatos por rama y soporte de anclas/vetos.
+- `solver.py`: léxico de `app/data/acentos_todas_palabras.json` (48.623 claves, longitudes 3-11), índices por longitud/posición/letra, backtracking con MRV/Degree, forward checking, tope de 150 candidatos por rama y soporte de anclas/vetos.
 - `solver_bitset.py`: AC-3 con dominios como bitsets para máscaras densas; MRV + backtracking con presupuesto de nodos/segundos.
 - `validator.py`: tamaños 7 y 11; mínimos de 5 y 12 palabras; validación de estructura, cobertura, simetría (solo warning) y solubilidad con presupuestos crecientes.
 - Detalle de rendimiento: la propagación AC-3 reencola vecinos excepto el que originó el recorte (`solver_bitset.py:136-138`). Es una propagación incompleta que puede explorar de más, pero no produce soluciones inválidas.

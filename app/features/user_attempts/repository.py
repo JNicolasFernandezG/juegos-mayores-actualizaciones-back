@@ -8,10 +8,7 @@ from typing import Any, Dict, Optional, Tuple
 from fastapi import HTTPException
 from pymongo.errors import DuplicateKeyError
 
-from app.features.user_attempts.schemas import (
-    UserAttemptCreateRequest,
-    UserAttemptResponse,
-)
+from app.features.user_attempts.schemas import UserAttemptCreateRequest, UserAttemptResponse
 
 _DIFFICULTY_PATTERN = re.compile(r"^[a-z0-9_-]{1,32}$")
 _COMPLETED_STATUSES = ("completed", "won")
@@ -47,9 +44,7 @@ def _doc_difficulty(doc: dict) -> str:
 
 
 def _is_completed_attempt(doc: Optional[dict]) -> bool:
-    if not doc:
-        return False
-    return doc.get("status") in _COMPLETED_STATUSES and doc.get("validation_status") != "rejected"
+    return bool(doc and doc.get("status") in _COMPLETED_STATUSES and doc.get("validation_status") != "rejected")
 
 
 def _difficulty_is_completed(doc: Optional[dict], difficulty: str) -> bool:
@@ -59,9 +54,7 @@ def _difficulty_is_completed(doc: Optional[dict], difficulty: str) -> bool:
     if sub:
         return _is_completed_attempt(sub)
     # Documentos históricos sin by_difficulty: se interpretan como su dificultad declarada.
-    if _doc_difficulty(doc) == difficulty:
-        return _is_completed_attempt(doc)
-    return False
+    return _is_completed_attempt(doc) if _doc_difficulty(doc) == difficulty else False
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -101,9 +94,7 @@ def _should_replace_top_level(existing: dict, final_status: str) -> bool:
     """El nivel superior refleja la última partida, salvo que ya esté completada."""
     if existing.get("validation_status") == "rejected":
         return True
-    if existing.get("status") in _COMPLETED_STATUSES:
-        return final_status == "completed"
-    return True
+    return final_status == "completed" if existing.get("status") in _COMPLETED_STATUSES else True
 
 
 def _attempt_snapshot(doc: dict) -> dict:
@@ -114,16 +105,12 @@ def _attempt_snapshot(doc: dict) -> dict:
 def _preserve_existing_difficulty(existing: dict, difficulty: str, update_fields: dict) -> None:
     """Materializa by_difficulty si el documento histórico no lo tenía."""
     existing_difficulty = _doc_difficulty(existing)
-    if existing_difficulty == difficulty:
-        return
-    if existing_difficulty not in (existing.get("by_difficulty") or {}):
+    if existing_difficulty != difficulty and existing_difficulty not in (existing.get("by_difficulty") or {}):
         update_fields[f"by_difficulty.{existing_difficulty}"] = _attempt_snapshot(existing)
 
 
 def _serialize_attempt(
-    doc: dict,
-    puntos_ganados: int = 0,
-    puntos_totales_usuario: Optional[int] = None,
+    doc: dict, puntos_ganados: int = 0, puntos_totales_usuario: Optional[int] = None
 ) -> UserAttemptResponse:
     updated_at = doc.get("updated_at")
     updated_at_str = (
@@ -154,17 +141,9 @@ def _serialize_attempt(
 
 
 def build_attempt_doc(
-    req: UserAttemptCreateRequest,
-    user_id: int,
-    game_id: str,
-    date: str,
-    difficulty: str,
-    time_taken: Optional[int],
-    started_at: Optional[datetime],
-    now: datetime,
-    evaluated: AttemptEvaluation,
-    bonus_puntos: int,
-    bonus_dias: int,
+    req: UserAttemptCreateRequest, user_id: int, game_id: str, date: str, difficulty: str,
+    time_taken: Optional[int], started_at: Optional[datetime], now: datetime,
+    evaluated: AttemptEvaluation, bonus_puntos: int, bonus_dias: int,
 ) -> Dict[str, Any]:
     """Construye el documento de intento a persistir en MongoDB."""
     doc: Dict[str, Any] = {
@@ -186,8 +165,7 @@ def build_attempt_doc(
         "updated_at": now,
     }
     if bonus_puntos > 0:
-        doc["bonus_racha_puntos"] = bonus_puntos
-        doc["bonus_racha_dias"] = bonus_dias
+        doc["bonus_racha_puntos"], doc["bonus_racha_dias"] = bonus_puntos, bonus_dias
     # Momento real de cierre: las medallas se contabilizan por cuándo se jugó.
     if evaluated.final_status == "completed" and evaluated.validation_status != "rejected":
         doc["completed_at"] = now
@@ -205,14 +183,8 @@ def build_attempt_doc(
 
 
 async def _apply_attempt_update(
-    db: Any,
-    filter_query: Dict[str, Any],
-    existing: Optional[dict],
-    doc: Dict[str, Any],
-    difficulty: str,
-    final_status: str,
-    now: datetime,
-    conflict_detail: str,
+    db: Any, filter_query: Dict[str, Any], existing: Optional[dict], doc: Dict[str, Any],
+    difficulty: str, final_status: str, now: datetime, conflict_detail: str,
 ) -> dict:
     update_fields: Dict[str, Any] = {f"by_difficulty.{difficulty}": doc, "updated_at": now}
     if existing:
@@ -228,13 +200,8 @@ async def _apply_attempt_update(
 
 
 async def persist_user_attempt_doc(
-    db: Any,
-    filter_query: Dict[str, Any],
-    doc: Dict[str, Any],
-    difficulty: str,
-    final_status: str,
-    now: datetime,
-    existing: Optional[dict] = None,
+    db: Any, filter_query: Dict[str, Any], doc: Dict[str, Any], difficulty: str,
+    final_status: str, now: datetime, existing: Optional[dict] = None,
 ) -> Tuple[dict, bool]:
     """Persiste un intento de forma atómica; devuelve (documento, es_replay)."""
     if existing:
@@ -247,10 +214,8 @@ async def persist_user_attempt_doc(
     initial = {**doc, "by_difficulty": {difficulty: dict(doc)}}
     try:
         result = await db["user_attempts"].find_one_and_update(
-            filter_query,
-            {"$set": initial, "$setOnInsert": {"created_at": now}},
-            upsert=True,
-            return_document=True,
+            filter_query, {"$set": initial, "$setOnInsert": {"created_at": now}},
+            upsert=True, return_document=True,
         )
         return result, False
     except DuplicateKeyError:

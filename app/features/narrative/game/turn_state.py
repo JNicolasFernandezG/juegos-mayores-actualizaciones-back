@@ -1,12 +1,7 @@
 """Estado común del turno para recargas/F5: expone el motor V2 y el grafo activo."""
 
-from fastapi import HTTPException
-
 from app.core.database import get_database
-from app.features.narrative.constants import (
-    COLL_CARDS,
-    COLL_RUNS,
-)
+from app.features.narrative.constants import COLL_CARDS
 from app.features.narrative.schemas.catalog_schemas import (
     CartaResponse,
     ResultadoResponse,
@@ -16,15 +11,13 @@ from app.features.narrative.schemas.game_schemas import (
     EstadoTurnoResponse,
 )
 from app.features.narrative.game.motor_v2.v2_graph_service import proyectar_grafo_actual
-from app.features.narrative.game.identity import filtro_run
+from app.features.narrative.game.run_repository import obtener_run_activo_o_404
 
 
 async def obtener_turno_actual(user_id: int, date: str) -> EstadoTurnoResponse:
     """Retorna el estado reactivo del turno actual para sincronización de frontend o recarga F5."""
     db = get_database()
-    run = await db[COLL_RUNS].find_one(filtro_run(user_id, date))
-    if not run:
-        raise HTTPException(status_code=404, detail="Partida no encontrada.")
+    run = await obtener_run_activo_o_404(user_id, date, db=db)
 
     turno = run.get("turno_actual", {})
     draft_ids = turno.get("cartas_ofrecidas_ids", [])

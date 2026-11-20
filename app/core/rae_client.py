@@ -1,6 +1,7 @@
 """Cliente centralizado y reutilizable para la API no oficial de la RAE (rae-api.com)."""
 
 import atexit
+import concurrent.futures
 import json
 import logging
 import os
@@ -9,7 +10,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from typing import Dict, Optional, Tuple
+from typing import Dict, Iterable, Optional, Tuple
 
 from app.core.config import settings
 from app.core.rae_formatter import (  # noqa: F401
@@ -216,3 +217,16 @@ def fetch_rae_definition(word: str, mask_spoiler: bool = True) -> Optional[str]:
 def get_masked_definition(word: str) -> Optional[str]:
     """Obtiene la definición de la RAE con la palabra tapada mediante '___'."""
     return fetch_rae_definition(word, mask_spoiler=True)
+
+
+def fetch_rae_definitions_batch(
+    words: Iterable[str], *, mask_spoiler: bool = True
+) -> Dict[str, Optional[str]]:
+    """Consulta definiciones RAE en paralelo acotadas por RAE_MAX_CONCURRENCY."""
+    unique = list(dict.fromkeys(w for w in words if w))
+    if not unique:
+        return {}
+    workers = max(1, min(int(settings.RAE_MAX_CONCURRENCY), len(unique)))
+    fn = fetch_rae_definition if mask_spoiler else (lambda w: fetch_rae_definition(w, mask_spoiler=False))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+        return dict(zip(unique, executor.map(fn, unique)))

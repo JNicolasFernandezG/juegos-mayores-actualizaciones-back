@@ -143,42 +143,40 @@ def _frecuencias_default(universo_id: str) -> List[Dict[str, Any]]:
     ]
 
 
-async def obtener_usos_accion(accion_id: str) -> Dict[str, Any]:
-    db = get_database()
-    filtro = {
-        "$or": [
-            {"efectos.acciones.accion_id": accion_id},
-            {"efectos.accion.tipo": accion_id},
-        ]
-    }
-    cartas = await db[COLL_CARDS].find(filtro, {"_id": 1, "nombre": 1, "universo_id": 1}).to_list(None)
-    personajes = await db[COLL_CHARACTERS].find(filtro, {"_id": 1, "nombre": 1, "universo_id": 1}).to_list(None)
+def _serializar_usos(docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return [
+        {"id": str(d["_id"]), "nombre": d.get("nombre", str(d["_id"])), "universo_id": d.get("universo_id")}
+        for d in docs
+    ]
 
+
+async def _consultar_usos_entidad(
+    clave_id: str, valor_id: str, filtro: Dict[str, Any]
+) -> Dict[str, Any]:
+    db = get_database()
+    proyeccion = {"_id": 1, "nombre": 1, "universo_id": 1}
+    cartas = await db[COLL_CARDS].find(filtro, proyeccion).to_list(None)
+    personajes = await db[COLL_CHARACTERS].find(filtro, proyeccion).to_list(None)
     return {
-        "accion_id": accion_id,
+        clave_id: valor_id,
         "total_usos": len(cartas) + len(personajes),
-        "cartas": [{"id": str(c["_id"]), "nombre": c.get("nombre", str(c["_id"])), "universo_id": c.get("universo_id")} for c in cartas],
-        "personajes": [{"id": str(p["_id"]), "nombre": p.get("nombre", str(p["_id"])), "universo_id": p.get("universo_id")} for p in personajes],
+        "cartas": _serializar_usos(cartas),
+        "personajes": _serializar_usos(personajes),
     }
+
+
+async def obtener_usos_accion(accion_id: str) -> Dict[str, Any]:
+    return await _consultar_usos_entidad(
+        "accion_id",
+        accion_id,
+        {"$or": [{"efectos.acciones.accion_id": accion_id}, {"efectos.accion.tipo": accion_id}]},
+    )
 
 
 async def obtener_usos_frecuencia(frecuencia_id: str, universo_id: Optional[str] = None) -> Dict[str, Any]:
-    db = get_database()
     filtro: Dict[str, Any] = {
-        "$or": [
-            {"efectos.frecuencia_id": frecuencia_id},
-            {"efectos.disparador": frecuencia_id},
-        ]
+        "$or": [{"efectos.frecuencia_id": frecuencia_id}, {"efectos.disparador": frecuencia_id}]
     }
     if universo_id:
         filtro["universo_id"] = universo_id
-
-    cartas = await db[COLL_CARDS].find(filtro, {"_id": 1, "nombre": 1, "universo_id": 1}).to_list(None)
-    personajes = await db[COLL_CHARACTERS].find(filtro, {"_id": 1, "nombre": 1, "universo_id": 1}).to_list(None)
-
-    return {
-        "frecuencia_id": frecuencia_id,
-        "total_usos": len(cartas) + len(personajes),
-        "cartas": [{"id": str(c["_id"]), "nombre": c.get("nombre", str(c["_id"])), "universo_id": c.get("universo_id")} for c in cartas],
-        "personajes": [{"id": str(p["_id"]), "nombre": p.get("nombre", str(p["_id"])), "universo_id": p.get("universo_id")} for p in personajes],
-    }
+    return await _consultar_usos_entidad("frecuencia_id", frecuencia_id, filtro)

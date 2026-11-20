@@ -22,6 +22,12 @@ COLL_V2_EVENTS = "narrative_v2_events"
 COLL_V2_CONVERSATIONS = "narrative_v2_conversations"
 COLL_V2_EVENTOS_ESPECIALES = "narrative_v2_eventos_especiales"
 
+COLECCION_V2_POR_TIPO = {
+    "evento": COLL_V2_EVENTS,
+    "conversacion": COLL_V2_CONVERSATIONS,
+    "evento_especial": COLL_V2_EVENTOS_ESPECIALES,
+}
+
 # Umbrales de afinidad para disparar eventos especiales de lealtad / traición
 AFINIDAD_UMBRAL_LEALTAD = 95
 AFINIDAD_UMBRAL_TRAICION = 15

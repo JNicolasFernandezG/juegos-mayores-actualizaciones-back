@@ -1,94 +1,67 @@
 """
 transition_service.py
-Gestión común de la Fase 4 (Balance y Transición Mensual), compartida por V1 y V2:
-- Registro del resumen del mes en la bitácora acumulada (historial).
-- Evaluación de fin de año (Mes 12: Victoria y cálculo de rango S/A/B/C).
-- Avance al siguiente mes (Mes + 1).
-- Despacho de efectos pasivos recurrentes (CADA_MES) de corte y cartas.
-- Verificación de colapso de recursos post-pasivos.
-- Sorteo de las 3 cartas para el nuevo draft.
+Gestión de la Fase 4 (Balance y Transición Mensual): bitácora, victoria en Mes 12,
+despacho de pasivos recurrentes `cada_mes`, verificación de colapso y nuevo draft.
 """
 
 import logging
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
 
 from app.core.database import get_database
 from app.features.narrative.constants import (
-    COLL_SETTINGS,
-    COLL_CHARACTERS,
     COLL_CARDS,
-    COLL_RUNS,
-    COLL_CHALLENGES
+    COLL_CHALLENGES,
+    COLL_CHARACTERS,
+    COLL_SETTINGS,
 )
-from app.features.narrative.enums import (
-    RunPhaseEnum,
-    DisparadorEnum
-)
-from app.features.narrative.schemas.catalog_schemas import (
-    CartaResponse,
-    FinalizacionResponse
-)
-from app.features.narrative.schemas.game_schemas import (
-    AvanzarMesRequest,
-    AvanzarMesV2Response
-)
-from app.features.narrative.schemas.rules_schemas import EfectoSchema
-from app.features.narrative.engine.rule_engine import despachar_efectos, evaluar_condiciones
 from app.features.narrative.engine.catalog_loader import obtener_catalogos_universo
+from app.features.narrative.engine.rule_engine import despachar_efectos_entidades_activas
 from app.features.narrative.engine.tag_state import personajes_activos, sincronizar_personajes
-from app.features.narrative.game.draft_sampling import sortear_cartas_draft
-from app.features.narrative.game.endings_service import (
-    verificar_colapso_recursos,
-    calcular_finalizacion_victoria,
-    sincronizar_intento_usuario
+from app.features.narrative.enums import DisparadorEnum, RunPhaseEnum
+from app.features.narrative.game.draft_sampling import (
+    nuevo_turno_actual,
+    preparar_draft_mensual,
+    sortear_cartas_draft,
 )
+from app.features.narrative.game.endings_service import (
+    calcular_finalizacion_victoria,
+    sincronizar_intento_usuario,
+    verificar_colapso_recursos,
+)
+from app.features.narrative.game.run_repository import obtener_run_activo_o_404, persistir_run
 from app.features.narrative.game.universe_resources import obtener_mapa_recursos_universo
-from app.features.narrative.game.run_repository import persistir_run
-from app.features.narrative.game.identity import filtro_run
+from app.features.narrative.schemas.catalog_schemas import CartaResponse, FinalizacionResponse
+from app.features.narrative.schemas.game_schemas import AvanzarMesRequest, AvanzarMesV2Response
 
 logger = logging.getLogger(__name__)
 
-async def avanzar_mes(user_id: int, req: AvanzarMesRequest) -> AvanzarMesV2Response:
-    """
-    [Común V1/V2] Fase 4: Aplica efectos pasivos 'cada_mes' y avanza al siguiente mes.
-    Retorna los recursos post-pasivos y únicamente las 3 nuevas cartas de draft (o epílogo si terminó).
-    """
-    db = get_database()
-    run = await db[COLL_RUNS].find_one(filtro_run(user_id, req.date))
-    if not run:
-        raise HTTPException(status_code=404, detail="Partida no encontrada.")
 
-    # Reintento idempotente: un segundo POST tras un avance exitoso (draft abierto o año
-    # terminado) devuelve el estado ya aplicado en lugar de un 400 que rompe al cliente.
-    fase_actual = run.get("fase_actual")
-    if fase_actual in (RunPhaseEnum.DRAFT_MENSUAL.value, RunPhaseEnum.FINALIZADA.value):
-        turno_previo = run.get("turno_actual", {})
-        draft_ids = turno_previo.get("cartas_ofrecidas_ids", []) if fase_actual == RunPhaseEnum.DRAFT_MENSUAL.value else []
-        draft_docs_previos = await db[COLL_CARDS].find({"_id": {"$in": draft_ids}}).to_list(None) if draft_ids else []
-        fin_resp = FinalizacionResponse(**run["finalizacion"]) if run.get("finalizacion") else None
-        return AvanzarMesV2Response(
-            mes_actual=run.get("mes_actual", 1),
-            fase_actual=fase_actual,
-            status=run.get("status", "in_progress"),
-            recursos=run.get("recursos", {}),
-            cartas_draft_actual=[CartaResponse(**c) for c in draft_docs_previos],
-            finalizacion=fin_resp,
-        )
+def _respuesta_cierre_mes(
+    run: Dict[str, Any],
+    cartas_draft_actual: List[CartaResponse],
+    puntos_ganados: Optional[int] = None,
+) -> AvanzarMesV2Response:
+    fin_resp = FinalizacionResponse(**run["finalizacion"]) if run.get("finalizacion") else None
+    return AvanzarMesV2Response(
+        mes_actual=run.get("mes_actual", 1),
+        fase_actual=run.get("fase_actual", ""),
+        status=run.get("status", "in_progress"),
+        recursos=run.get("recursos", {}),
+        cartas_draft_actual=cartas_draft_actual,
+        finalizacion=fin_resp,
+        puntos_ganados=puntos_ganados,
+    )
 
-    if fase_actual != RunPhaseEnum.BALANCE_MES.value:
-        raise HTTPException(status_code=400, detail="La partida no se encuentra en fase de balance mensual.")
 
-    turno = run.get("turno_actual", {})
-    mes_actual = run.get("mes_actual", 1)
-
-    # 1. Guardar resumen del mes en historial acumulado
+def _registrar_mes_en_historial(run: Dict[str, Any], turno: Dict[str, Any], mes_actual: int) -> None:
     decisiones_v2 = [
         dict(decision)
         for decision in run.get("historial_grafos", [])
         if decision.get("mes") == mes_actual
     ]
-    historial_item = {
+    run["historial_mensual"].append({
         "mes": mes_actual,
         "carta_elegida_id": turno.get("carta_elegida_id"),
         "evento_id": turno.get("evento_actual_id"),
@@ -97,16 +70,53 @@ async def avanzar_mes(user_id: int, req: AvanzarMesRequest) -> AvanzarMesV2Respo
         "conversacion_id": turno.get("conversacion_actual_id"),
         "decision_conversacion_opcion": turno.get("decision_conversacion_opcion"),
         "decisiones_v2": decisiones_v2,
-        "recursos_fin_mes": dict(run.get("recursos", {}))
-    }
-    run["historial_mensual"].append(historial_item)
+        "recursos_fin_mes": dict(run.get("recursos", {})),
+    })
+    evento_id = turno.get("evento_actual_id")
+    if evento_id and evento_id not in run.get("eventos_jugados", []):
+        run["eventos_jugados"].append(evento_id)
 
-    if turno.get("evento_actual_id"):
-        evento_id = turno.get("evento_actual_id")
-        if evento_id not in run.get("eventos_jugados", []):
-            run["eventos_jugados"].append(evento_id)
 
-    # 2. ¿Llegó al Mes 12? Fin de Partida (Victoria Anual)
+async def _aplicar_pasivos_mensuales(run: Dict[str, Any], db: Any, recursos_mapa: Dict[str, Any]) -> None:
+    corte_ids = personajes_activos(run)
+    personajes_docs = await db[COLL_CHARACTERS].find({"_id": {"$in": corte_ids}}).to_list(None)
+    cartas_docs = await db[COLL_CARDS].find({"_id": {"$in": run["cartas_en_mano"]}}).to_list(None)
+    cat_acciones, cat_frecuencias = await obtener_catalogos_universo(run["universo_id"], db)
+
+    despachar_efectos_entidades_activas(
+        DisparadorEnum.CADA_MES,
+        run,
+        [*personajes_docs, *cartas_docs],
+        recursos_mapa,
+        mes_actual=run["mes_actual"],
+        catalogo_acciones=cat_acciones,
+        catalogo_frecuencias=cat_frecuencias,
+    )
+    await sincronizar_personajes(run, personajes_activos(run), db)
+
+
+async def avanzar_mes(user_id: int, req: AvanzarMesRequest) -> AvanzarMesV2Response:
+    """
+    Fase 4: Aplica efectos pasivos 'cada_mes' y avanza al siguiente mes.
+    Retorna los recursos post-pasivos y las 3 nuevas cartas de draft (o epílogo si terminó).
+    """
+    db = get_database()
+    run = await obtener_run_activo_o_404(user_id, req.date, db=db)
+
+    fase_actual = run.get("fase_actual")
+    if fase_actual in (RunPhaseEnum.DRAFT_MENSUAL.value, RunPhaseEnum.FINALIZADA.value):
+        turno_previo = run.get("turno_actual", {})
+        draft_ids = turno_previo.get("cartas_ofrecidas_ids", []) if fase_actual == RunPhaseEnum.DRAFT_MENSUAL.value else []
+        draft_docs_previos = await db[COLL_CARDS].find({"_id": {"$in": draft_ids}}).to_list(None) if draft_ids else []
+        return _respuesta_cierre_mes(run, [CartaResponse(**c) for c in draft_docs_previos])
+
+    if fase_actual != RunPhaseEnum.BALANCE_MES.value:
+        raise HTTPException(status_code=400, detail="La partida no se encuentra en fase de balance mensual.")
+
+    turno = run.get("turno_actual", {})
+    mes_actual = run.get("mes_actual", 1)
+    _registrar_mes_en_historial(run, turno, mes_actual)
+
     if mes_actual >= 12:
         run["fase_actual"] = RunPhaseEnum.FINALIZADA.value
         run["status"] = "completed"
@@ -114,110 +124,24 @@ async def avanzar_mes(user_id: int, req: AvanzarMesRequest) -> AvanzarMesV2Respo
         run["finalizacion"] = calcular_finalizacion_victoria(run, universo_doc)
         run["updated_at"] = datetime.now(timezone.utc).isoformat()
         await persistir_run(run)
-        puntos_ganados = await sincronizar_intento_usuario(run)
-        fin_resp = FinalizacionResponse(**run["finalizacion"]) if run.get("finalizacion") else None
-        return AvanzarMesV2Response(
-            mes_actual=run["mes_actual"],
-            fase_actual=run["fase_actual"],
-            status=run["status"],
-            recursos=run["recursos"],
-            cartas_draft_actual=[],
-            finalizacion=fin_resp,
-            puntos_ganados=puntos_ganados,
-        )
+        return _respuesta_cierre_mes(run, [], await sincronizar_intento_usuario(run))
 
-    # Avanzar al siguiente mes
     run["mes_actual"] = mes_actual + 1
     run["fase_actual"] = RunPhaseEnum.DRAFT_MENSUAL.value
-
-    # Aplicar efectos pasivos "cada_mes" con periodicidad relativa y catalogo desacoplado
     recursos_mapa = await obtener_mapa_recursos_universo(run["universo_id"])
-    corte_ids = list(run.get("afinidad", {}).keys()) or run.get("corte_activa", [])
-    personajes_docs = await db[COLL_CHARACTERS].find({"_id": {"$in": corte_ids}}).to_list(None)
-    cartas_docs = await db[COLL_CARDS].find({"_id": {"$in": run["cartas_en_mano"]}}).to_list(None)
-    cat_acciones, cat_frecuencias = await obtener_catalogos_universo(run["universo_id"], db)
+    await _aplicar_pasivos_mensuales(run, db, recursos_mapa)
 
-    for p in personajes_docs:
-        efectos_p = [EfectoSchema(**e) for e in p.get("efectos", [])]
-        despachar_efectos(
-            DisparadorEnum.CADA_MES,
-            run,
-            efectos_p,
-            recursos_mapa,
-            duenio_id=str(p["_id"]),
-            mes_actual=run["mes_actual"],
-            catalogo_acciones=cat_acciones,
-            catalogo_frecuencias=cat_frecuencias,
-        )
-
-    for c in cartas_docs:
-        efectos_c = [EfectoSchema(**e) for e in c.get("efectos", [])]
-        despachar_efectos(
-            DisparadorEnum.CADA_MES,
-            run,
-            efectos_c,
-            recursos_mapa,
-            duenio_id=str(c["_id"]),
-            mes_actual=run["mes_actual"],
-            catalogo_acciones=cat_acciones,
-            catalogo_frecuencias=cat_frecuencias,
-        )
-
-    # Los efectos mensuales pueden reclutar personajes: activar sus tags estáticos
-    await sincronizar_personajes(run, personajes_activos(run), db)
-
-    # Si algún recurso colapsó por costos mensuales pasivos:
-    derrota = await verificar_colapso_recursos(run)
-    if derrota:
+    if await verificar_colapso_recursos(run):
         run["updated_at"] = datetime.now(timezone.utc).isoformat()
         await persistir_run(run)
-        puntos_ganados = await sincronizar_intento_usuario(run)
-        fin_resp = FinalizacionResponse(**run["finalizacion"]) if run.get("finalizacion") else None
-        return AvanzarMesV2Response(
-            mes_actual=run["mes_actual"],
-            fase_actual=run["fase_actual"],
-            status=run["status"],
-            recursos=run["recursos"],
-            cartas_draft_actual=[],
-            finalizacion=fin_resp,
-            puntos_ganados=puntos_ganados,
-        )
+        return _respuesta_cierre_mes(run, [], await sincronizar_intento_usuario(run))
 
-    # Sortear 3 cartas para el nuevo mes aplicando condiciones_aparicion
     challenge = await db[COLL_CHALLENGES].find_one({"game_id": "narrativo", "date": req.date})
     pool_mensuales = challenge.get("config", {}).get("pool_cartas_mensuales_ids", [])
-    disponibles = [cid for cid in pool_mensuales if cid not in run["cartas_en_mano"]]
-    if len(disponibles) < 3:
-        disponibles = pool_mensuales
-
-    cartas_docs_map = {c["_id"]: c for c in await db[COLL_CARDS].find({"_id": {"$in": disponibles}}).to_list(None)}
-    elegibles = [
-        cid for cid in disponibles
-        if evaluar_condiciones(cartas_docs_map.get(cid, {}).get("condiciones_aparicion", []), run)
-    ]
-    candidatas = elegibles if len(elegibles) >= 3 else (elegibles + [cid for cid in disponibles if cid not in elegibles])
-    cartas_sorteadas = sortear_cartas_draft(candidatas, cartas_docs_map)
-    run["turno_actual"] = {
-        "cartas_ofrecidas_ids": cartas_sorteadas,
-        "carta_elegida_id": None,
-        "evento_actual_id": None,
-        "opcion_elegida_id": None,
-        "resultado_obtenido_id": None,
-        "conversacion_actual_id": None
-    }
-
+    cartas_sorteadas = await preparar_draft_mensual(run, pool_mensuales, db, sortear_fn=sortear_cartas_draft)
+    run["turno_actual"] = nuevo_turno_actual(cartas_sorteadas)
     run["updated_at"] = datetime.now(timezone.utc).isoformat()
     await persistir_run(run)
 
-    # Cargar ÚNICAMENTE las 3 cartas sorteadas para la respuesta
     draft_docs = await db[COLL_CARDS].find({"_id": {"$in": cartas_sorteadas}}).to_list(None)
-    cartas_draft_resp = [CartaResponse(**c) for c in draft_docs]
-
-    return AvanzarMesV2Response(
-        mes_actual=run["mes_actual"],
-        fase_actual=run["fase_actual"],
-        status=run["status"],
-        recursos=run["recursos"],
-        cartas_draft_actual=cartas_draft_resp,
-        finalizacion=None
-    )
+    return _respuesta_cierre_mes(run, [CartaResponse(**c) for c in draft_docs])

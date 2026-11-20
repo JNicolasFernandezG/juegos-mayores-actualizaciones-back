@@ -5,11 +5,11 @@ from datetime import datetime, timezone
 from typing import Any, Optional, Tuple
 
 from fastapi import HTTPException, status
-from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from app.core.database import get_database
 from app.features.economy.config import get_economy_config
+from app.features.economy.points import debit_user_points
 from app.features.economy.schemas import UseHintResponse
 from app.shared.clock import today_str
 
@@ -27,156 +27,131 @@ async def _find_hint_challenge(db: Any, game_id: str, target_date: str, difficul
     candidates = await db["daily_challenges"].find(
         {"game_id": game_id, "date": target_date}
     ).limit(2).to_list(length=2)
-    if len(candidates) == 1:
-        return candidates[0]
-    return None
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def _resolve_crucigrama_hint(config: dict, req: Any, idx: int) -> Tuple[Optional[str], Any, str]:
+    words = config.get("words") or []
+    if req.row is not None and req.col is not None:
+        hint_key = f"cell:{req.row}:{req.col}"
+        for w in words:
+            word_str = w.get("word", "")
+            for i, coord in enumerate(w.get("coords") or []):
+                if len(coord) >= 2 and coord[0] == req.row and coord[1] == req.col and i < len(word_str):
+                    val = word_str[i]
+                    return (f"La letra en ({req.row + 1}, {req.col + 1}) es '{val}'", val, hint_key)
+        return (None, None, hint_key)
+    if words and 0 <= idx < len(words):
+        texto = f"{words[idx].get('direction', 'Horiz.')} {words[idx].get('number', '')}: {words[idx].get('clue', '')}"
+        return (texto, None, f"word:{idx}")
+    return (None, None, f"hint:{idx}")
 
 
 def _resolve_hint(config: dict, game: str, req: Any) -> Tuple[Optional[str], Any, str]:
     """Devuelve (texto, valor_revelado, hint_key) sin cobrar nada."""
-    pista_texto = None
-    valor_revelado = None
     idx = req.hint_index or 0
-    hint_key = f"hint:{idx}"
-
     if game == "wordle":
         hints = config.get("hints") or []
         if hints:
             idx = idx if 0 <= idx < len(hints) else 0
-            pista_texto = hints[idx]
-            hint_key = f"hint:{idx}"
-        elif config.get("solution"):
-            pista_texto = f"Empieza con la letra '{config['solution'][0]}'"
-            hint_key = "letter:first"
-
+            return (hints[idx], None, f"hint:{idx}")
+        if config.get("solution"):
+            return (f"Empieza con la letra '{config['solution'][0]}'", None, "letter:first")
     elif game == "sudoku":
         sol = config.get("solution")
-        if (
-            sol
-            and req.row is not None
-            and req.col is not None
-            and 0 <= req.row < 9
-            and 0 <= req.col < 9
-        ):
-            valor_revelado = sol[req.row][req.col]
-            pista_texto = (
-                f"El número en la fila {req.row + 1}, "
-                f"columna {req.col + 1} es {valor_revelado}"
-            )
-            hint_key = f"cell:{req.row}:{req.col}"
-
+        if sol and req.row is not None and req.col is not None and 0 <= req.row < 9 and 0 <= req.col < 9:
+            val = sol[req.row][req.col]
+            return (f"El número en la fila {req.row + 1}, columna {req.col + 1} es {val}", val, f"cell:{req.row}:{req.col}")
     elif game == "sopa_letras":
-        hints = config.get("hints") or []
-        words = config.get("words") or []
+        hints, words = config.get("hints") or [], config.get("words") or []
         if hints and 0 <= idx < len(hints):
-            pista_texto = hints[idx]
-        elif words and 0 <= idx < len(words):
-            pista_texto = f"Palabra a buscar: {words[idx]}"
-            hint_key = f"word:{idx}"
-
+            return (hints[idx], None, f"hint:{idx}")
+        if words and 0 <= idx < len(words):
+            return (f"Palabra a buscar: {words[idx]}", None, f"word:{idx}")
     elif game == "crucigrama":
-        words = config.get("words") or []
-        if req.row is not None and req.col is not None:
-            hint_key = f"cell:{req.row}:{req.col}"
-            for w in words:
-                coords = w.get("coords") or []
-                word_str = w.get("word", "")
-                for i, coord in enumerate(coords):
-                    if len(coord) < 2:
-                        continue
-                    r, cl = coord[0], coord[1]
-                    if r == req.row and cl == req.col and i < len(word_str):
-                        valor_revelado = word_str[i]
-                        pista_texto = (
-                            f"La letra en ({req.row + 1}, {req.col + 1}) "
-                            f"es '{valor_revelado}'"
-                        )
-                        break
-                if valor_revelado is not None:
-                    break
-        elif words and 0 <= idx < len(words):
-            pista_texto = (
-                f"{words[idx].get('direction', 'Horiz.')} "
-                f"{words[idx].get('number', '')}: {words[idx].get('clue', '')}"
-            )
-            hint_key = f"word:{idx}"
-
-    return (pista_texto, valor_revelado, hint_key)
+        return _resolve_crucigrama_hint(config, req, idx)
+    return (None, None, f"hint:{idx}")
 
 
-async def _hint_response_from_record(record: dict, user: dict, costo: int, replayed: bool) -> UseHintResponse:
-    puntos_actuales = int(user.get("puntos", 0))
+def _build_hint_response(
+    user: dict,
+    *,
+    puntos_descontados: int,
+    pista: Optional[str],
+    valor_revelado: Any,
+    message: str,
+) -> UseHintResponse:
     return UseHintResponse(
         success=True,
-        puntos_restantes=puntos_actuales,
-        puntos_descontados=0,
+        puntos_restantes=int(user.get("puntos", 0)),
+        puntos_descontados=puntos_descontados,
         vidas_restantes=int(user.get("vidas") or 5),
         vidas_descontadas=0,
-        pista=record.get("pista"),
-        valor_revelado=record.get("valor_revelado"),
-        message=(
-            "Esta pista ya fue desbloqueada; no se descontaron puntos."
-            if replayed
-            else f"Pista desbloqueada exitosamente (-{costo} puntos)."
-        ),
+        pista=pista,
+        valor_revelado=valor_revelado,
+        message=message,
     )
 
 
+async def _hint_response_from_record(record: dict, user: dict, costo: int, replayed: bool) -> UseHintResponse:
+    msg = (
+        "Esta pista ya fue desbloqueada; no se descontaron puntos."
+        if replayed
+        else f"Pista desbloqueada exitosamente (-{costo} puntos)."
+    )
+    return _build_hint_response(
+        user,
+        puntos_descontados=0,
+        pista=record.get("pista"),
+        valor_revelado=record.get("valor_revelado"),
+        message=msg,
+    )
+
+
+async def _resolve_difficulty(db: Any, user_id: int, game: str, target_date: str, raw_diff: Optional[str]) -> str:
+    difficulty = (raw_diff or "").strip().lower()
+    if difficulty:
+        return difficulty
+    attempt = await db["user_attempts"].find_one(
+        {"user_id": user_id, "game_id": game, "date": target_date}
+    )
+    return str((attempt or {}).get("difficulty") or "standard").lower() or "standard"
+
+
 async def use_hint(user_id: int, req: Any) -> UseHintResponse:
-    """
-    Entrega una pista y descuenta puntos solo si hay contenido y no se entregó antes.
-    """
+    """Entrega una pista y descuenta puntos solo si hay contenido y no se entregó antes."""
     db = get_database()
     config = await get_economy_config()
     costo = int(config.costo_pista_puntos or 20)
 
     game = req.game_id.lower().strip()
     target_date = req.date or today_str()
-    difficulty = (req.difficulty or "").strip().lower() or None
-    if not difficulty:
-        attempt = await db["user_attempts"].find_one(
-            {"user_id": user_id, "game_id": game, "date": target_date}
-        )
-        difficulty = str((attempt or {}).get("difficulty") or "standard").lower()
-    difficulty = difficulty or "standard"
+    difficulty = await _resolve_difficulty(db, user_id, game, target_date, req.difficulty)
 
     user = await db["usuarios"].find_one({"id": user_id})
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Usuario {user_id} no encontrado.",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Usuario {user_id} no encontrado.")
 
     challenge = await _find_hint_challenge(db, game, target_date, difficulty)
-    pista_texto = None
-    valor_revelado = None
-    hint_key = f"hint:{req.hint_index or 0}"
+    pista_texto, valor_revelado, hint_key = None, None, f"hint:{req.hint_index or 0}"
     if challenge and "config" in challenge:
         try:
-            pista_texto, valor_revelado, hint_key = _resolve_hint(
-                challenge["config"] or {}, game, req
-            )
+            pista_texto, valor_revelado, hint_key = _resolve_hint(challenge["config"] or {}, game, req)
         except Exception as e:
             logger.warning(f"[ECONOMIA] No se pudo resolver la pista de {game}: {e}")
 
     if pista_texto is None and valor_revelado is None:
-        return UseHintResponse(
-            success=True,
-            puntos_restantes=int(user.get("puntos", 0)),
+        return _build_hint_response(
+            user,
             puntos_descontados=0,
-            vidas_restantes=int(user.get("vidas") or 5),
-            vidas_descontadas=0,
             pista=None,
             valor_revelado=None,
             message="No hay pista disponible para este desafío; no se descontaron puntos.",
         )
 
     hint_filter = {
-        "user_id": user_id,
-        "game_id": game,
-        "date": target_date,
-        "difficulty": difficulty,
-        "hint_key": hint_key,
+        "user_id": user_id, "game_id": game, "date": target_date,
+        "difficulty": difficulty, "hint_key": hint_key,
     }
     existing = await db[COLL_HINTS].find_one(hint_filter)
     if existing:
@@ -184,12 +159,8 @@ async def use_hint(user_id: int, req: Any) -> UseHintResponse:
 
     now = datetime.now(timezone.utc)
     record = {
-        **hint_filter,
-        "pista": pista_texto,
-        "valor_revelado": valor_revelado,
-        "status": "pending",
-        "created_at": now,
-        "updated_at": now,
+        **hint_filter, "pista": pista_texto, "valor_revelado": valor_revelado,
+        "status": "pending", "created_at": now, "updated_at": now,
     }
     try:
         await db[COLL_HINTS].insert_one(record)
@@ -199,51 +170,29 @@ async def use_hint(user_id: int, req: Any) -> UseHintResponse:
             return await _hint_response_from_record(existing, user, costo, replayed=True)
         raise
 
-    result = await db["usuarios"].find_one_and_update(
-        {"id": user_id, "puntos": {"$gte": costo}},
-        {
-            "$inc": {"puntos": -costo},
-            "$set": {"updated_at": now},
-        },
-        return_document=ReturnDocument.AFTER,
-    )
-
+    result = await debit_user_points(db, user_id, costo, now=now)
     if not result:
         await db[COLL_HINTS].delete_one({"_id": record["_id"]})
         user_actual = await db["usuarios"].find_one({"id": user_id})
         puntos_actuales = int(user_actual.get("puntos", 0)) if user_actual else 0
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Puntos insuficientes para pedir una pista. Cuesta {costo} pts "
-                f"y tenés {puntos_actuales} pts."
-            ),
+            detail=f"Puntos insuficientes para pedir una pista. Cuesta {costo} pts y tenés {puntos_actuales} pts.",
         )
 
     nuevos_puntos = int(result.get("puntos", 0))
     await db[COLL_HINTS].update_one(
         {"_id": record["_id"]},
-        {
-            "$set": {
-                "status": "applied",
-                "puntos_descontados": costo,
-                "saldo_despues": nuevos_puntos,
-                "updated_at": now,
-            }
-        },
+        {"$set": {"status": "applied", "puntos_descontados": costo, "saldo_despues": nuevos_puntos, "updated_at": now}},
     )
     logger.info(
         f"[ECONOMIA] Usuario {user_id} consumió {costo} pts por pista en "
         f"{game}/{difficulty}/{target_date}. Restan: {nuevos_puntos} pts"
     )
-
-    return UseHintResponse(
-        success=True,
-        puntos_restantes=nuevos_puntos,
+    return _build_hint_response(
+        result,
         puntos_descontados=costo,
-        vidas_restantes=int(result.get("vidas") or 5),
-        vidas_descontadas=0,
         pista=pista_texto,
         valor_revelado=valor_revelado,
-        message=f"Pista desbloqueada exitosamente (-{costo} puntos)."
+        message=f"Pista desbloqueada exitosamente (-{costo} puntos).",
     )

@@ -9650,6 +9650,67 @@
         ],
         "title": "EventoEspecialV2GrafoSchema"
       },
+      "EventoMuestraSetupResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "descripcion": {
+            "type": "string",
+            "title": "Descripcion",
+            "default": ""
+          },
+          "categoria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria"
+          },
+          "categoria_evento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Evento"
+          },
+          "tono": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "positivo",
+                  "negativo",
+                  "neutro"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tono"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "titulo"
+        ],
+        "title": "EventoMuestraSetupResponse"
+      },
       "EventoTurnoResponse": {
         "properties": {
           "id": {
@@ -9704,6 +9765,12 @@
             "title": "Titulo",
             "description": "Título visible del evento"
           },
+          "descripcion": {
+            "type": "string",
+            "title": "Descripcion",
+            "description": "Resumen corto para la Etapa 0; si está vacío se usa el texto del nodo raíz",
+            "default": ""
+          },
           "imagen": {
             "type": "string",
             "title": "Imagen",
@@ -9722,6 +9789,35 @@
             "type": "array",
             "title": "Tags Tematicos",
             "description": "Etiquetas temáticas para sinergias con corte o cartas"
+          },
+          "categoria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria",
+            "description": "Categoría temática opcional del evento (ej: Pueblo, Fe, Ejército, Oro)"
+          },
+          "tono": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "positivo",
+                  "negativo",
+                  "neutro"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tono",
+            "description": "Tono climático opcional del evento ('positivo', 'negativo', 'neutro')"
           },
           "requisitos_eventos_previos": {
             "items": {
@@ -12308,6 +12404,14 @@
             },
             "type": "array",
             "title": "Cartas Ofrecidas"
+          },
+          "eventos_del_dia": {
+            "items": {
+              "$ref": "#/components/schemas/EventoMuestraSetupResponse"
+            },
+            "type": "array",
+            "title": "Eventos Del Dia",
+            "default": []
           },
           "tiene_partida_activa": {
             "type": "boolean",

@@ -4,7 +4,7 @@ Orquestador de reglas ECA (despacho de frecuencias y efectos) y fachada compatib
 de evaluación de condiciones y ejecución de acciones.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from app.features.narrative.engine.action_executor import (
     _aplicar_operacion_matematica,
@@ -17,6 +17,8 @@ from app.features.narrative.engine.condition_evaluator import (
     _comparar_valores,
     evaluar_condicion,
     evaluar_condiciones,
+    generar_motivo_bloqueo,
+    primer_motivo_bloqueo,
 )
 from app.features.narrative.schemas.rules_schemas import EfectoSchema
 
@@ -121,9 +123,38 @@ def despachar_efectos(
             )
 
 
+def despachar_efectos_entidades_activas(
+    disparador: Any,
+    run_data: Dict[str, Any],
+    entidades: Iterable[Dict[str, Any]],
+    recursos_definicion: Optional[Dict[str, Dict[str, Any]]] = None,
+    *,
+    mes_actual: Optional[int] = None,
+    catalogo_acciones: Optional[Dict[str, Any]] = None,
+    catalogo_frecuencias: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Despacha efectos de un conjunto de cartas o personajes usando su `_id` como dueño."""
+    for entidad in entidades:
+        efectos = entidad.get("efectos") or []
+        if not efectos:
+            continue
+        despachar_efectos(
+            disparador,
+            run_data,
+            [EfectoSchema(**e) for e in efectos],
+            recursos_definicion,
+            duenio_id=str(entidad["_id"]),
+            mes_actual=mes_actual,
+            catalogo_acciones=catalogo_acciones,
+            catalogo_frecuencias=catalogo_frecuencias,
+        )
+
+
 __all__ = [
     "evaluar_condicion",
     "evaluar_condiciones",
+    "generar_motivo_bloqueo",
+    "primer_motivo_bloqueo",
     "_comparar_valores",
     "_aplicar_operacion_matematica",
     "_extraer_primitiva_y_params",
@@ -131,4 +162,5 @@ __all__ = [
     "aplicar_delta_recurso",
     "ejecutar_accion",
     "despachar_efectos",
+    "despachar_efectos_entidades_activas",
 ]

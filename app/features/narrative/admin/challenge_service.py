@@ -24,6 +24,7 @@ from app.features.narrative.constants import (
 from app.features.narrative.enums import TipoFinalizacionEnum
 from app.features.narrative.schemas.catalog_schemas import FinalizacionResponse
 from app.features.narrative.admin.crud_service import obtener_finalizaciones
+from app.features.narrative.game.event_cycle import seleccionar_ciclo_eventos_diario
 
 logger = logging.getLogger(__name__)
 
@@ -138,10 +139,12 @@ async def generar_mes_narrativo(year: int, month: int, universo_id: str) -> Dict
     if not universo:
         raise HTTPException(status_code=404, detail=f"Universo '{universo_id}' no encontrado.")
 
-    pjs = await db[COLL_CHARACTERS].find({"universo_id": universo_id}).to_list(None)
-    cartas = await db[COLL_CARDS].find({"universo_id": universo_id}).to_list(None)
-    eventos_v2 = await db[COLL_V2_EVENTS].find({"universo_id": universo_id}).to_list(None)
-    convs_v2 = await db[COLL_V2_CONVERSATIONS].find({"universo_id": universo_id}).to_list(None)
+    # Orden estable por _id: la semilla diaria depende del orden de las listas, así que
+    # sin sort el mazo cambiaría según el orden natural de Mongo.
+    pjs = await db[COLL_CHARACTERS].find({"universo_id": universo_id}).sort("_id", 1).to_list(None)
+    cartas = await db[COLL_CARDS].find({"universo_id": universo_id}).sort("_id", 1).to_list(None)
+    eventos_v2 = await db[COLL_V2_EVENTS].find({"universo_id": universo_id}).sort("_id", 1).to_list(None)
+    convs_v2 = await db[COLL_V2_CONVERSATIONS].find({"universo_id": universo_id}).sort("_id", 1).to_list(None)
 
     eventos = eventos_v2
     convs = convs_v2
@@ -173,6 +176,7 @@ async def generar_mes_narrativo(year: int, month: int, universo_id: str) -> Dict
         cartas_mensuales_pool = [c for c in carta_ids if c not in setup_cartas]
         if len(cartas_mensuales_pool) < 6:
             cartas_mensuales_pool = carta_ids
+        eventos_dia_ids = seleccionar_ciclo_eventos_diario(eventos, rng)
 
         challenge_doc = {
             "game_id": "narrativo",
@@ -187,7 +191,7 @@ async def generar_mes_narrativo(year: int, month: int, universo_id: str) -> Dict
                 "setup_corte_ofrecidos_ids": setup_corte,
                 "setup_cartas_ofrecidas_ids": setup_cartas,
                 "pool_cartas_mensuales_ids": cartas_mensuales_pool,
-                "pool_eventos_disponibles_ids": evento_ids,
+                "pool_eventos_disponibles_ids": eventos_dia_ids,
                 "pool_conversaciones_ids": conv_ids
             },
             "created_at": datetime.now(timezone.utc)

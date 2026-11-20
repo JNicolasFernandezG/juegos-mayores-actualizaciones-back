@@ -17,6 +17,7 @@ from app.features.narrative.constants import (
     COLL_RUNS,
     COLL_RUNS_ARCHIVE,
 )
+from app.features.narrative.game.identity import filtro_run
 
 CONFLICTO_DETALLE = (
     "La partida fue modificada por otra petición. "
@@ -99,6 +100,21 @@ async def persistir_run(
 
 async def obtener_run_activo(run_id: str) -> Optional[Dict[str, Any]]:
     return await get_database()[COLL_RUNS].find_one({"_id": run_id})
+
+
+async def obtener_run_activo_o_404(
+    user_id: int,
+    date: str,
+    *,
+    db=None,
+    detail: str = "Partida no encontrada.",
+) -> Dict[str, Any]:
+    """Recupera la partida activa del usuario para la fecha o lanza HTTP 404."""
+    database = db if db is not None else get_database()
+    run = await database[COLL_RUNS].find_one(filtro_run(user_id, date))
+    if not run:
+        raise HTTPException(status_code=404, detail=detail)
+    return run
 
 
 async def obtener_run_por_id(run_id: str) -> Optional[Dict[str, Any]]:

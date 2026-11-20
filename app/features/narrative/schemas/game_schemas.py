@@ -65,6 +65,15 @@ class ReiniciarPartidaRequest(BaseModel):
 # 3. DTOs DE CÁLCULO DE PROBABILIDADES Y TURNO
 # ============================================================================
 
+class EventoMuestraSetupResponse(BaseModel):
+    id: str
+    titulo: str
+    descripcion: str = ""
+    categoria: Optional[str] = None
+    categoria_evento: Optional[str] = None
+    tono: Optional[Literal["positivo", "negativo", "neutro"]] = None
+
+
 class SetupDesafioResponse(BaseModel):
     date: str
     universo_id: str
@@ -73,6 +82,7 @@ class SetupDesafioResponse(BaseModel):
     atributos_iniciales: Dict[str, int]
     personajes_ofrecidos: List[PersonajeResponse]
     cartas_ofrecidas: List[CartaResponse]
+    eventos_del_dia: List[EventoMuestraSetupResponse] = []
     tiene_partida_activa: bool = False
     fase_partida_activa: Optional[str] = None
 

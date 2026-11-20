@@ -1,14 +1,13 @@
 """Desbloqueo de días históricos con puntos o suscripción Premium."""
 
 import logging
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException, status
-from pymongo import ReturnDocument
 
 from app.core.database import get_database
 from app.features.economy.config import get_economy_config
+from app.features.economy.points import debit_user_points
 
 logger = logging.getLogger("EconomyService")
 
@@ -32,7 +31,7 @@ async def unlock_historical_day(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Usuario {user_id} no encontrado."
+            detail=f"Usuario {user_id} no encontrado.",
         )
 
     suscripcion = str(user.get("suscripcion", "basica")).lower()
@@ -62,15 +61,11 @@ async def unlock_historical_day(
         }
 
     costo = config.costo_desbloqueo_dia_puntos
-
-    result = await db["usuarios"].find_one_and_update(
-        {"id": user_id, "puntos": {"$gte": costo}},
-        {
-            "$inc": {"puntos": -costo},
-            "$addToSet": {"dias_desbloqueados": unlock_key},
-            "$set": {"updated_at": datetime.now(timezone.utc)},
-        },
-        return_document=ReturnDocument.AFTER,
+    result = await debit_user_points(
+        db,
+        user_id,
+        costo,
+        extra_update={"$addToSet": {"dias_desbloqueados": unlock_key}},
     )
 
     if not result:
@@ -80,7 +75,10 @@ async def unlock_historical_day(
         )
 
     nuevos_puntos = int(result.get("puntos", 0))
-    logger.info(f"[DESBLOQUEO DIA] Usuario {user_id} desbloqueó '{unlock_key}' por {costo} pts. Saldo restante: {nuevos_puntos} pts.")
+    logger.info(
+        f"[DESBLOQUEO DIA] Usuario {user_id} desbloqueó '{unlock_key}' por {costo} pts. "
+        f"Saldo restante: {nuevos_puntos} pts."
+    )
 
     return {
         "success": True,

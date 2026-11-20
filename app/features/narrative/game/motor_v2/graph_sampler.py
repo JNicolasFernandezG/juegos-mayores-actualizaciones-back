@@ -5,6 +5,7 @@ Filtra por universo, historial de jugados, requisitos previos y condiciones dinÃ
 aplicando sinergias con la corte, cartas en mano y recursos en crisis.
 """
 
+import logging
 import random
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -17,6 +18,9 @@ from app.features.narrative.constants import (
     COLL_V2_EVENTS,
 )
 from app.features.narrative.engine.rule_engine import evaluar_condiciones
+from app.features.narrative.engine.tag_state import personajes_activos
+
+logger = logging.getLogger(__name__)
 
 
 async def _cargar_tags_corte(db, corte_activa: Set[str]) -> Set[str]:
@@ -103,11 +107,18 @@ async def sortear_evento_v2(
         query["_id"] = {"$in": pool_ids}
 
     candidatos = await database[COLL_V2_EVENTS].find(query).to_list(None)
+    if not candidatos and pool_ids:
+        logger.warning(
+            "Mazo de eventos sin coincidencias (universo=%s, %d ids); se usa el universo completo.",
+            universo_id,
+            len(pool_ids),
+        )
+        candidatos = await database[COLL_V2_EVENTS].find({"universo_id": universo_id}).to_list(None)
     if not candidatos:
         return None
 
     eventos_jugados = set(run.get("eventos_jugados", []))
-    corte_activa = set(run.get("afinidad", {}).keys()) or set(run.get("corte_activa", []))
+    corte_activa = set(personajes_activos(run))
     tags_corte = await _cargar_tags_corte(database, corte_activa)
     tags_cartas = await _cargar_tags_cartas(database, run.get("cartas_en_mano", []))
     recursos_crisis = {k.lower() for k, v in run.get("recursos", {}).items() if float(v) < 25.0}
@@ -115,11 +126,23 @@ async def sortear_evento_v2(
     disponibles, pesos = _filtrar_eventos_elegibles(
         candidatos, eventos_jugados, corte_activa, tags_corte, tags_cartas, recursos_crisis, run
     )
+    if not disponibles and pool_ids:
+        logger.warning(
+            "Sin eventos elegibles dentro del mazo anunciado (universo=%s, %d ids); "
+            "se sortea sobre el universo completo.",
+            universo_id,
+            len(pool_ids),
+        )
+        candidatos = await database[COLL_V2_EVENTS].find({"universo_id": universo_id}).to_list(None)
+        disponibles, pesos = _filtrar_eventos_elegibles(
+            candidatos, eventos_jugados, corte_activa, tags_corte, tags_cartas, recursos_crisis, run
+        )
 
     if not disponibles and eventos_jugados:
         universo_doc = await database[COLL_SETTINGS].find_one({"_id": universo_id}, {"reciclaje_eventos_v2": 1})
         reciclar = bool(run.get("reciclaje_eventos_v2") or (universo_doc or {}).get("reciclaje_eventos_v2"))
         if reciclar:
+            logger.info("Mazo agotado; reciclando historial de eventos V2 (universo=%s).", universo_id)
             # Reciclaje controlado: libera el historial al agotar elegibles para completar los 12 meses.
             run["eventos_jugados"] = []
             run["reciclajes_eventos_v2"] = int(run.get("reciclajes_eventos_v2", 0)) + 1
@@ -147,23 +170,30 @@ async def sortear_conversacion_v2(
         query["_id"] = {"$in": pool_ids}
 
     candidatas = await database[COLL_V2_CONVERSATIONS].find(query).to_list(None)
+    if not candidatas and pool_ids:
+        candidatas = await database[COLL_V2_CONVERSATIONS].find({"universo_id": universo_id}).to_list(None)
     if not candidatas:
         return None
 
     convs_jugadas = set(run.get("conversaciones_jugadas", []))
-    corte_activa = set(run.get("afinidad", {}).keys()) or set(run.get("corte_activa", []))
+    corte_activa = set(personajes_activos(run))
 
-    validas = []
-    for conv in candidatas:
-        if conv.get("_id") in convs_jugadas:
-            continue
-        if not set(conv.get("requisitos", [])).issubset(corte_activa):
-            continue
-        condiciones = conv.get("condiciones_disparo", [])
-        if condiciones and not evaluar_condiciones(condiciones, run):
-            continue
-        validas.append(conv)
+    def _filtrar_convs(lista: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        out = []
+        for conv in lista:
+            if conv.get("_id") in convs_jugadas:
+                continue
+            if not set(conv.get("requisitos", [])).issubset(corte_activa):
+                continue
+            condiciones = conv.get("condiciones_disparo", [])
+            if condiciones and not evaluar_condiciones(condiciones, run):
+                continue
+            out.append(conv)
+        return out
 
-    if not validas:
-        return None
-    return random.choice(validas)
+    validas = _filtrar_convs(candidatas)
+    if not validas and pool_ids:
+        candidatas = await database[COLL_V2_CONVERSATIONS].find({"universo_id": universo_id}).to_list(None)
+        validas = _filtrar_convs(candidatas)
+
+    return random.choice(validas) if validas else None

@@ -1,220 +1,128 @@
+"""Casos de uso de autenticación delegados al microservicio central."""
+
+from typing import Any, Dict, Optional
+
 import httpx
-from datetime import datetime, date, timezone
-from typing import Dict, Optional
 from fastapi import HTTPException, status
-from app.core.database import get_database
+
+from app.core.config import settings
 from app.core.security import (
     GUEST_ID_PATTERN,
     crear_credencial_invitado,
     decode_guest_credential,
     generar_guest_id,
 )
-from app.core.config import settings
 from app.features.auth.central_client import post_to_auth_service
 from app.features.auth.schemas import (
-    LoginSistemasRequest, LoginCodigoRequest, VerificarTokenRequest,
-    RegisterRequest
+    LoginCodigoRequest,
+    LoginSistemasRequest,
+    RegisterRequest,
+    VerificarTokenRequest,
+)
+from app.features.auth.user_sync import (  # noqa: F401
+    _extract_first,
+    _normalize_role,
+    _to_bool,
+    format_user_response,
+    sync_local_user_from_auth_service,
 )
 
-def format_user_response(user: dict, include_access_code: bool = True) -> dict:
-    """Formatea el documento de MongoDB al contrato JSON esperado por el frontend."""
-    date_start = user.get("date_start")
-    if isinstance(date_start, datetime):
-        date_start_str = date_start.strftime("%Y-%m-%dT%H:%M:%S")
-    elif isinstance(date_start, date):
-        date_start_str = date_start.strftime("%Y-%m-%dT00:00:00")
-    else:
-        date_start_str = date_start
 
-    date_end = user.get("date_end")
-    if isinstance(date_end, (datetime, date)):
-        date_end_str = date_end.strftime("%Y-%m-%d")
-    else:
-        date_end_str = date_end
-
-    estado_id = user.get("estado_id", 2 if user.get("activo", True) else 3)
-    estado_codigo = user.get("estado_codigo")
-    if not estado_codigo:
-        if estado_id == 1:
-            estado_codigo = "PENDIENTE_VERIFICACION"
-        elif estado_id == 2:
-            estado_codigo = "ACTIVO"
-        else:
-            estado_codigo = "SUSPENDIDO"
-
-    payload = {
-        "id": user.get("id"),
-        "name": user.get("name", ""),
-        "email": user.get("email", ""),
-        "tipoUsuario": user.get("tipo_usuario", 1),
-        "black": bool(user.get("black", False)),
-        "activo": bool(user.get("activo", True)),
-        "estadoId": estado_id,
-        "estadoCodigo": estado_codigo,
-        "dateStart": date_start_str,
-        "dateEnd": date_end_str
-    }
-    if include_access_code:
-        payload["codigoAcceso"] = user.get("codigo_acceso", "")
-    return payload
-
-async def sync_local_user_from_auth_service(remote_user: dict) -> dict:
-    """
-    Sincroniza o crea el usuario en la coleccion local 'usuarios' de MongoDB (mayores_actualizaciones).
-    El microservicio central de Autenticacion es el UNICO dueno de la verdad del ID numerico y la identidad.
-    Utiliza una operacion atomica de 'upsert' por 'id' que garantiza que nunca ocurran colisiones de clave duplicada.
-    """
-    if not remote_user:
-        return {}
-
-    db = get_database()
-    user_id = int(remote_user["id"])
-    email = remote_user.get("email", "").lower().strip()
-    update_fields = {
-        "id": user_id,
-        "name": remote_user.get("name") or remote_user.get("nombre") or "",
-        "email": email,
-        "codigo_acceso": remote_user.get("codigoAcceso") or remote_user.get("codigo_acceso") or "",
-        "tipo_usuario": int(remote_user.get("tipoUsuario") or remote_user.get("tipo_usuario") or 1),
-        "black": bool(remote_user.get("black", False)),
-        "activo": bool(remote_user.get("activo", True)),
-        "estado_id": int(remote_user.get("estadoId") or remote_user.get("estado_id") or 2),
-        "estado_codigo": remote_user.get("estadoCodigo") or remote_user.get("estado_codigo") or "ACTIVO",
-    }
-
-    if email:
-        await db["usuarios"].delete_many({"email": email, "id": {"$ne": user_id}})
-
-    await db["usuarios"].update_one(
-        {"id": user_id},
-        {
-            "$set": update_fields,
-            "$setOnInsert": {
-                "date_start": datetime.now(timezone.utc),
-                "date_end": None,
-                "puntos": 0
-            }
-        },
-        upsert=True
-    )
-
-    local_user = await db["usuarios"].find_one({"id": user_id})
-    return local_user or {}
-
-
-async def login_sistemas(req: LoginSistemasRequest):
-    """
-    Autentica al operador de sistemas delegando la verificación de credenciales
-    al microservicio central de Autenticación.
-    """
-    data = await post_to_auth_service(
-        "/auth/login",
-        {
-            "email": req.email.lower().strip(),
-            "password": req.password,
-            "servicio": settings.SERVICE_KEY,
-        },
-        default_error="Credenciales incorrectas",
+async def _post_auth(
+    endpoint: str,
+    payload: Dict[str, Any],
+    *,
+    default_error: str,
+    fixed_error_status: Optional[int] = None,
+) -> Dict[str, Any]:
+    return await post_to_auth_service(
+        endpoint,
+        payload,
+        default_error=default_error,
         client_cls=httpx.AsyncClient,
+        fixed_error_status=fixed_error_status,
         base_url=settings.AUTH_SERVICE_URL,
     )
+
+
+async def _finalize_auth_response(
+    data: Dict[str, Any],
+    default_message: str,
+    *,
+    use_remote_message: bool = False,
+    token_fallback: Optional[str] = None,
+    **extra: Any,
+) -> Dict[str, Any]:
     remote_user = data.get("user") if isinstance(data.get("user"), dict) else {}
-    tipo_usuario = int(remote_user.get("tipoUsuario") or remote_user.get("tipo_usuario") or 1)
-    if tipo_usuario != 2:
+    local_user = await sync_local_user_from_auth_service(remote_user)
+    token = data.get("token") if token_fallback is None else (data.get("token") or token_fallback)
+    message = (data.get("message") or default_message) if use_remote_message else default_message
+    return {
+        "success": True,
+        "message": message,
+        "token": token,
+        "user": format_user_response(local_user),
+        **extra,
+    }
+
+
+async def login_sistemas(req: LoginSistemasRequest) -> Dict[str, Any]:
+    """Autentica al operador de sistemas delegando en el microservicio central."""
+    data = await _post_auth(
+        "/auth/login",
+        {"email": req.email.lower().strip(), "password": req.password, "servicio": settings.SERVICE_KEY},
+        default_error="Credenciales incorrectas",
+    )
+    remote_user = data.get("user") if isinstance(data.get("user"), dict) else {}
+    if _normalize_role(remote_user) != 2:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acceso denegado: Se requieren permisos de Operador de Sistemas",
         )
-
-    local_user = await sync_local_user_from_auth_service(remote_user)
-    return {
-        "success": True,
-        "message": "Inicio de sesión exitoso",
-        "token": data.get("token"),
-        "user": format_user_response(local_user),
-    }
+    return await _finalize_auth_response(data, "Inicio de sesión exitoso")
 
 
-async def login_codigo(req: LoginCodigoRequest):
-    """
-    Autentica a los alumnos mediante su correo electrónico y PIN de 6 dígitos
-    delegando la validación al microservicio central de Autenticación.
-    """
-    email_clean = str(req.email).strip().lower()
-    code = req.get_codigo()
+async def login_codigo(req: LoginCodigoRequest) -> Dict[str, Any]:
+    """Autentica alumnos por correo y PIN de 6 dígitos en el microservicio central."""
+    email_clean, code = str(req.email).strip().lower(), req.get_codigo()
     if not email_clean:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El correo electrónico es obligatorio",
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El correo electrónico es obligatorio")
     if not code:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La clave de 6 dígitos es obligatoria",
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La clave de 6 dígitos es obligatoria")
 
-    data = await post_to_auth_service(
+    data = await _post_auth(
         "/auth/validar-acceso",
-        {
-            "email": email_clean,
-            "codigoAcceso": code,
-            "servicio": settings.SERVICE_KEY,
-        },
+        {"email": email_clean, "codigoAcceso": code, "servicio": settings.SERVICE_KEY},
         default_error="Correo o clave de 6 dígitos incorrecta",
-        client_cls=httpx.AsyncClient,
-        base_url=settings.AUTH_SERVICE_URL,
     )
     if not data.get("allowed"):
-        message = data.get("message") or "Acceso denegado: correo o clave incorrecta."
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN if data.get("success") else status.HTTP_401_UNAUTHORIZED,
-            detail=message,
+            detail=data.get("message") or "Acceso denegado: correo o clave incorrecta.",
         )
-
-    remote_user = data.get("user") if isinstance(data.get("user"), dict) else {}
-    local_user = await sync_local_user_from_auth_service(remote_user)
-    return {
-        "success": True,
-        "message": "Acceso concedido exitosamente.",
-        "token": data.get("token"),
-        "user": format_user_response(local_user),
-    }
+    return await _finalize_auth_response(data, "Acceso concedido exitosamente.")
 
 
-async def verificar_token(req: VerificarTokenRequest):
-    """
-    Verifica la validez de un token JWT contra el microservicio central de Autenticación.
-    """
-    data = await post_to_auth_service(
+async def verificar_token(req: VerificarTokenRequest) -> Dict[str, Any]:
+    """Verifica la validez de un token JWT contra el microservicio central."""
+    data = await _post_auth(
         "/auth/validar-acceso",
         {"token": req.token, "servicio": settings.SERVICE_KEY},
         default_error="Token inválido o expirado",
-        client_cls=httpx.AsyncClient,
         fixed_error_status=status.HTTP_401_UNAUTHORIZED,
-        base_url=settings.AUTH_SERVICE_URL,
     )
     if not data.get("allowed"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=data.get("message") or "Token inválido o no autorizado para el servicio.",
         )
-
-    remote_user = data.get("user") if isinstance(data.get("user"), dict) else {}
-    local_user = await sync_local_user_from_auth_service(remote_user)
-    return {
-        "success": True,
-        "valid": True,
-        "token": data.get("token") or req.token,
-        "message": "Token verificado con éxito",
-        "user": format_user_response(local_user),
-    }
+    return await _finalize_auth_response(
+        data, "Token verificado con éxito", token_fallback=req.token, valid=True
+    )
 
 
-async def register_usuario(req: RegisterRequest, is_admin_creation: bool = False):
-    """
-    Registra un nuevo usuario delegando la creación y generación de PIN
-    al microservicio central de Autenticación.
-    """
+async def register_usuario(req: RegisterRequest, is_admin_creation: bool = False) -> Dict[str, Any]:
+    """Registra un nuevo usuario delegando creación y PIN al Autenticador Central."""
     payload: Dict[str, object] = {
         "name": req.name.strip(),
         "email": req.email.lower().strip(),
@@ -226,37 +134,22 @@ async def register_usuario(req: RegisterRequest, is_admin_creation: bool = False
         "activo": bool(req.activo) if (is_admin_creation and req.activo is not None) else True,
         "servicios": {settings.SERVICE_KEY: True, "cognijuegos": True},
     }
-    data = await post_to_auth_service(
+    data = await _post_auth(
         "/auth/register",
         payload,
         default_error="Error al registrar el usuario en el Autenticador Central",
-        client_cls=httpx.AsyncClient,
-        base_url=settings.AUTH_SERVICE_URL,
     )
-    remote_user = data.get("user") if isinstance(data.get("user"), dict) else {}
-    local_user = await sync_local_user_from_auth_service(remote_user)
-    return {
-        "success": True,
-        "message": data.get("message") or "Usuario registrado con éxito.",
-        "token": data.get("token"),
-        "user": format_user_response(local_user),
-    }
+    return await _finalize_auth_response(data, "Usuario registrado con éxito.", use_remote_message=True)
 
 
 def emitir_credencial_invitado(credencial_actual: Optional[str]) -> dict:
-    """
-    Emite una credencial de invitado firmada por el backend.
-
-    Si el cliente presenta una credencial vigente, se reutiliza su ``guest_id`` para
-    que el invitado conserve su partida; si no, se genera una identidad nueva.
-    """
+    """Emite o renueva una credencial firmada de invitado."""
     guest_id = None
     if credencial_actual:
         payload = decode_guest_credential(credencial_actual)
         candidato = (payload or {}).get("sub")
         if isinstance(candidato, str) and GUEST_ID_PATTERN.match(candidato):
             guest_id = candidato
-
     if not guest_id:
         guest_id = generar_guest_id()
 

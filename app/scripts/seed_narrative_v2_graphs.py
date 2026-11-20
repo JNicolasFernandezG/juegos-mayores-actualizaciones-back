@@ -1672,6 +1672,8 @@ async def seed_v2_graphs():
     col_convs = db[COLL_V2_CONVERSATIONS]
     col_especiales = db[COLL_V2_EVENTOS_ESPECIALES]
 
+    from app.scripts.narrative_catalog_extra import construir_eventos_extra
+
     eventos_todos = [
         evento_cometa,
         evento_secta,
@@ -1679,7 +1681,8 @@ async def seed_v2_graphs():
         evento_embargo,
         evento_motin,
         evento_sequia,
-        evento_pretendiente
+        evento_pretendiente,
+        *construir_eventos_extra(),
     ]
     for ev in eventos_todos:
         doc = ev.model_dump(by_alias=True)

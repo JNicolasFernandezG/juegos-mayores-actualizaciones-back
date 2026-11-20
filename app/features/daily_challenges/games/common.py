@@ -106,6 +106,7 @@ async def upsert_daily_challenge(
     config: Dict[str, Any],
     difficulty: str = "standard",
     now_utc: Optional[datetime] = None,
+    extra_fields: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Crea o actualiza un desafío diario de forma idempotente."""
     timestamp = now_utc or datetime.now(timezone.utc)
@@ -116,6 +117,7 @@ async def upsert_daily_challenge(
         "title": title,
         "config": config,
         "updated_at": timestamp,
+        **(extra_fields or {}),
     }
     await db["daily_challenges"].update_one(
         {"game_id": game_id, "date": date_str, "difficulty": difficulty},

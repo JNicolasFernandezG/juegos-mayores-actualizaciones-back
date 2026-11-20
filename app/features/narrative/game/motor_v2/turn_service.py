@@ -25,7 +25,7 @@ async def iniciar_evento_grafo_mes(
     """Rama V2 de la Fase 1: inicia un grafo de evento para el universo de la partida."""
     evento_v2 = await graph_engine.sortear_evento_v2(
         run=run,
-        pool_ids=None,
+        pool_ids=run.get("pool_eventos_disponibles_ids") or None,
         universo_id=run.get("universo_id", "corte_medieval")
     )
     if not evento_v2:

@@ -65,14 +65,25 @@ async def listar_acciones(universo_id: Optional[str] = None) -> List[AccionCatal
     return [AccionCatalogoResponse(**d) for d in docs]
 
 
-async def obtener_accion_por_id(accion_id: str, universo_id: Optional[str] = None) -> AccionCatalogoResponse:
-    db = get_database()
+async def _buscar_accion_o_404(accion_id: str, universo_id: Optional[str] = None) -> tuple[Any, Dict[str, Any], Dict[str, Any]]:
+    col = get_database()[COLL_ACTIONS]
     filtro: Dict[str, Any] = {"_id": accion_id}
     if universo_id:
         filtro["universo_id"] = universo_id
-    doc = await db[COLL_ACTIONS].find_one(filtro)
+    doc = await col.find_one(filtro)
     if not doc:
         raise HTTPException(status_code=404, detail=f"Acción '{accion_id}' no encontrada.")
+    return col, filtro, doc
+
+
+def _validar_occ(doc: Dict[str, Any], expected_version: Optional[int], mensaje_tpl: str) -> None:
+    actual = doc.get("version", 1)
+    if expected_version is not None and actual != expected_version:
+        raise HTTPException(status_code=409, detail=mensaje_tpl.format(expected=expected_version, actual=actual))
+
+
+async def obtener_accion_por_id(accion_id: str, universo_id: Optional[str] = None) -> AccionCatalogoResponse:
+    _, _, doc = await _buscar_accion_o_404(accion_id, universo_id)
     return AccionCatalogoResponse(**doc)
 
 
@@ -81,36 +92,23 @@ async def actualizar_accion(
     payload: AccionCatalogoUpdateRequest,
     universo_id: Optional[str] = None,
 ) -> AccionCatalogoResponse:
-    db = get_database()
-    col = db[COLL_ACTIONS]
-    filtro: Dict[str, Any] = {"_id": accion_id}
-    if universo_id:
-        filtro["universo_id"] = universo_id
-
-    doc = await col.find_one(filtro)
-    if not doc:
-        raise HTTPException(status_code=404, detail=f"Acción '{accion_id}' no encontrada.")
-
-    if payload.expected_version is not None and doc.get("version", 1) != payload.expected_version:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Conflicto de concurrencia: la versión esperada ({payload.expected_version}) no coincide con la actual ({doc.get('version', 1)}).",
-        )
+    col, filtro, doc = await _buscar_accion_o_404(accion_id, universo_id)
+    _validar_occ(
+        doc,
+        payload.expected_version,
+        "Conflicto de concurrencia: la versión esperada ({expected}) no coincide con la actual ({actual}).",
+    )
 
     updates: Dict[str, Any] = {
         "version": doc.get("version", 1) + 1,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    if payload.nombre is not None:
-        updates["nombre"] = payload.nombre
-    if payload.descripcion is not None:
-        updates["descripcion"] = payload.descripcion
+    for campo in ("nombre", "descripcion", "permitido_en", "activo"):
+        valor = getattr(payload, campo)
+        if valor is not None:
+            updates[campo] = valor
     if payload.primitiva is not None:
         updates["primitiva"] = payload.primitiva.value
-    if payload.permitido_en is not None:
-        updates["permitido_en"] = payload.permitido_en
-    if payload.activo is not None:
-        updates["activo"] = payload.activo
 
     await col.update_one(filtro, {"$set": updates})
     doc.update(updates)
@@ -118,15 +116,7 @@ async def actualizar_accion(
 
 
 async def eliminar_accion(accion_id: str, universo_id: Optional[str] = None) -> Dict[str, Any]:
-    db = get_database()
-    col = db[COLL_ACTIONS]
-    filtro: Dict[str, Any] = {"_id": accion_id}
-    if universo_id:
-        filtro["universo_id"] = universo_id
-
-    doc = await col.find_one(filtro)
-    if not doc:
-        raise HTTPException(status_code=404, detail=f"Acción '{accion_id}' no encontrada.")
+    col, filtro, _ = await _buscar_accion_o_404(accion_id, universo_id)
 
     usos = await obtener_usos_accion(accion_id)
     if usos["total_usos"] > 0:
@@ -206,11 +196,11 @@ async def actualizar_frecuencias_universo(
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
-    if payload.expected_version is not None and doc.get("version", 1) != payload.expected_version:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Conflicto de concurrencia: versión esperada {payload.expected_version} difiere de la actual {doc.get('version', 1)}.",
-        )
+    _validar_occ(
+        doc,
+        payload.expected_version,
+        "Conflicto de concurrencia: versión esperada {expected} difiere de la actual {actual}.",
+    )
 
     items_dict = _validar_items_frecuencias(payload.items)
     updates = {

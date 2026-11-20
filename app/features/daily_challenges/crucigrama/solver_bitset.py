@@ -83,18 +83,9 @@ def solve_with_bitsets(
         return None
 
     cached_defs = _load_definitions_cache()
-    anchors = base_solver.normalize_preassigned(preassigned or {}, slots, intersections)
-    banned = {
-        base_solver.normalize_word(word)
-        for word in (banned_words or set())
-        if base_solver.normalize_word(word)
-    }
-
-    fijadas_vetadas = [word for word in anchors.values() if word in banned]
-    if fijadas_vetadas:
-        raise ValueError(
-            f"La palabra '{fijadas_vetadas[0]}' está fijada y vetada al mismo tiempo."
-        )
+    anchors, banned = base_solver.prepare_anchors_and_bans(
+        preassigned, banned_words, slots, intersections
+    )
 
     slot_by_id = {slot["id"]: slot for slot in slots}
     degree = {slot["id"]: len(intersections[slot["id"]]) for slot in slots}

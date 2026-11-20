@@ -9,18 +9,15 @@ from typing import Optional, Dict, Any
 from fastapi import HTTPException
 
 from app.core.database import get_database
-from app.features.narrative.constants import (
-    COLL_RUNS
-)
 from app.features.narrative.enums import RunPhaseEnum
 from app.features.narrative.schemas.v2_graph_schemas import (
     AvanzarNodoV2Request,
     EstadoGrafoV2Response,
     NodoNarrativoSchema
 )
+from app.features.narrative.game.motor_v2.graph_chaining import construir_estado_grafo_v2
 from app.features.narrative.game.motor_v2.graph_engine import graph_engine
-from app.features.narrative.game.identity import filtro_run
-from app.features.narrative.game.run_repository import persistir_run
+from app.features.narrative.game.run_repository import obtener_run_activo_o_404, persistir_run
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +26,12 @@ _FASES_CONVERSACION = {RunPhaseEnum.RESOLVER_CONVERSACION.value}
 
 
 async def _obtener_run_activo(user_id: int, date: str) -> Dict[str, Any]:
-    db = get_database()
-    run = await db[COLL_RUNS].find_one(filtro_run(user_id, date))
-    if not run:
-        raise HTTPException(status_code=404, detail="Partida no encontrada para la fecha especificada.")
-    return run
+    return await obtener_run_activo_o_404(
+        user_id,
+        date,
+        db=get_database(),
+        detail="Partida no encontrada para la fecha especificada.",
+    )
 
 
 def _exigir_partida_v2_en_fase(
@@ -103,16 +101,15 @@ async def proyectar_grafo_actual(run: Dict[str, Any]) -> Optional[EstadoGrafoV2R
     nodo_schema = NodoNarrativoSchema(**nodo_data)
     nodo_cliente = nodo_schema.to_cliente_schema(run)
 
-    return EstadoGrafoV2Response(
+    return construir_estado_grafo_v2(
+        run,
+        grafo,
+        tipo,
+        grafo_id,
+        nodo_cliente,
         fase_actual=run.get("fase_actual", RunPhaseEnum.TOMA_DECISION_EVENTO.value),
-        grafo_id=grafo_id,
-        tipo=tipo,
-        titulo=grafo.get("titulo", ""),
-        imagen=grafo.get("imagen", ""),
-        nodo_actual=nodo_cliente,
         afinidad=run.get("afinidad") if nodo_schema.es_final else None,
         recursos=run.get("recursos") if nodo_schema.es_final else None,
-        status=run.get("status", "CONTINUA")
     )
 
 async def avanzar_nodo_v2(user_id: int, req: AvanzarNodoV2Request) -> EstadoGrafoV2Response:
@@ -154,7 +151,7 @@ async def iniciar_evento_mes_v2(user_id: int, date: str) -> EstadoGrafoV2Respons
 
     evento = await graph_engine.sortear_evento_v2(
         run=run,
-        pool_ids=None,
+        pool_ids=run.get("pool_eventos_disponibles_ids") or None,
         universo_id=run.get("universo_id", "corte_medieval")
     )
 
@@ -186,7 +183,7 @@ async def iniciar_conversacion_mes_v2(user_id: int, date: str) -> Optional[Estad
 
     conv = await graph_engine.sortear_conversacion_v2(
         run=run,
-        pool_ids=None,
+        pool_ids=run.get("pool_conversaciones_ids") or None,
         universo_id=run.get("universo_id", "corte_medieval")
     )
 

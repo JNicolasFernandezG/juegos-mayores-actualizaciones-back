@@ -2,14 +2,8 @@
 generator.py
 Orquestador del Crucigrama con dos dificultades:
 
-- facil: tablero 7x7 con plantillas simétricas + backtracking CSP, pistas
-  curadas pedagógicas (CURATED_CLUES) y definiciones RAE como respaldo.
-- dificil: tablero 11x11 generado por crecimiento (growth.py) con definiciones
-  formales de la RAE.
-
-La salida de ambas es el mismo contrato: {theme, grid_size, cells, words,
-total_words, date}. `cells` describe la grilla con bloques/números/punteros,
-igual que el formato previo, solo que `grid_size` varía (7 u 11).
+- facil: tablero 7x7 con plantillas simétricas + backtracking CSP y pistas curadas.
+- dificil: tablero 11x11 generado por crecimiento con definiciones RAE.
 """
 
 import concurrent.futures
@@ -19,179 +13,145 @@ import re
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from app.core.config import settings
-from app.core.rae_client import fetch_rae_definition
+from app.core.rae_client import fetch_rae_definition, fetch_rae_definitions_batch
 from app.features.daily_challenges.crucigrama.clues import CURATED_CLUES
 from app.features.daily_challenges.crucigrama.growth import generate_growth_board
-from app.features.daily_challenges.crucigrama.solver import (
-    _parse_template_slots,
-    _solve_crucigrama_backtracking,
-    normalize_word,
+from app.features.daily_challenges.crucigrama.lexicon import (
+    _parse_template_slots, build_solution_grid, normalize_banned,
 )
+from app.features.daily_challenges.crucigrama.solver import _solve_crucigrama_backtracking
 from app.features.daily_challenges.crucigrama.templates_facil import CRUCIGRAMA_TEMPLATES
 
 logger = logging.getLogger(__name__)
+DIFF_FACIL, DIFF_DIFICIL, DIFICIL_SIZE = "facil", "dificil", 11
 
-DIFF_FACIL = "facil"
-DIFF_DIFICIL = "dificil"
-DIFICIL_SIZE = 11
+
+def _fetch_clue(word: str) -> Optional[str]:
+    return fetch_rae_definition(word)
+
+
+_DEFAULT_FETCH_CLUE = _fetch_clue
+_DEFAULT_FETCH_RAE = fetch_rae_definition
+
+
+def _extract_grid_word(
+    grid_raw: List[str], r: int, c: int, dr: int, dc: int,
+    prefix: str, direction: str, num: int, ptr_grid: List[List[Optional[int]]],
+) -> Dict[str, Any]:
+    rows, cols = len(grid_raw), len(grid_raw[0])
+    chars, coords = [], []
+    rr, cc = r, c
+    while rr < rows and cc < cols and grid_raw[rr][cc] != "#":
+        chars.append(grid_raw[rr][cc])
+        coords.append([rr, cc])
+        ptr_grid[rr][cc] = num
+        rr += dr
+        cc += dc
+    word_str = "".join(chars)
+    return {
+        "id": f"{prefix}{num}", "number": num, "direction": direction,
+        "word": word_str, "length": len(word_str), "row": r, "col": c,
+        "coords": coords, "clue": CURATED_CLUES.get(word_str, f"Palabra de {len(word_str)} letras."),
+    }
+
+
+def _enrich_clues(
+    all_words: List[Dict[str, Any]], overrides: Dict[str, str], prefer_curated: bool
+) -> None:
+    rae_needed = [
+        item["word"] for item in all_words
+        if item["word"] not in overrides and not (prefer_curated and item["word"] in CURATED_CLUES)
+    ]
+    rae_defs: Dict[str, Optional[str]] = {}
+    if rae_needed:
+        if _fetch_clue is _DEFAULT_FETCH_CLUE and fetch_rae_definition is _DEFAULT_FETCH_RAE:
+            rae_defs = fetch_rae_definitions_batch(rae_needed)
+        else:
+            unique = list(dict.fromkeys(rae_needed))
+            workers = max(1, min(settings.RAE_MAX_CONCURRENCY, len(unique)))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+                rae_defs = dict(zip(unique, executor.map(_fetch_clue, unique)))
+
+    for item in all_words:
+        w = item["word"]
+        raw = (
+            overrides.get(w)
+            or (CURATED_CLUES[w] if prefer_curated and w in CURATED_CLUES else None)
+            or rae_defs.get(w)
+            or f"Palabra de {len(w)} letras que comienza con '{w[0]}' y termina en '{w[-1]}'."
+        )
+        item["clue"] = re.sub(r"^definici[oó]n\s*[:\-]?\s*", "", raw, flags=re.IGNORECASE).strip()
+
+
+def _build_cells_matrix(
+    grid_raw: List[str],
+    cell_numbers: List[List[Optional[int]]],
+    cell_across: List[List[Optional[int]]],
+    cell_down: List[List[Optional[int]]],
+) -> List[List[Dict[str, Any]]]:
+    return [
+        [
+            {
+                "row": r, "col": c, "is_block": (ch == "#"),
+                "letter": "" if ch == "#" else ch, "number": cell_numbers[r][c],
+                "across_num": cell_across[r][c], "down_num": cell_down[r][c],
+            }
+            for c, ch in enumerate(row)
+        ]
+        for r, row in enumerate(grid_raw)
+    ]
 
 
 def _parse_and_build_challenge(
-    theme: str,
-    grid_raw: List[str],
-    prefer_curated: bool = True,
+    theme: str, grid_raw: List[str], prefer_curated: bool = True,
     clue_overrides: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
-    """
-    Analiza una grilla resuelta, asigna números en orden occidental, construye
-    la matriz de celdas con bloques/punteros y enriquece las pistas con la RAE.
-
-    prefer_curated=True (facil): pistas curadas primero, RAE como respaldo.
-    prefer_curated=False (dificil): definiciones formales de la RAE.
-    clue_overrides permite fijar pistas propias por palabra (palabra -> pista).
-    """
-    R = len(grid_raw)
-    C = len(grid_raw[0]) if R else 0
-    grid_raw = [row.ljust(C, "#")[:C] for row in grid_raw]
-
+    """Analiza una grilla resuelta, asigna números y enriquece pistas con la RAE."""
+    rows, cols = len(grid_raw), len(grid_raw[0]) if grid_raw else 0
+    grid_raw = [row.ljust(cols, "#")[:cols] for row in grid_raw]
     num = 1
-    across_words = []
-    down_words = []
-    cell_numbers = [[None for _ in range(C)] for _ in range(R)]
-    cell_across = [[None for _ in range(C)] for _ in range(R)]
-    cell_down = [[None for _ in range(C)] for _ in range(R)]
+    across_words, down_words = [], []
+    cell_numbers = [[None] * cols for _ in range(rows)]
+    cell_across = [[None] * cols for _ in range(rows)]
+    cell_down = [[None] * cols for _ in range(rows)]
 
-    for r in range(R):
-        for c in range(C):
-            ch = grid_raw[r][c]
-            if ch == "#":
+    for r in range(rows):
+        for c in range(cols):
+            if grid_raw[r][c] == "#":
                 continue
+            is_a = (c == 0 or grid_raw[r][c - 1] == "#") and (c + 1 < cols and grid_raw[r][c + 1] != "#")
+            is_d = (r == 0 or grid_raw[r - 1][c] == "#") and (r + 1 < rows and grid_raw[r + 1][c] != "#")
+            if not (is_a or is_d):
+                continue
+            assigned_num = num
+            cell_numbers[r][c] = num
+            num += 1
+            if is_a:
+                across_words.append(_extract_grid_word(grid_raw, r, c, 0, 1, "H", "horizontal", assigned_num, cell_across))
+            if is_d:
+                down_words.append(_extract_grid_word(grid_raw, r, c, 1, 0, "V", "vertical", assigned_num, cell_down))
 
-            is_a_start = (c == 0 or grid_raw[r][c - 1] == "#") and (c + 1 < C and grid_raw[r][c + 1] != "#")
-            is_d_start = (r == 0 or grid_raw[r - 1][c] == "#") and (r + 1 < R and grid_raw[r + 1][c] != "#")
-
-            assigned_num = None
-            if is_a_start or is_d_start:
-                assigned_num = num
-                cell_numbers[r][c] = num
-                num += 1
-
-            if is_a_start:
-                w_chars = []
-                coords = []
-                cc = c
-                while cc < C and grid_raw[r][cc] != "#":
-                    w_chars.append(grid_raw[r][cc])
-                    coords.append([r, cc])
-                    cell_across[r][cc] = assigned_num
-                    cc += 1
-                word_str = "".join(w_chars)
-                across_words.append({
-                    "id": f"H{assigned_num}",
-                    "number": assigned_num,
-                    "direction": "horizontal",
-                    "word": word_str,
-                    "length": len(word_str),
-                    "row": r,
-                    "col": c,
-                    "coords": coords,
-                    "clue": CURATED_CLUES.get(word_str, f"Palabra de {len(word_str)} letras."),
-                })
-
-            if is_d_start:
-                w_chars = []
-                coords = []
-                rr = r
-                while rr < R and grid_raw[rr][c] != "#":
-                    w_chars.append(grid_raw[rr][c])
-                    coords.append([rr, c])
-                    cell_down[rr][c] = assigned_num
-                    rr += 1
-                word_str = "".join(w_chars)
-                down_words.append({
-                    "id": f"V{assigned_num}",
-                    "number": assigned_num,
-                    "direction": "vertical",
-                    "word": word_str,
-                    "length": len(word_str),
-                    "row": r,
-                    "col": c,
-                    "coords": coords,
-                    "clue": CURATED_CLUES.get(word_str, f"Palabra de {len(word_str)} letras."),
-                })
-
-    # Enriquecer pistas con la RAE y limpiar prefijos.
-    # Las consultas RAE son independientes por palabra: se paralelizan para no
-    # demorar la generación (cada palabra suele tardar ~0.8s en red).
     all_words = across_words + down_words
     overrides = {
         str(k).strip().upper(): str(v).strip()
         for k, v in (clue_overrides or {}).items()
         if str(v or "").strip()
     }
-
-    def _resolve_clue(item: Dict[str, Any]) -> str:
-        w = item["word"]
-        if w in overrides:
-            return overrides[w]
-        if prefer_curated and w in CURATED_CLUES:
-            return CURATED_CLUES[w]
-        rae_def = fetch_rae_definition(w)
-        if rae_def:
-            return rae_def
-        return f"Palabra de {len(w)} letras que comienza con '{w[0]}' y termina en '{w[-1]}'."
-
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=max(1, min(settings.RAE_MAX_CONCURRENCY, len(all_words) or 1))
-    ) as executor:
-        raw_clues = list(executor.map(_resolve_clue, all_words))
-
-    for item, raw_clue in zip(all_words, raw_clues):
-        clean_clue = re.sub(r"^definici[oó]n\s*[:\-]?\s*", "", raw_clue, flags=re.IGNORECASE).strip()
-        item["clue"] = clean_clue
-
-    # Construir matriz de celdas serializable
-    cells = []
-    for r in range(R):
-        row_cells = []
-        for c in range(C):
-            ch = grid_raw[r][c]
-            is_block = (ch == "#")
-            row_cells.append({
-                "row": r,
-                "col": c,
-                "is_block": is_block,
-                "letter": "" if is_block else ch,
-                "number": cell_numbers[r][c],
-                "across_num": cell_across[r][c],
-                "down_num": cell_down[r][c],
-            })
-        cells.append(row_cells)
-
+    _enrich_clues(all_words, overrides, prefer_curated)
+    cells = _build_cells_matrix(grid_raw, cell_numbers, cell_across, cell_down)
     return {
-        "theme": theme,
-        "grid_size": R,
-        "cells": cells,
-        "words": all_words,
-        "total_words": len(all_words),
+        "theme": theme, "grid_size": rows, "cells": cells,
+        "words": all_words, "total_words": len(all_words),
     }
 
 
 def build_challenge_from_solution(
-    theme: str,
-    solution_grid: List[str],
-    prefer_curated: bool = False,
+    theme: str, solution_grid: List[str], prefer_curated: bool = False,
     clue_overrides: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
-    """
-    Construye el contrato completo del desafío a partir de una grilla resuelta
-    (por ejemplo, la solución de una máscara diseñada en el panel admin).
-    """
+    """Construye el contrato completo del desafío a partir de una grilla resuelta."""
     return _parse_and_build_challenge(
-        theme,
-        solution_grid,
-        prefer_curated=prefer_curated,
-        clue_overrides=clue_overrides,
+        theme, solution_grid, prefer_curated=prefer_curated, clue_overrides=clue_overrides
     )
 
 
@@ -202,34 +162,21 @@ def _generate_facil(
     tmpl_data = CRUCIGRAMA_TEMPLATES[seed_val % len(CRUCIGRAMA_TEMPLATES)]
     theme = tmpl_data.get("theme", "Palabras Cruzadas")
     pattern = tmpl_data["pattern"]
-
     slots, intersections = _parse_template_slots(pattern)
     solution = _solve_crucigrama_backtracking(
         slots, intersections, rng, prefer_curated=True, banned_words=banned
     )
-
-    if solution:
-        R = len(pattern)
-        C = len(pattern[0]) if R else 0
-        grid_letters = [["#" if pattern[r][c] == "#" else "" for c in range(C)] for r in range(R)]
-        for s in slots:
-            word = solution[s["id"]]
-            for (r, c), ch in zip(s["coords"], word):
-                grid_letters[r][c] = ch
-        final_grid = ["".join(row) for row in grid_letters]
-    else:
+    final_grid = build_solution_grid(pattern, slots, solution) if solution else None
+    if final_grid is None:
         logger.warning(f"[CRUCIGRAMA] Backtracking sin solución para {date_str} (facil). Usando tablero curado de respaldo.")
         final_grid = tmpl_data["fallback_grid"]
-
     return theme, final_grid
 
 
 def _generate_dificil(
     date_str: str, rng: random.Random, banned: Set[str] = frozenset()
 ) -> Tuple[str, List[str]]:
-    result = generate_growth_board(
-        DIFICIL_SIZE, rng, min_words=15, max_words=28, banned_words=banned
-    )
+    result = generate_growth_board(DIFICIL_SIZE, rng, min_words=15, max_words=28, banned_words=banned)
     if result is None:
         raise RuntimeError("No se pudo generar el crucigrama difícil (índice de palabras vacío).")
     final_grid, words = result
@@ -241,19 +188,10 @@ def _generate_dificil(
 def generate_crucigrama_challenge_for_date(
     date_str: str, difficulty: str = DIFF_FACIL, banned_words: Optional[Iterable[str]] = None
 ) -> Dict[str, Any]:
-    """
-    Genera la configuración completa del desafío de Crucigrama para una fecha.
-
-    Determinista: misma fecha + dificultad produce el mismo tablero en cualquier
-    servidor (todo el azar sale de un `random.Random` sembrado por fecha y nivel).
-    `banned_words` (vetos globales) se excluye del pool de candidatos.
-    """
+    """Genera la configuración determinista del Crucigrama para una fecha y dificultad."""
     diff = (difficulty or DIFF_FACIL).lower().strip()
     rng = random.Random(f"crucigrama_{date_str}_{diff}")
-    banned: Set[str] = {
-        normalize_word(word) for word in (banned_words or ()) if normalize_word(word)
-    }
-
+    banned = normalize_banned(banned_words)
     if diff == DIFF_DIFICIL:
         theme, final_grid = _generate_dificil(date_str, rng, banned)
         challenge = _parse_and_build_challenge(theme, final_grid, prefer_curated=False)
@@ -264,9 +202,7 @@ def generate_crucigrama_challenge_for_date(
     infractoras = sorted({w["word"] for w in challenge.get("words", [])} & banned)
     if infractoras:
         logger.warning(
-            f"[CRUCIGRAMA] {date_str} ({diff}): tablero de respaldo con palabras vetadas: "
-            f"{', '.join(infractoras)}."
+            f"[CRUCIGRAMA] {date_str} ({diff}): tablero de respaldo con palabras vetadas: {', '.join(infractoras)}."
         )
-
     challenge["date"] = date_str
     return challenge

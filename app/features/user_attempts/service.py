@@ -10,19 +10,13 @@ from pymongo import ASCENDING
 
 from app.core.database import get_database
 from app.features.economy.streak_bonus import BonusRachaAplicado, SIN_BONUS, resolver_bonus_racha
-from app.features.user_attempts.grading import _parse_errors, _tier_value, calculate_grade_and_score
+from app.features.user_attempts.grading import _parse_errors, calculate_grade_and_score
 from app.features.user_attempts.repository import (
-    AttemptEvaluation,
-    _as_utc, _attempt_snapshot, _attempt_started_at, _difficulty_is_completed,
-    _doc_difficulty, _is_completed_attempt, _normalize_difficulty,
-    _preserve_existing_difficulty, _serialize_attempt, _server_elapsed_seconds,
-    _should_replace_top_level, build_attempt_doc, persist_user_attempt_doc,
+    AttemptEvaluation, _attempt_started_at, _difficulty_is_completed,
+    _normalize_difficulty, _serialize_attempt, _server_elapsed_seconds,
+    build_attempt_doc, persist_user_attempt_doc,
 )
-from app.features.user_attempts.schemas import (
-    UserAttemptCreateRequest,
-    UserAttemptResponse,
-    UserAttemptsListResponse,
-)
+from app.features.user_attempts.schemas import UserAttemptCreateRequest, UserAttemptResponse, UserAttemptsListResponse
 from app.features.user_attempts.validation import Submission, is_enforcement_enabled, validate_submission
 from app.shared.economy_points import DEFAULT_PUNTOS_POR_CALIFICACION
 from app.shared.ledger import LedgerKey, get_points_ledger
@@ -31,9 +25,7 @@ from app.shared.streak import registrar_ingreso_y_racha
 logger = logging.getLogger(__name__)
 
 
-async def _register_replay_rejection(
-    user_id: int, game_id: str, date: str, difficulty: str, status: str
-) -> None:
+async def _register_replay_rejection(user_id: int, game_id: str, date: str, difficulty: str, status: str) -> None:
     try:
         await get_points_ledger().record_event(
             user_id=user_id, motivo="replay_rejected", puntos=0,
@@ -63,23 +55,15 @@ async def _load_economy_config(game_id: str) -> Tuple[Any, Dict[str, int], Optio
         logger.warning(f"No se pudo cargar la configuración de economía: {e}")
         puntos_config = dict(DEFAULT_PUNTOS_POR_CALIFICACION)
 
-    escalas = (
-        econ_config.escalas_tiempo_por_juego.get(game_id)
-        if getattr(econ_config, "escalas_tiempo_por_juego", None)
-        else None
-    )
+    escalas = econ_config.escalas_tiempo_por_juego.get(game_id) if getattr(econ_config, "escalas_tiempo_por_juego", None) else None
     return econ_config, puntos_config, escalas
 
 
 def _extract_client_time(req: UserAttemptCreateRequest) -> Optional[int]:
     raw = req.time_taken_seconds
     if raw is None and req.game_data:
-        raw = (
-            req.game_data.get("timeTaken")
-            or req.game_data.get("time_taken_seconds")
-            or req.game_data.get("elapsedSeconds")
-            or req.game_data.get("elapsed_seconds")
-        )
+        gd = req.game_data
+        raw = gd.get("timeTaken") or gd.get("time_taken_seconds") or gd.get("elapsedSeconds") or gd.get("elapsed_seconds")
     if raw is None:
         return None
     try:
@@ -101,19 +85,13 @@ async def _evaluate_attempt(
     final_status: str, time_taken: Optional[int], server_elapsed: Optional[int],
     time_suspect: bool, puntos_config: Dict[str, int], escalas_juego: Optional[List[Any]],
 ) -> AttemptEvaluation:
-    validation_status: Optional[str] = None
-    validation_reason: Optional[str] = None
-    attempts_val = req.attempts
-    effective_time = time_taken
-    effective_game_data = req.game_data
+    validation_status, attempts_val = None, req.attempts
+    effective_time, effective_game_data = time_taken, req.game_data
     provided_grade, provided_score, provided_stars = req.grade, req.score, req.stars
 
     if final_status == "completed" and is_enforcement_enabled(game_id):
         errors = _parse_errors(req.game_data)
-        submission = Submission(
-            word=req.word, guesses=req.guesses or [], attempts=req.attempts,
-            errors=errors, game_data=req.game_data or {},
-        )
+        submission = Submission(word=req.word, guesses=req.guesses or [], attempts=req.attempts, errors=errors, game_data=req.game_data or {})
         validation = await validate_submission(game_id, date, difficulty, submission)
         if not validation.valid:
             logger.info(f"[VALIDACION] Intento rechazado {user_id}/{game_id}/{date}/{difficulty}: {validation.reason}")
@@ -141,9 +119,8 @@ async def _evaluate_attempt(
         final_status, grade, score, stars = "failed", "F", 0, 0
 
     return AttemptEvaluation(
-        final_status=final_status, attempts_value=attempts_val, grade=grade, score=score,
-        stars=stars, validation_status=validation_status, validation_reason=validation_reason,
-        server_elapsed=server_elapsed, time_suspect=time_suspect,
+        final_status=final_status, attempts_value=attempts_val, grade=grade, score=score, stars=stars,
+        validation_status=validation_status, validation_reason=None, server_elapsed=server_elapsed, time_suspect=time_suspect,
     )
 
 
@@ -184,9 +161,7 @@ async def _credit_attempt_points(
             f"dificultad {difficulty}, bonus racha {bonus_racha.puntos}) en {game_id}. Saldo: {res.saldo}"
         )
         return puntos, res.saldo
-    logger.info(
-        f"[PUNTOS] Acreditación ya aplicada para {user_id}/{game_id}/{date}/{difficulty}; no se suman puntos."
-    )
+    logger.info(f"[PUNTOS] Acreditación ya aplicada para {user_id}/{game_id}/{date}/{difficulty}; no se suman puntos.")
     return 0, res.saldo
 
 
@@ -218,19 +193,12 @@ async def save_user_attempt(
         time_taken, server_elapsed, time_suspect, puntos_config, escalas_juego,
     )
     bonus = await _resolve_streak_bonus(econ_config, user_id, game_id, evaluated)
-    doc = build_attempt_doc(
-        req, user_id, game_id, date, difficulty, time_taken, started_at, now,
-        evaluated, bonus.puntos, bonus.dias_tramo,
-    )
-    result, is_replay = await persist_user_attempt_doc(
-        db, filter_query, doc, difficulty, evaluated.final_status, now, existing=existing
-    )
+    doc = build_attempt_doc(req, user_id, game_id, date, difficulty, time_taken, started_at, now, evaluated, bonus.puntos, bonus.dias_tramo)
+    result, is_replay = await persist_user_attempt_doc(db, filter_query, doc, difficulty, evaluated.final_status, now, existing=existing)
     if is_replay:
         return await _reject_replay(ledger, result, user_id, game_id, date, difficulty, evaluated.final_status)
 
-    puntos_ganados, puntos_totales = await _credit_attempt_points(
-        ledger, user_id, game_id, date, difficulty, evaluated, bonus
-    )
+    puntos_ganados, puntos_totales = await _credit_attempt_points(ledger, user_id, game_id, date, difficulty, evaluated, bonus)
     if puntos_totales is None:
         puntos_totales = await ledger.saldo(user_id)
     return _serialize_attempt(result, puntos_ganados=puntos_ganados, puntos_totales_usuario=puntos_totales)
@@ -241,22 +209,16 @@ async def get_user_attempt_by_date(
 ) -> Optional[UserAttemptResponse]:
     """Obtiene el intento de un usuario para un juego y fecha específicos."""
     target_date = (date or date_str or "").strip()
-    doc = await get_database()["user_attempts"].find_one(
-        {"user_id": user_id, "game_id": game_id.lower().strip(), "date": target_date}
-    )
+    doc = await get_database()["user_attempts"].find_one({"user_id": user_id, "game_id": game_id.lower().strip(), "date": target_date})
     return _serialize_attempt(doc) if doc else None
 
 
-async def get_user_attempts_by_month(
-    user_id: int, game_id: str, year: int, month: int
-) -> UserAttemptsListResponse:
+async def get_user_attempts_by_month(user_id: int, game_id: str, year: int, month: int) -> UserAttemptsListResponse:
     """Obtiene todos los intentos de un usuario para un mes calendario."""
     days_in_month = calendar.monthrange(year, month)[1]
     start_date, end_date = f"{year:04d}-{month:02d}-01", f"{year:04d}-{month:02d}-{days_in_month:02d}"
-    cursor = get_database()["user_attempts"].find({
-        "user_id": user_id, "game_id": game_id.lower().strip(), "date": {"$gte": start_date, "$lte": end_date},
-    }).sort("date", ASCENDING)
+    cursor = get_database()["user_attempts"].find(
+        {"user_id": user_id, "game_id": game_id.lower().strip(), "date": {"$gte": start_date, "$lte": end_date}}
+    ).sort("date", ASCENDING)
     items = [_serialize_attempt(d) for d in await cursor.to_list(length=31)]
-    return UserAttemptsListResponse(
-        user_id=user_id, game_id=game_id, year=year, month=month, total=len(items), attempts=items
-    )
+    return UserAttemptsListResponse(user_id=user_id, game_id=game_id, year=year, month=month, total=len(items), attempts=items)

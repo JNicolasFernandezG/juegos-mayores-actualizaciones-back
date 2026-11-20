@@ -1,472 +1,195 @@
 """
 router.py
 Controlador FastAPI de la Torre de Control y Administración (/api/narrative/admin).
-Expone endpoints REST para catálogo de reglas, carga de multimedia WebP,
-gestión de colecciones estáticas y generador procedural mensual.
 """
 
-from fastapi import APIRouter, Query, Path, HTTPException, File, Request, UploadFile, Depends
-from typing import Optional, List
+from typing import List, Optional
+from fastapi import APIRouter, Depends, File, Path, Query, UploadFile
 
-from app.features.narrative.admin.actions_router import actions_admin_router
-from app.features.narrative.schemas import (
-    UniversoCreateRequest,
-    UniversoResponse,
-    PersonajeCreateRequest,
-    PersonajeResponse,
-    CartaCreateRequest,
-    CartaResponse,
-    FinalizacionCreateRequest,
-    FinalizacionResponse,
-    TagCreateRequest,
-    TagUpdateRequest,
-    TagResponse
-)
-from app.features.narrative.schemas.v2_graph_schemas import (
-    EventoV2GrafoSchema,
-    ConversacionV2GrafoSchema,
-    EventoEspecialV2GrafoSchema,
-    ValidarGrafoV2Request,
-    ValidarGrafoV2Response,
-)
-from app.features.narrative.validation import (
-    TIPOS_VALIDOS,
-    validar_grafo_para_guardado,
-    validar_grafos_almacenados,
-)
-from app.features.narrative.admin.rules_catalog import obtener_catalogo_reglas_dict
-from app.features.narrative.admin.image_service import procesar_y_guardar_imagen_narrativa
-from app.features.narrative.admin.crud_service import (
-    crear_o_actualizar_tag,
-    obtener_tags,
-    obtener_tag_por_id,
-    eliminar_tag,
-    crear_o_actualizar_universo,
-    obtener_universos,
-    obtener_universo_por_id,
-    eliminar_universo,
-    crear_o_actualizar_personaje,
-    obtener_personajes,
-    obtener_personaje_por_id,
-    eliminar_personaje,
-    crear_o_actualizar_carta,
-    obtener_cartas,
-    obtener_carta_por_id,
-    eliminar_carta,
-    crear_o_actualizar_finalizacion,
-    obtener_finalizaciones,
-    obtener_finalizacion_por_id,
-    eliminar_finalizacion,
-    crear_o_actualizar_evento_v2,
-    obtener_eventos_v2,
-    obtener_evento_v2_por_id,
-    eliminar_evento_v2,
-    crear_o_actualizar_conversacion_v2,
-    obtener_conversaciones_v2,
-    obtener_conversacion_v2_por_id,
-    eliminar_conversacion_v2,
-    crear_o_actualizar_evento_especial_v2,
-    obtener_eventos_especiales_v2,
-    obtener_evento_especial_v2_por_id,
-    eliminar_evento_especial_v2,
-)
-from app.features.narrative.admin.challenge_service import (
-    sembrar_finalizaciones_para_universo,
-    generar_mes_narrativo,
-)
 from app.core.dependencies import get_current_admin
-
-router = APIRouter(
-    prefix="/api/narrative/admin",
-    dependencies=[Depends(get_current_admin)]
+from app.features.narrative.admin.actions_router import actions_admin_router
+from app.features.narrative.admin.challenge_service import generar_mes_narrativo, sembrar_finalizaciones_para_universo
+from app.features.narrative.admin.crud_service import (
+    crear_o_actualizar_carta, crear_o_actualizar_finalizacion, crear_o_actualizar_personaje,
+    crear_o_actualizar_tag, crear_o_actualizar_universo, eliminar_carta, eliminar_finalizacion,
+    eliminar_personaje, eliminar_tag, eliminar_universo, obtener_carta_por_id, obtener_cartas,
+    obtener_finalizacion_por_id, obtener_finalizaciones, obtener_personaje_por_id, obtener_personajes,
+    obtener_tag_por_id, obtener_tags, obtener_universo_por_id, obtener_universos,
+)
+from app.features.narrative.admin.image_service import procesar_y_guardar_imagen_narrativa
+from app.features.narrative.admin.rules_catalog import obtener_catalogo_reglas_dict
+from app.features.narrative.admin.v2_graphs_router import (
+    _contar_grafos_v2, _eliminar_o_404, _obtener_o_404, _resolver_validador_v2,
+    endpoint_ejecutar_seed_v2, endpoint_eliminar_conversacion_v2, endpoint_eliminar_evento_especial_v2,
+    endpoint_eliminar_evento_v2, endpoint_estado_seed_v2, endpoint_guardar_conversacion_v2,
+    endpoint_guardar_evento_especial_v2, endpoint_guardar_evento_v2, endpoint_listar_conversaciones_v2,
+    endpoint_listar_eventos_especiales_v2, endpoint_listar_eventos_v2, endpoint_obtener_conversacion_v2,
+    endpoint_obtener_evento_especial_v2, endpoint_obtener_evento_v2, endpoint_validar_grafos_v2,
+    v2_graphs_router,
+)
+from app.features.narrative.schemas import (
+    CartaCreateRequest, CartaResponse, FinalizacionCreateRequest, FinalizacionResponse,
+    PersonajeCreateRequest, PersonajeResponse, TagCreateRequest, TagResponse,
+    TagUpdateRequest, UniversoCreateRequest, UniversoResponse,
 )
 
-# ============================================================================
-# 1. CATÁLOGO OFICIAL DE REGLAS (Para desplegables del Admin)
-# ============================================================================
+router = APIRouter(prefix="/api/narrative/admin", dependencies=[Depends(get_current_admin)])
 
-@router.get(
-    "/catalogo-reglas",
-    summary="Obtener el catálogo formal de disparadores, operadores y acciones",
-    tags=["Narrativo - Administración"]
-)
+
+@router.get("/catalogo-reglas", summary="Obtener el catálogo formal de disparadores, operadores y acciones", tags=["Narrativo - Administración"])
 async def endpoint_obtener_catalogo_reglas():
     """Retorna el catálogo canónico de disparadores, operadores y acciones para desplegables de UI."""
     return obtener_catalogo_reglas_dict()
 
-# ============================================================================
-# 2. SUBIDA Y OPTIMIZACIÓN DE IMÁGENES WEBP
-# ============================================================================
 
-@router.post(
-    "/upload-imagen",
-    summary="Subir y optimizar imagen a WebP para cualquier categoría del juego narrativo",
-    tags=["Narrativo - Administración"]
-)
+@router.post("/upload-imagen", summary="Subir y optimizar imagen a WebP para cualquier categoría del juego narrativo", tags=["Narrativo - Administración"])
 async def endpoint_subir_imagen_narrativa(
     file: UploadFile = File(...),
-    categoria: str = Query(..., description="Categoría (universos, personajes, cartas, eventos, resultados, conversaciones, finalizaciones)")
+    categoria: str = Query(..., description="Categoría (universos, personajes, cartas, eventos, resultados, conversaciones, finalizaciones)"),
 ):
     """Procesa una imagen JPG/PNG, la redimensiona proporcionalmente y la comprime a WebP."""
     return await procesar_y_guardar_imagen_narrativa(file=file, categoria=categoria)
 
-# ============================================================================
-# 3. CRUD DE UNIVERSOS / TEMÁTICAS
-# ============================================================================
 
 @router.get("/universos", response_model=List[UniversoResponse], summary="Listar todos los universos", tags=["Narrativo - CRUD Universos"])
 async def endpoint_listar_universos():
     return await obtener_universos()
 
+
 @router.get("/universos/{universo_id}", response_model=UniversoResponse, summary="Obtener universo por ID", tags=["Narrativo - CRUD Universos"])
 async def endpoint_obtener_universo(universo_id: str = Path(...)):
-    u = await obtener_universo_por_id(universo_id)
-    if not u:
-        raise HTTPException(status_code=404, detail="Universo no encontrado.")
-    return u
+    return await _obtener_o_404(obtener_universo_por_id, universo_id, "Universo no encontrado.")
+
 
 @router.post("/universos", response_model=UniversoResponse, summary="Crear o actualizar un universo", tags=["Narrativo - CRUD Universos"])
 async def endpoint_guardar_universo(req: UniversoCreateRequest):
     return await crear_o_actualizar_universo(req)
 
+
 @router.delete("/universos/{universo_id}", summary="Eliminar un universo", tags=["Narrativo - CRUD Universos"])
 async def endpoint_eliminar_universo(universo_id: str = Path(...)):
-    exito = await eliminar_universo(universo_id)
-    if not exito:
-        raise HTTPException(status_code=404, detail="Universo no encontrado.")
-    return {"message": "Universo eliminado correctamente."}
+    return await _eliminar_o_404(eliminar_universo, universo_id, "Universo no encontrado.", "Universo eliminado correctamente.")
 
-# ============================================================================
-# 4. CRUD DE PERSONAJES
-# ============================================================================
 
 @router.get("/personajes", response_model=List[PersonajeResponse], summary="Listar personajes", tags=["Narrativo - CRUD Personajes"])
 async def endpoint_listar_personajes(
     universo_id: Optional[str] = Query(None, description="Filtrar por universo"),
     limit: Optional[int] = Query(None, description="Límite de resultados"),
-    skip: int = Query(0, description="Paginación offset")
+    skip: int = Query(0, description="Paginación offset"),
 ):
     return await obtener_personajes(universo_id=universo_id, limit=limit, skip=skip)
 
+
 @router.get("/personajes/{personaje_id}", response_model=PersonajeResponse, summary="Obtener personaje por ID", tags=["Narrativo - CRUD Personajes"])
 async def endpoint_obtener_personaje(personaje_id: str = Path(...)):
-    p = await obtener_personaje_por_id(personaje_id)
-    if not p:
-        raise HTTPException(status_code=404, detail="Personaje no encontrado.")
-    return p
+    return await _obtener_o_404(obtener_personaje_por_id, personaje_id, "Personaje no encontrado.")
+
 
 @router.post("/personajes", response_model=PersonajeResponse, summary="Crear o actualizar personaje", tags=["Narrativo - CRUD Personajes"])
 async def endpoint_guardar_personaje(req: PersonajeCreateRequest):
     return await crear_o_actualizar_personaje(req)
 
+
 @router.delete("/personajes/{personaje_id}", summary="Eliminar personaje", tags=["Narrativo - CRUD Personajes"])
 async def endpoint_eliminar_personaje(personaje_id: str = Path(...)):
-    exito = await eliminar_personaje(personaje_id)
-    if not exito:
-        raise HTTPException(status_code=404, detail="Personaje no encontrado.")
-    return {"message": "Personaje eliminado correctamente."}
+    return await _eliminar_o_404(eliminar_personaje, personaje_id, "Personaje no encontrado.", "Personaje eliminado correctamente.")
 
-# ============================================================================
-# 5. CRUD DE CARTAS
-# ============================================================================
 
 @router.get("/cartas", response_model=List[CartaResponse], summary="Listar cartas", tags=["Narrativo - CRUD Cartas"])
 async def endpoint_listar_cartas(
     universo_id: Optional[str] = Query(None, description="Filtrar por universo"),
     limit: Optional[int] = Query(None, description="Límite de resultados"),
-    skip: int = Query(0, description="Paginación offset")
+    skip: int = Query(0, description="Paginación offset"),
 ):
     return await obtener_cartas(universo_id=universo_id, limit=limit, skip=skip)
 
+
 @router.get("/cartas/{carta_id}", response_model=CartaResponse, summary="Obtener carta por ID", tags=["Narrativo - CRUD Cartas"])
 async def endpoint_obtener_carta(carta_id: str = Path(...)):
-    c = await obtener_carta_por_id(carta_id)
-    if not c:
-        raise HTTPException(status_code=404, detail="Carta no encontrada.")
-    return c
+    return await _obtener_o_404(obtener_carta_por_id, carta_id, "Carta no encontrada.")
+
 
 @router.post("/cartas", response_model=CartaResponse, summary="Crear o actualizar carta", tags=["Narrativo - CRUD Cartas"])
 async def endpoint_guardar_carta(req: CartaCreateRequest):
     return await crear_o_actualizar_carta(req)
 
+
 @router.delete("/cartas/{carta_id}", summary="Eliminar carta", tags=["Narrativo - CRUD Cartas"])
 async def endpoint_eliminar_carta(carta_id: str = Path(...)):
-    exito = await eliminar_carta(carta_id)
-    if not exito:
-        raise HTTPException(status_code=404, detail="Carta no encontrada.")
-    return {"message": "Carta eliminada correctamente."}
+    return await _eliminar_o_404(eliminar_carta, carta_id, "Carta no encontrada.", "Carta eliminada correctamente.")
 
-# ============================================================================
-# 6. CRUD DE FINALIZACIONES / DERROTAS
-# ============================================================================
 
 @router.get("/finalizaciones", response_model=List[FinalizacionResponse], summary="Listar finalizaciones", tags=["Narrativo - CRUD Finalizaciones"])
 async def endpoint_listar_finalizaciones(
     universo_id: Optional[str] = Query(None, description="Filtrar por universo"),
     limit: Optional[int] = Query(None, description="Límite de resultados"),
-    skip: int = Query(0, description="Paginación offset")
+    skip: int = Query(0, description="Paginación offset"),
 ):
     return await obtener_finalizaciones(universo_id=universo_id, limit=limit, skip=skip)
 
+
 @router.get("/finalizaciones/{finalizacion_id}", response_model=FinalizacionResponse, summary="Obtener finalización por ID", tags=["Narrativo - CRUD Finalizaciones"])
 async def endpoint_obtener_finalizacion(finalizacion_id: str = Path(...)):
-    f = await obtener_finalizacion_por_id(finalizacion_id)
-    if not f:
-        raise HTTPException(status_code=404, detail="Finalización no encontrada.")
-    return f
+    return await _obtener_o_404(obtener_finalizacion_por_id, finalizacion_id, "Finalización no encontrada.")
+
 
 @router.post("/finalizaciones", response_model=FinalizacionResponse, summary="Crear o actualizar finalización", tags=["Narrativo - CRUD Finalizaciones"])
 async def endpoint_guardar_finalizacion(req: FinalizacionCreateRequest):
     return await crear_o_actualizar_finalizacion(req)
 
+
 @router.delete("/finalizaciones/{finalizacion_id}", summary="Eliminar finalización", tags=["Narrativo - CRUD Finalizaciones"])
 async def endpoint_eliminar_finalizacion(finalizacion_id: str = Path(...)):
-    exito = await eliminar_finalizacion(finalizacion_id)
-    if not exito:
-        raise HTTPException(status_code=404, detail="Finalización no encontrada.")
-    return {"message": "Finalización eliminada correctamente."}
+    return await _eliminar_o_404(eliminar_finalizacion, finalizacion_id, "Finalización no encontrada.", "Finalización eliminada correctamente.")
 
-@router.post(
-    "/universos/{universo_id}/sembrar-finalizaciones",
-    response_model=List[FinalizacionResponse],
-    summary="Sembrar automáticamente las finalizaciones de derrota base (<= 0) para cada recurso del universo",
-    tags=["Narrativo - CRUD Finalizaciones"]
-)
+
+@router.post("/universos/{universo_id}/sembrar-finalizaciones", response_model=List[FinalizacionResponse], summary="Sembrar automáticamente las finalizaciones de derrota base (<= 0) para cada recurso del universo", tags=["Narrativo - CRUD Finalizaciones"])
 async def endpoint_sembrar_finalizaciones_universo(universo_id: str = Path(...)):
     return await sembrar_finalizaciones_para_universo(universo_id)
 
-# ============================================================================
-# 7. GENERADOR MENSUAL DE DESAFÍOS
-# ============================================================================
 
-@router.post(
-    "/generar-mes",
-    summary="Generar masivamente los 28-31 desafíos diarios del mes para el juego narrativo",
-    tags=["Narrativo - Administración"]
-)
+@router.post("/generar-mes", summary="Generar masivamente los 28-31 desafíos diarios del mes para el juego narrativo", tags=["Narrativo - Administración"])
 async def endpoint_generar_mes_narrativo(
     year: int = Query(..., description="Año (ej: 2026)"),
     month: int = Query(..., ge=1, le=12, description="Mes (1 a 12)"),
-    universo_id: str = Query(..., description="ID del universo (ej: corte_medieval)")
+    universo_id: str = Query(..., description="ID del universo (ej: corte_medieval)"),
 ):
     return await generar_mes_narrativo(year=year, month=month, universo_id=universo_id)
 
-# ============================================================================
-# 8. MOTOR NARRATIVO V2: CRUD DE GRAFOS (EVENTOS Y CONVERSACIONES)
-# ============================================================================
 
-@router.get("/v2/eventos", response_model=List[EventoV2GrafoSchema], summary="Listar eventos de grafos V2", tags=["Narrativo - CRUD Eventos V2"])
-async def endpoint_listar_eventos_v2(
-    universo_id: Optional[str] = Query(None, description="Filtrar por universo"),
-    limit: Optional[int] = Query(None, description="Límite de resultados"),
-    skip: int = Query(0, description="Offset de paginación")
-):
-    return await obtener_eventos_v2(universo_id=universo_id, limit=limit, skip=skip)
+router.include_router(v2_graphs_router)
 
-@router.get("/v2/eventos/{evento_id}", response_model=EventoV2GrafoSchema, summary="Obtener evento V2 por ID", tags=["Narrativo - CRUD Eventos V2"])
-async def endpoint_obtener_evento_v2(evento_id: str = Path(...)):
-    e = await obtener_evento_v2_por_id(evento_id)
-    if not e:
-        raise HTTPException(status_code=404, detail="Evento V2 no encontrado.")
-    return e
-
-@router.post("/v2/eventos", response_model=EventoV2GrafoSchema, summary="Crear o actualizar evento V2", tags=["Narrativo - CRUD Eventos V2"])
-async def endpoint_guardar_evento_v2(req: EventoV2GrafoSchema):
-    return await crear_o_actualizar_evento_v2(req)
-
-@router.delete("/v2/eventos/{evento_id}", summary="Eliminar evento V2", tags=["Narrativo - CRUD Eventos V2"])
-async def endpoint_eliminar_evento_v2(evento_id: str = Path(...)):
-    exito = await eliminar_evento_v2(evento_id)
-    if not exito:
-        raise HTTPException(status_code=404, detail="Evento V2 no encontrado.")
-    return {"message": "Evento V2 eliminado correctamente."}
-
-@router.get("/v2/conversaciones", response_model=List[ConversacionV2GrafoSchema], summary="Listar conversaciones de grafos V2", tags=["Narrativo - CRUD Conversaciones V2"])
-async def endpoint_listar_conversaciones_v2(
-    universo_id: Optional[str] = Query(None, description="Filtrar por universo"),
-    limit: Optional[int] = Query(None, description="Límite de resultados"),
-    skip: int = Query(0, description="Offset de paginación")
-):
-    return await obtener_conversaciones_v2(universo_id=universo_id, limit=limit, skip=skip)
-
-@router.get("/v2/conversaciones/{conversacion_id}", response_model=ConversacionV2GrafoSchema, summary="Obtener conversación V2 por ID", tags=["Narrativo - CRUD Conversaciones V2"])
-async def endpoint_obtener_conversacion_v2(conversacion_id: str = Path(...)):
-    c = await obtener_conversacion_v2_por_id(conversacion_id)
-    if not c:
-        raise HTTPException(status_code=404, detail="Conversación V2 no encontrada.")
-    return c
-
-@router.post("/v2/conversaciones", response_model=ConversacionV2GrafoSchema, summary="Crear o actualizar conversación V2", tags=["Narrativo - CRUD Conversaciones V2"])
-async def endpoint_guardar_conversacion_v2(req: ConversacionV2GrafoSchema):
-    return await crear_o_actualizar_conversacion_v2(req)
-
-@router.delete("/v2/conversaciones/{conversacion_id}", summary="Eliminar conversación V2", tags=["Narrativo - CRUD Conversaciones V2"])
-async def endpoint_eliminar_conversacion_v2(conversacion_id: str = Path(...)):
-    exito = await eliminar_conversacion_v2(conversacion_id)
-    if not exito:
-        raise HTTPException(status_code=404, detail="Conversación V2 no encontrada.")
-    return {"message": "Conversación V2 eliminada correctamente."}
-
-@router.get("/v2/eventos-especiales", response_model=List[EventoEspecialV2GrafoSchema], summary="Listar eventos especiales de afinidad (lealtad/traición)", tags=["Narrativo - CRUD Eventos Especiales V2"])
-async def endpoint_listar_eventos_especiales_v2(
-    universo_id: Optional[str] = Query(None, description="Filtrar por universo"),
-    limit: Optional[int] = Query(None, description="Límite de resultados"),
-    skip: int = Query(0, description="Offset de paginación")
-):
-    return await obtener_eventos_especiales_v2(universo_id=universo_id, limit=limit, skip=skip)
-
-@router.get("/v2/eventos-especiales/{evento_id}", response_model=EventoEspecialV2GrafoSchema, summary="Obtener evento especial V2 por ID", tags=["Narrativo - CRUD Eventos Especiales V2"])
-async def endpoint_obtener_evento_especial_v2(evento_id: str = Path(...)):
-    e = await obtener_evento_especial_v2_por_id(evento_id)
-    if not e:
-        raise HTTPException(status_code=404, detail="Evento especial V2 no encontrado.")
-    return e
-
-@router.post("/v2/eventos-especiales", response_model=EventoEspecialV2GrafoSchema, summary="Crear o actualizar evento especial V2", tags=["Narrativo - CRUD Eventos Especiales V2"])
-async def endpoint_guardar_evento_especial_v2(req: EventoEspecialV2GrafoSchema):
-    return await crear_o_actualizar_evento_especial_v2(req)
-
-@router.delete("/v2/eventos-especiales/{evento_id}", summary="Eliminar evento especial V2", tags=["Narrativo - CRUD Eventos Especiales V2"])
-async def endpoint_eliminar_evento_especial_v2(evento_id: str = Path(...)):
-    exito = await eliminar_evento_especial_v2(evento_id)
-    if not exito:
-        raise HTTPException(status_code=404, detail="Evento especial V2 no encontrado.")
-    return {"message": "Evento especial V2 eliminado correctamente."}
-
-@router.get(
-    "/v2/seed",
-    summary="Estado del último intento de siembra de grafos V2",
-    tags=["Narrativo - Administración"]
-)
-async def endpoint_estado_seed_v2(request: Request):
-    """Reporta qué hizo el arranque y cuántos grafos hay hoy, sin exponer logs."""
-    from app.core.database import get_database
-    from app.features.narrative.constants import (
-        COLL_V2_CONVERSATIONS,
-        COLL_V2_EVENTOS_ESPECIALES,
-        COLL_V2_EVENTS,
-    )
-
-    db = get_database()
-    return {
-        "arranque": getattr(request.app.state, "seed_v2_status", "sin_registro"),
-        "eventos": await db[COLL_V2_EVENTS].count_documents({}),
-        "conversaciones": await db[COLL_V2_CONVERSATIONS].count_documents({}),
-        "eventos_especiales": await db[COLL_V2_EVENTOS_ESPECIALES].count_documents({}),
-    }
-
-@router.post(
-    "/v2/seed",
-    summary="Ejecutar la siembra insert-only de grafos V2",
-    tags=["Narrativo - Administración"]
-)
-async def endpoint_ejecutar_seed_v2():
-    """Dispara el mismo seed del arranque y devuelve el resultado o el error real."""
-    from app.core.database import get_database
-    from app.features.narrative.constants import (
-        COLL_V2_CONVERSATIONS,
-        COLL_V2_EVENTOS_ESPECIALES,
-        COLL_V2_EVENTS,
-    )
-    from app.scripts.seed_narrative_v2_graphs import seed_v2_graphs
-
-    try:
-        await seed_v2_graphs()
-    except Exception as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Seed V2 falló: {type(exc).__name__}: {exc}",
-        )
-
-    db = get_database()
-    return {
-        "success": True,
-        "eventos": await db[COLL_V2_EVENTS].count_documents({}),
-        "conversaciones": await db[COLL_V2_CONVERSATIONS].count_documents({}),
-        "eventos_especiales": await db[COLL_V2_EVENTOS_ESPECIALES].count_documents({}),
-    }
-
-@router.post(
-    "/v2/validar",
-    response_model=ValidarGrafoV2Response,
-    summary="Validar grafos V2 (estructura, catálogo y ejecutabilidad de los desenlaces)",
-    tags=["Narrativo - Administración"]
-)
-async def endpoint_validar_grafos_v2(req: ValidarGrafoV2Request):
-    """Valida un grafo inline, uno almacenado o todos los grafos de un universo."""
-    if req.tipo is not None and req.tipo not in TIPOS_VALIDOS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Tipo inválido: '{req.tipo}'. Válidos: {list(TIPOS_VALIDOS)}."
-        )
-
-    if req.grafo is not None:
-        if not req.tipo:
-            raise HTTPException(
-                status_code=400,
-                detail="Para validar un grafo inline se requiere indicar 'tipo'."
-            )
-        resultados = [await validar_grafo_para_guardado(req.grafo, req.tipo)]
-    else:
-        tipos = [req.tipo] if req.tipo else None
-        resultados = await validar_grafos_almacenados(
-            tipos=tipos,
-            grafo_id=req.grafo_id,
-            universo_id=req.universo_id
-        )
-        if req.grafo_id and not resultados:
-            raise HTTPException(status_code=404, detail=f"Grafo '{req.grafo_id}' no encontrado.")
-
-    return {
-        "resultados": [r.as_dict() for r in resultados],
-        "total": len(resultados),
-        "invalidos": sum(1 for r in resultados if not r.valido)
-    }
-
-
-
-
-# ============================================================================
-# TAGS NARRATIVOS (narrative_tags)
-# ============================================================================
 
 @router.get("/tags", response_model=List[TagResponse], summary="Listar tags narrativos del catálogo", tags=["Narrativo - CRUD Tags"])
 async def endpoint_listar_tags(
     universo_id: Optional[str] = Query(None, description="Filtrar por universo"),
     limit: Optional[int] = Query(None, description="Límite de resultados"),
-    skip: int = Query(0, description="Offset de paginación")
+    skip: int = Query(0, description="Offset de paginación"),
 ):
     return await obtener_tags(universo_id=universo_id, limit=limit, skip=skip)
 
+
 @router.get("/tags/{tag_id}", response_model=TagResponse, summary="Obtener tag por ID (slug)", tags=["Narrativo - CRUD Tags"])
 async def endpoint_obtener_tag(tag_id: str = Path(...)):
-    tag = await obtener_tag_por_id(tag_id)
-    if not tag:
-        raise HTTPException(status_code=404, detail=f"Tag '{tag_id}' no encontrado.")
-    return tag
+    return await _obtener_o_404(obtener_tag_por_id, tag_id, f"Tag '{tag_id}' no encontrado.")
+
 
 @router.post("/tags", response_model=TagResponse, summary="Crear o actualizar tag narrativo", tags=["Narrativo - CRUD Tags"])
 async def endpoint_guardar_tag(req: TagCreateRequest):
     return await crear_o_actualizar_tag(req)
 
+
 @router.put("/tags/{tag_id}", response_model=TagResponse, summary="Actualizar tag existente", tags=["Narrativo - CRUD Tags"])
 async def endpoint_actualizar_tag(tag_id: str = Path(...), req: TagUpdateRequest = ...):
-    actual = await obtener_tag_por_id(tag_id)
-    if not actual:
-        raise HTTPException(status_code=404, detail=f"Tag '{tag_id}' no encontrado.")
+    actual = await _obtener_o_404(obtener_tag_por_id, tag_id, f"Tag '{tag_id}' no encontrado.")
     data_dict = actual.model_dump(by_alias=True)
-    update_data = req.model_dump(exclude_unset=True)
-    data_dict.update(update_data)
-    tag_actualizado = TagCreateRequest(**data_dict)
-    return await crear_o_actualizar_tag(tag_actualizado)
+    data_dict.update(req.model_dump(exclude_unset=True))
+    return await crear_o_actualizar_tag(TagCreateRequest(**data_dict))
+
 
 @router.delete("/tags/{tag_id}", summary="Eliminar tag del catálogo", tags=["Narrativo - CRUD Tags"])
 async def endpoint_eliminar_tag(tag_id: str = Path(...)):
-    exito = await eliminar_tag(tag_id)
-    if not exito:
-        raise HTTPException(status_code=404, detail="Tag no encontrado.")
-    return {"message": "Tag eliminado correctamente."}
+    return await _eliminar_o_404(eliminar_tag, tag_id, "Tag no encontrado.", "Tag eliminado correctamente.")
 
 
-# Incluir subrouter de acciones y frecuencias desacopladas
 router.include_router(actions_admin_router)

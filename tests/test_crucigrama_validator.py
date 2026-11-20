@@ -11,7 +11,11 @@ import pytest
 
 from app.features.daily_challenges.crucigrama.clues import CURATED_CLUES
 from app.features.daily_challenges.crucigrama.templates_facil import CRUCIGRAMA_TEMPLATES
-from app.features.daily_challenges.crucigrama.validator import _is_symmetric, validate_pattern
+from app.features.daily_challenges.crucigrama.validator import (
+    _is_symmetric,
+    validate_pattern,
+    validate_structure,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 LEXICO = ROOT / "app" / "data" / "acentos_todas_palabras.json"
@@ -89,6 +93,25 @@ def test_plantilla_facil_es_soluble():
     )
 
 
+def test_mascara_11x11_acepta_rachas_de_11_letras():
+    pattern = [
+        "....##.....",
+        "...........",
+        "...........",
+        "##.......##",
+        "...........",
+        "...........",
+        "...........",
+        "##.......##",
+        "...........",
+        "...........",
+        "....##.....",
+    ]
+    report = validate_structure(pattern)
+    assert report["valid"], report["errors"]
+    assert report["slot_lengths"][11] == 12
+
+
 def test_mascara_11x11_es_soluble_con_reintentos():
     report = validate_pattern(MASK_11X11, prefer_curated=False)
     assert report["valid"], report["errors"]
@@ -106,7 +129,7 @@ def test_mascara_11x11_es_soluble_con_reintentos():
         (["......."] * 6 + ["......X"], "Caracteres inválidos"),
         (RACHA_CORTA, "2 letras"),
         (CELDA_AISLADA, "aisladas"),
-        (["..........."] * 11, "más de 10 letras"),
+        (["............"] * 12, "más de 11 letras"),
         (POCAS_PALABRAS, "al menos 5"),
     ],
 )

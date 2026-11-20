@@ -1,8 +1,8 @@
 """
 graph_engine.py
 Motor Narrativo Genérico V2 basado en Grafos de Decisión.
-Agnóstico al tipo de contenido (Eventos o Conversaciones), resuelve la navegación
-paso a paso (heurística sin spoilers), valida transiciones y delega sorteo y resolución terminal.
+Agnóstico al tipo de contenido (Eventos, Conversaciones o Especiales), resuelve navegación
+paso a paso sin spoilers y delega sorteo, encadenamiento y resolución terminal.
 """
 
 import logging
@@ -11,14 +11,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from fastapi import HTTPException
 
 from app.core.database import get_database
-from app.features.narrative.constants import (
-    COLL_V2_CONVERSATIONS,
-    COLL_V2_EVENTOS_ESPECIALES,
-    COLL_V2_EVENTS,
-)
-from app.features.narrative.engine.rule_engine import evaluar_condicion
-from app.features.narrative.enums import DisparadorEnum
-from app.features.narrative.game.motor_v2 import graph_sampler, node_resolver
+from app.features.narrative.constants import COLECCION_V2_POR_TIPO
+from app.features.narrative.engine.condition_evaluator import primer_motivo_bloqueo
+from app.features.narrative.game.motor_v2 import graph_chaining, graph_sampler, node_resolver
 from app.features.narrative.game.run_repository import persistir_run
 from app.features.narrative.schemas.v2_graph_schemas import (
     DesenlaceNodoSchema,
@@ -37,24 +32,19 @@ class GraphTraversalEngine:
     @staticmethod
     def _obtener_nodos_dict(grafo: Dict[str, Any]) -> Dict[str, Any]:
         """Normaliza los nodos del grafo asegurando formato diccionario indexado por ID."""
-        return node_resolver.obtener_nodos_dict(grafo)
+        return graph_chaining.obtener_nodos_dict(grafo)
 
     def _get_collection_for_tipo(self, tipo: str):
-        db = get_database()
-        if tipo == "evento":
-            return db[COLL_V2_EVENTS]
-        if tipo == "conversacion":
-            return db[COLL_V2_CONVERSATIONS]
-        if tipo == "evento_especial":
-            return db[COLL_V2_EVENTOS_ESPECIALES]
-        raise ValueError(
-            f"Tipo de grafo desconocido: '{tipo}'. Debe ser 'evento', 'conversacion' o 'evento_especial'."
-        )
+        col_name = COLECCION_V2_POR_TIPO.get(tipo)
+        if not col_name:
+            raise ValueError(
+                f"Tipo de grafo desconocido: '{tipo}'. Debe ser 'evento', 'conversacion' o 'evento_especial'."
+            )
+        return get_database()[col_name]
 
     async def obtener_grafo(self, tipo: str, grafo_id: str) -> Optional[Dict[str, Any]]:
         """Recupera un grafo completo desde la colección correspondiente."""
-        col = self._get_collection_for_tipo(tipo)
-        return await col.find_one({"_id": grafo_id})
+        return await self._get_collection_for_tipo(tipo).find_one({"_id": grafo_id})
 
     async def sortear_evento_v2(
         self,
@@ -64,10 +54,7 @@ class GraphTraversalEngine:
     ) -> Optional[Dict[str, Any]]:
         """Sortea un evento V2 elegible según universo, historial, requisitos y sinergias."""
         return await graph_sampler.sortear_evento_v2(
-            run=run,
-            pool_ids=pool_ids,
-            universo_id=universo_id,
-            db=get_database(),
+            run=run, pool_ids=pool_ids, universo_id=universo_id, db=get_database()
         )
 
     async def sortear_conversacion_v2(
@@ -78,10 +65,7 @@ class GraphTraversalEngine:
     ) -> Optional[Dict[str, Any]]:
         """Sortea una conversación V2 elegible respetando corte activa y condiciones."""
         return await graph_sampler.sortear_conversacion_v2(
-            run=run,
-            pool_ids=pool_ids,
-            universo_id=universo_id,
-            db=get_database(),
+            run=run, pool_ids=pool_ids, universo_id=universo_id, db=get_database()
         )
 
     async def iniciar_grafo_en_partida(
@@ -92,32 +76,9 @@ class GraphTraversalEngine:
         fase: str,
     ) -> EstadoGrafoV2Response:
         """Inicia un grafo en la partida fijando el nodo raíz y devolviendo el estado sanitizado."""
-        grafo_id = grafo["_id"]
-        nodo_raiz_id = grafo["nodo_raiz"]
-        nodo_raiz_dict = self._obtener_nodos_dict(grafo).get(nodo_raiz_id)
-        if not nodo_raiz_dict:
-            raise HTTPException(
-                status_code=500,
-                detail=f"El grafo '{grafo_id}' no contiene su nodo raíz '{nodo_raiz_id}'.",
-            )
-
-        nodo_cliente = NodoNarrativoSchema(**nodo_raiz_dict).to_cliente_schema(run)
-        # La preparación es en memoria; el coordinador confirma la transición completa.
-        run["grafo_activo"] = {
-            "tipo": tipo,
-            "grafo_id": grafo_id,
-            "nodo_actual_id": nodo_raiz_id,
-        }
-        run["fase_actual"] = fase
-
-        return EstadoGrafoV2Response(
-            fase_actual=fase,
-            grafo_id=grafo_id,
-            tipo=tipo,
-            titulo=grafo.get("titulo", ""),
-            imagen=grafo.get("imagen", ""),
-            nodo_actual=nodo_cliente,
-            status=run.get("status", "CONTINUA"),
+        nodo_cliente = graph_chaining.activar_raiz_grafo(run, grafo, tipo, fase)
+        return graph_chaining.construir_estado_grafo_v2(
+            run, grafo, tipo, grafo["_id"], nodo_cliente, fase_actual=fase
         )
 
     def _detectar_cruces_afinidad(
@@ -130,42 +91,6 @@ class GraphTraversalEngine:
     @staticmethod
     def _pesos_desenlaces(desenlaces: List[DesenlaceNodoSchema], run: Dict[str, Any]) -> List[float]:
         return node_resolver._pesos_desenlaces(desenlaces, run)
-
-    @staticmethod
-    def _senal_desenlace(
-        nodo: NodoNarrativoSchema,
-        net_delta_recursos: float,
-    ) -> Optional[DisparadorEnum]:
-        return node_resolver._senal_desenlace(nodo, net_delta_recursos)
-
-    async def _despachar_reactivos(
-        self,
-        run: Dict[str, Any],
-        disparador: DisparadorEnum,
-        recursos_mapa: Dict[str, Any],
-        cat_acciones: Dict[str, Any],
-        cat_frecuencias: Dict[str, Any],
-        db,
-    ) -> None:
-        await node_resolver._despachar_reactivos(
-            run, disparador, recursos_mapa, cat_acciones, cat_frecuencias, db
-        )
-
-    async def _obtener_evento_especial(
-        self,
-        personaje_id: str,
-        direccion: str,
-        universo_id: str,
-    ) -> Optional[Dict[str, Any]]:
-        return await node_resolver._obtener_evento_especial(
-            personaje_id, direccion, universo_id, db=get_database()
-        )
-
-    async def _obtener_siguiente_especial_pendiente(
-        self,
-        run: Dict[str, Any],
-    ) -> Optional[Dict[str, Any]]:
-        return await node_resolver._obtener_siguiente_especial_pendiente(run, db=get_database())
 
     async def _cargar_nodo_actual(
         self,
@@ -213,14 +138,9 @@ class GraphTraversalEngine:
                 detail=f"La opción '{opcion_id}' no es válida para el nodo '{nodo_actual.id}'.",
             )
 
-        for cond in opcion_elegida.condiciones:
-            cond_dict = cond.model_dump() if hasattr(cond, "model_dump") else cond
-            if not evaluar_condicion(cond_dict, run):
-                motivo = NodoNarrativoSchema._generar_motivo_bloqueo(cond)
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"La opción '{opcion_id}' está bloqueada: {motivo}.",
-                )
+        motivo = primer_motivo_bloqueo(opcion_elegida.condiciones, run)
+        if motivo is not None:
+            raise HTTPException(status_code=400, detail=f"La opción '{opcion_id}' está bloqueada: {motivo}.")
 
         if opcion_elegida.desenlaces:
             nodos_destino = [d.nodo for d in opcion_elegida.desenlaces]
@@ -263,14 +183,8 @@ class GraphTraversalEngine:
             run["grafo_activo"]["nodo_actual_id"] = siguiente_nodo_id
             run.setdefault("turno_actual", {})["opcion_elegida_id"] = opcion_id
             await persistir_run(run, ["grafo_activo", "turno_actual"])
-            return EstadoGrafoV2Response(
-                fase_actual=run["fase_actual"],
-                grafo_id=grafo_id,
-                tipo=tipo,
-                titulo=grafo.get("titulo", ""),
-                imagen=grafo.get("imagen", ""),
-                nodo_actual=nodo_cliente,
-                status=run.get("status", "CONTINUA"),
+            return graph_chaining.construir_estado_grafo_v2(
+                run, grafo, tipo, grafo_id, nodo_cliente
             )
 
         return await node_resolver.resolver_nodo_terminal(
@@ -288,5 +202,4 @@ class GraphTraversalEngine:
         )
 
 
-# Instancia singleton del motor
 graph_engine = GraphTraversalEngine()

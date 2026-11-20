@@ -11,15 +11,8 @@ from app.features.narrative.constants import COLL_TAGS
 from app.features.narrative.schemas.rules_schemas import PrimitivaOperacionEnum
 
 _PRIMITIVAS_VALIDAS = {p.value for p in PrimitivaOperacionEnum}
-
-# Eventos que el motor despacha por nombre, sin depender del catálogo de frecuencias.
 _EVENTOS_MOTOR = {
-    "al_obtener",
-    "cada_mes",
-    "inicio_mes",
-    "al_desenlace",
-    "en_evento_positivo",
-    "en_evento_negativo",
+    "al_obtener", "cada_mes", "inicio_mes", "al_desenlace", "en_evento_positivo", "en_evento_negativo",
 }
 
 
@@ -52,9 +45,7 @@ class ResultadoValidacion:
 
     def as_dict(self) -> Dict[str, Any]:
         return {
-            "tipo": self.tipo,
-            "grafo_id": self.grafo_id,
-            "valido": self.valido,
+            "tipo": self.tipo, "grafo_id": self.grafo_id, "valido": self.valido,
             "errores": [h.as_dict() for h in self.errores],
             "advertencias": [h.as_dict() for h in self.advertencias],
         }
@@ -76,9 +67,7 @@ def _crudo(value: Any) -> Optional[str]:
 
 def _primitiva_de(accion_id: str, catalogo_acciones: Optional[Dict[str, Any]]) -> str:
     item = (catalogo_acciones or {}).get(accion_id)
-    if item:
-        return _crudo(item.get("primitiva") or item.get("tipo_accion")) or accion_id
-    return accion_id
+    return (_crudo(item.get("primitiva") or item.get("tipo_accion")) or accion_id) if item else accion_id
 
 
 def _recurso_exigido(primitiva: str, params: Dict[str, Any]) -> Optional[str]:
@@ -98,38 +87,28 @@ def hallazgos_de_tags_referenciados(
     condiciones: Sequence[Any] = (),
     *,
     tags_validos: Optional[Set[str]] = None,
+    nodo_id: Optional[str] = None,
 ) -> List[Hallazgo]:
     """Verifica que los tags declarados existan en el catálogo del universo."""
     if tags_validos is None:
         return []
 
-    def buscar_tag(tag: Any) -> Optional[Hallazgo]:
-        tag_id = _crudo(tag)
-        if tag_id and tag_id not in tags_validos:
-            return Hallazgo("tag_inexistente", f"El tag '{tag_id}' no existe en el catálogo del universo.")
-        return None
-
-    hallazgos: List[Hallazgo] = []
-    for tag in tags:
-        encontrado = buscar_tag(tag)
-        if encontrado:
-            hallazgos.append(encontrado)
+    candidatos = [_crudo(tag) for tag in tags]
     for crudo in condiciones:
         condicion = _as_dict(crudo)
         if _crudo(condicion.get("tipo")) == "tiene_tag":
-            encontrado = buscar_tag(condicion.get("tag"))
-            if encontrado:
-                hallazgos.append(encontrado)
-    return hallazgos
+            candidatos.append(_crudo(condicion.get("tag")))
+
+    return [
+        Hallazgo("tag_inexistente", f"El tag '{tag_id}' no existe en el catálogo del universo.", nodo_id=nodo_id)
+        for tag_id in candidatos
+        if tag_id and tag_id not in tags_validos
+    ]
 
 
 def _validar_tags_accion(
-    primitiva: str,
-    params: Dict[str, Any],
-    etiqueta: str,
-    accion_id: str,
-    tags_validos: Optional[Set[str]],
-    nodo_id: Optional[str],
+    primitiva: str, params: Dict[str, Any], etiqueta: str, accion_id: str,
+    tags_validos: Optional[Set[str]], nodo_id: Optional[str],
 ) -> List[Hallazgo]:
     tags_de_accion: List[Any] = []
     if primitiva in ("otorgar_tag", "remover_tag"):
@@ -143,22 +122,14 @@ def _validar_tags_accion(
         if not tag_id:
             hallazgos.append(Hallazgo("tag_sin_id", f"El efecto '{etiqueta}' ({accion_id}) opera sobre tags sin declarar cuál.", nodo_id))
         elif tags_validos is not None and tag_id not in tags_validos:
-            hallazgos.append(Hallazgo(
-                "tag_inexistente",
-                f"El efecto '{etiqueta}' ({accion_id}) usa el tag '{tag_id}', que no existe en el catálogo del universo.",
-                nodo_id,
-            ))
+            msg = f"El efecto '{etiqueta}' ({accion_id}) usa el tag '{tag_id}', que no existe en el catálogo del universo."
+            hallazgos.append(Hallazgo("tag_inexistente", msg, nodo_id))
     return hallazgos
 
 
 def _validar_accion_efecto(
-    accion: Dict[str, Any],
-    etiqueta: str,
-    *,
-    recursos_validos: Optional[Set[str]],
-    catalogo_acciones: Optional[Dict[str, Any]],
-    tags_validos: Optional[Set[str]],
-    nodo_id: Optional[str],
+    accion: Dict[str, Any], etiqueta: str, *, recursos_validos: Optional[Set[str]],
+    catalogo_acciones: Optional[Dict[str, Any]], tags_validos: Optional[Set[str]], nodo_id: Optional[str],
 ) -> List[Hallazgo]:
     accion_id = _crudo(accion.get("accion_id") or accion.get("tipo"))
     if not accion_id:
@@ -166,21 +137,15 @@ def _validar_accion_efecto(
 
     primitiva = _primitiva_de(accion_id, catalogo_acciones)
     if primitiva not in _PRIMITIVAS_VALIDAS:
-        return [Hallazgo(
-            "accion_desconocida",
-            f"El efecto '{etiqueta}' referencia '{accion_id}', que no es acción del catálogo ni primitiva del motor.",
-            nodo_id,
-        )]
+        msg = f"El efecto '{etiqueta}' referencia '{accion_id}', que no es acción del catálogo ni primitiva del motor."
+        return [Hallazgo("accion_desconocida", msg, nodo_id)]
 
     hallazgos: List[Hallazgo] = []
     params = _as_dict(accion.get("parametros")) or accion
     recurso = _recurso_exigido(primitiva, params)
     if recurso and recursos_validos is not None and recurso.lower() not in recursos_validos:
-        hallazgos.append(Hallazgo(
-            "recurso_inexistente",
-            f"El efecto '{etiqueta}' ({accion_id}) opera sobre '{recurso}', que no es un recurso del universo.",
-            nodo_id,
-        ))
+        msg = f"El efecto '{etiqueta}' ({accion_id}) opera sobre '{recurso}', que no es un recurso del universo."
+        hallazgos.append(Hallazgo("recurso_inexistente", msg, nodo_id))
     if primitiva == "modificar_afinidad" and params.get("destino") == "personaje" and not params.get("personaje_id"):
         hallazgos.append(Hallazgo("afinidad_sin_personaje", f"El efecto '{etiqueta}' modifica afinidad de un personaje sin decir cuál.", nodo_id))
     hallazgos.extend(_validar_tags_accion(primitiva, params, etiqueta, accion_id, tags_validos, nodo_id))
@@ -188,13 +153,9 @@ def _validar_accion_efecto(
 
 
 def hallazgos_de_efectos(
-    efectos: Sequence[Any],
-    *,
-    recursos_validos: Optional[Set[str]] = None,
-    catalogo_acciones: Optional[Dict[str, Any]] = None,
-    catalogo_frecuencias: Optional[Dict[str, Any]] = None,
-    tags_validos: Optional[Set[str]] = None,
-    nodo_id: Optional[str] = None,
+    efectos: Sequence[Any], *, recursos_validos: Optional[Set[str]] = None,
+    catalogo_acciones: Optional[Dict[str, Any]] = None, catalogo_frecuencias: Optional[Dict[str, Any]] = None,
+    tags_validos: Optional[Set[str]] = None, nodo_id: Optional[str] = None,
 ) -> List[Hallazgo]:
     """Errores de efectos ECA declarados en un nodo, una carta o un personaje."""
     hallazgos: List[Hallazgo] = []
@@ -206,13 +167,10 @@ def hallazgos_de_efectos(
         if not evento:
             hallazgos.append(Hallazgo("efecto_sin_evento", f"El efecto '{etiqueta}' no declara frecuencia ni disparador.", nodo_id))
         elif catalogo_frecuencias is not None and evento not in _EVENTOS_MOTOR and not catalogo_frecuencias.get(evento):
-            hallazgos.append(Hallazgo(
-                "evento_no_despachado",
-                f"El efecto '{etiqueta}' usa '{evento}': el motor no lo emite y no está activo en el catálogo de frecuencias.",
-                nodo_id,
-            ))
+            msg = f"El efecto '{etiqueta}' usa '{evento}': el motor no lo emite y no está activo en el catálogo de frecuencias."
+            hallazgos.append(Hallazgo("evento_no_despachado", msg, nodo_id))
 
-        hallazgos.extend(hallazgos_de_tags_referenciados(condiciones=efecto.get("condiciones") or [], tags_validos=tags_validos))
+        hallazgos.extend(hallazgos_de_tags_referenciados(condiciones=efecto.get("condiciones") or [], tags_validos=tags_validos, nodo_id=nodo_id))
         acciones = [_as_dict(a) for a in (efecto.get("acciones") or [])]
         if efecto.get("accion"):
             acciones.append(_as_dict(efecto["accion"]))
@@ -243,12 +201,7 @@ async def _cargar_contexto_universo(universo_id: str, db) -> Dict[str, Any]:
 
 
 async def validar_efectos_almacenables(
-    efectos: Sequence[Any],
-    universo_id: str,
-    db=None,
-    *,
-    tags: Sequence[Any] = (),
-    condiciones_aparicion: Sequence[Any] = (),
+    efectos: Sequence[Any], universo_id: str, db=None, *, tags: Sequence[Any] = (), condiciones_aparicion: Sequence[Any] = ()
 ) -> List[Hallazgo]:
     """Valida efectos y tags antes de guardar una carta o personaje usando los catálogos del universo."""
     if db is None:

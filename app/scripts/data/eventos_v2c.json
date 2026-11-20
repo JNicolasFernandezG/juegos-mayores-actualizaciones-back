@@ -1,0 +1,2578 @@
+[
+ {
+  "_id": "evt_asedio_bandidos_v2c",
+  "condiciones_disparo": [],
+  "imagen": "/assets/narrative/eventos/default.webp",
+  "nodo_raiz": "nodo_inicio",
+  "nodos": {
+   "nodo_inicio": {
+    "id": "nodo_inicio",
+    "hablante_id": "narrador",
+    "texto": "Caravanas comerciales han sido asaltadas en las quebradas. El comercio hacia la capital está paralizado.",
+    "imagen": null,
+    "es_final": false,
+    "opciones": [
+     {
+      "id": "op_a",
+      "texto": "Lanzar ofensiva militar directa al campamento bandolero",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_victoria_militar_frontera",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_comandante_marcus",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 35.0,
+          "explicacion": "+35% por veteranía de Marcus"
+         },
+         {
+          "condicion": {
+           "tipo": "tiene_tag",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": null,
+           "carta_id": null,
+           "tag": "defensa"
+          },
+          "delta_peso": 15.0,
+          "explicacion": "+15% por escudos pesados"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_emboscada_y_perdida",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_b",
+      "texto": "Negociar amnistía a cambio de despejar el camino",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_embajador_satisfecho",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_canciller_elena",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 30.0,
+          "explicacion": "+30% por diplomacia de Elena"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_emboscada_y_perdida",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_c",
+      "texto": "[Secreto] Envenenar los barriles del campamento bandido",
+      "siguiente_nodo": "fin_res_victoria_militar_frontera",
+      "desenlaces": [],
+      "condiciones": [
+       {
+        "tipo": "tiene_personaje",
+        "clave": null,
+        "operador": null,
+        "valor": null,
+        "personaje_id": "pj_ladrona_sylvia",
+        "carta_id": null,
+        "tag": null
+       }
+      ],
+      "bloqueo_modo": "oculta"
+     }
+    ],
+    "resultado_texto": "",
+    "impactos_recursos": [],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": null,
+    "efectos": []
+   },
+   "fin_res_victoria_militar_frontera": {
+    "id": "fin_res_victoria_militar_frontera",
+    "hablante_id": "narrador",
+    "texto": "Victoria Aplastante en la Frontera",
+    "imagen": "/assets/narrative/results/victoria_militar.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Las legiones de la guardia barrieron a los invasores, afianzando la paz del reino.",
+    "impactos_recursos": [
+     {
+      "recurso": "ejercito",
+      "delta": 20
+     },
+     {
+      "recurso": "oro",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_emboscada_y_perdida": {
+    "id": "fin_res_emboscada_y_perdida",
+    "hablante_id": "narrador",
+    "texto": "Patrulla Derrotada en el Camino",
+    "imagen": "/assets/narrative/results/emboscada.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Bandidos y rebeldes emboscaron a la comitiva, robando los suministros y armas.",
+    "impactos_recursos": [
+     {
+      "recurso": "ejercito",
+      "delta": -15
+     },
+     {
+      "recurso": "oro",
+      "delta": -10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_embajador_satisfecho": {
+    "id": "fin_res_embajador_satisfecho",
+    "hablante_id": "narrador",
+    "texto": "Alianza Fronteriza Sellada",
+    "imagen": "/assets/narrative/results/diplomacia_exito.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "El banquete y las palabras diplomáticas lograron un acuerdo comercial muy ventajoso.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": 20
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   }
+  },
+  "peso_base": 85.0,
+  "requisitos_eventos_previos": [],
+  "requisitos_personajes": [],
+  "tags_tematicos": [
+   "militar",
+   "comercio",
+   "seguridad"
+  ],
+  "titulo": "Bandidos en el Paso de Montaña",
+  "universo_id": "corte_medieval",
+  "descripcion": "Bandidos cortan el paso de montaña y asfixian el comercio de la frontera.",
+  "categoria": "Militar",
+  "tono": "negativo"
+ },
+ {
+  "_id": "evt_brote_peste_v2c",
+  "condiciones_disparo": [],
+  "imagen": "/assets/narrative/eventos/default.webp",
+  "nodo_raiz": "nodo_inicio",
+  "nodos": {
+   "nodo_inicio": {
+    "id": "nodo_inicio",
+    "hablante_id": "narrador",
+    "texto": "Una extraña fiebre debilita a los artesanos y soldados en los cuarteles periféricos.",
+    "imagen": null,
+    "es_final": false,
+    "opciones": [
+     {
+      "id": "op_a",
+      "texto": "Aislar los distritos afectados con cordón sanitario militar",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_suministros_asegurados",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_comandante_marcus",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 30.0,
+          "explicacion": "+30% por disciplina de Marcus"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_plaga_descontrolada",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_b",
+      "texto": "Llamar a oraciones solemnes y caridad de la iglesia",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_bendicion_catedral",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_obispo_tomas",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 35.0,
+          "explicacion": "+35% por influencia del Hermano Tomás"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_plaga_descontrolada",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_c",
+      "texto": "[Secreto] Formular antídoto magistral en el laboratorio alquímico",
+      "siguiente_nodo": "fin_res_cura_alquimica",
+      "desenlaces": [],
+      "condiciones": [
+       {
+        "tipo": "tiene_personaje",
+        "clave": null,
+        "operador": null,
+        "valor": null,
+        "personaje_id": "pj_alquimista_vera",
+        "carta_id": null,
+        "tag": null
+       }
+      ],
+      "bloqueo_modo": "oculta"
+     }
+    ],
+    "resultado_texto": "",
+    "impactos_recursos": [],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": null,
+    "efectos": []
+   },
+   "fin_res_suministros_asegurados": {
+    "id": "fin_res_suministros_asegurados",
+    "hablante_id": "narrador",
+    "texto": "Graneros Protegidos con Disciplina",
+    "imagen": "/assets/narrative/results/guardia_victoria.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "La guardia custodió los silos y evitó saqueos, manteniendo las raciones estables.",
+    "impactos_recursos": [
+     {
+      "recurso": "ejercito",
+      "delta": 10
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_plaga_descontrolada": {
+    "id": "fin_res_plaga_descontrolada",
+    "hablante_id": "narrador",
+    "texto": "Epidemia en los Suburbios",
+    "imagen": "/assets/narrative/results/peste.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "La enfermedad se extendió sin control por los barrios bajos, causando luto general.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": -25
+     },
+     {
+      "recurso": "fe",
+      "delta": -10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_bendicion_catedral": {
+    "id": "fin_res_bendicion_catedral",
+    "hablante_id": "narrador",
+    "texto": "Canto Solemne en la Catedral",
+    "imagen": "/assets/narrative/results/catedral.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Las campanas repicaron en bendición del reinado, devolviendo la esperanza a los fieles.",
+    "impactos_recursos": [
+     {
+      "recurso": "fe",
+      "delta": 20
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_cura_alquimica": {
+    "id": "fin_res_cura_alquimica",
+    "hablante_id": "narrador",
+    "texto": "Milagro de la Alquimia",
+    "imagen": "/assets/narrative/results/cura.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Los tónicos botánicos purificadores sanaron la peste y devolvieron el vigor a la corte.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": 25
+     },
+     {
+      "recurso": "fe",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   }
+  },
+  "peso_base": 95.0,
+  "requisitos_eventos_previos": [],
+  "requisitos_personajes": [],
+  "tags_tematicos": [
+   "salud",
+   "crisis",
+   "pueblo"
+  ],
+  "titulo": "Brote de Fiebre en los Suburbios",
+  "universo_id": "corte_medieval",
+  "descripcion": "Una fiebre desconocida debilita a los artesanos y a la guarnición.",
+  "categoria": "Pueblo",
+  "tono": "negativo"
+ },
+ {
+  "_id": "evt_cometa_cielo_v2c",
+  "condiciones_disparo": [],
+  "imagen": "/assets/narrative/eventos/default.webp",
+  "nodo_raiz": "nodo_inicio",
+  "nodos": {
+   "nodo_inicio": {
+    "id": "nodo_inicio",
+    "hablante_id": "narrador",
+    "texto": "Una estela verde cruza el firmamento. El pueblo teme un presagio nefasto y clama en los templos.",
+    "imagen": null,
+    "es_final": false,
+    "opciones": [
+     {
+      "id": "op_a",
+      "texto": "Financiar procesiones y vigilias de expiación en la catedral",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_bendicion_catedral",
+        "peso": 60.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_obispo_tomas",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 35.0,
+          "explicacion": "+35% por prédica de Tomás"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_disturbios_populares",
+        "peso": 40.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_b",
+      "texto": "Bando municipal llamando a la calma y el sosiego",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_embajador_satisfecho",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_canciller_elena",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 30.0,
+          "explicacion": "+30% por oratoria de Elena"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_disturbios_populares",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_c",
+      "texto": "[Secreto] Explicar el fenómeno astronómico con mediciones ópticas",
+      "siguiente_nodo": "fin_res_cura_alquimica",
+      "desenlaces": [],
+      "condiciones": [
+       {
+        "tipo": "tiene_personaje",
+        "clave": null,
+        "operador": null,
+        "valor": null,
+        "personaje_id": "pj_alquimista_vera",
+        "carta_id": null,
+        "tag": null
+       }
+      ],
+      "bloqueo_modo": "oculta"
+     }
+    ],
+    "resultado_texto": "",
+    "impactos_recursos": [],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": null,
+    "efectos": []
+   },
+   "fin_res_bendicion_catedral": {
+    "id": "fin_res_bendicion_catedral",
+    "hablante_id": "narrador",
+    "texto": "Canto Solemne en la Catedral",
+    "imagen": "/assets/narrative/results/catedral.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Las campanas repicaron en bendición del reinado, devolviendo la esperanza a los fieles.",
+    "impactos_recursos": [
+     {
+      "recurso": "fe",
+      "delta": 20
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_disturbios_populares": {
+    "id": "fin_res_disturbios_populares",
+    "hablante_id": "narrador",
+    "texto": "Clamor y Protestas en las Calles",
+    "imagen": "/assets/narrative/results/disturbios.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "La multitud marchó frente a las puertas del castillo arrojando piedras e insultos.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": -20
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_embajador_satisfecho": {
+    "id": "fin_res_embajador_satisfecho",
+    "hablante_id": "narrador",
+    "texto": "Alianza Fronteriza Sellada",
+    "imagen": "/assets/narrative/results/diplomacia_exito.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "El banquete y las palabras diplomáticas lograron un acuerdo comercial muy ventajoso.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": 20
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_cura_alquimica": {
+    "id": "fin_res_cura_alquimica",
+    "hablante_id": "narrador",
+    "texto": "Milagro de la Alquimia",
+    "imagen": "/assets/narrative/results/cura.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Los tónicos botánicos purificadores sanaron la peste y devolvieron el vigor a la corte.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": 25
+     },
+     {
+      "recurso": "fe",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   }
+  },
+  "peso_base": 90.0,
+  "requisitos_eventos_previos": [],
+  "requisitos_personajes": [],
+  "tags_tematicos": [
+   "fe",
+   "religion",
+   "moral"
+  ],
+  "titulo": "El Cometa de Medianoche",
+  "universo_id": "corte_medieval",
+  "descripcion": "Un segundo cometa aparece en el cielo y reaviva los presagios de la corte.",
+  "categoria": "Ciencia",
+  "tono": "neutro"
+ },
+ {
+  "_id": "evt_conspiracion_corte_v2c",
+  "condiciones_disparo": [],
+  "imagen": "/assets/narrative/eventos/default.webp",
+  "nodo_raiz": "nodo_inicio",
+  "nodos": {
+   "nodo_inicio": {
+    "id": "nodo_inicio",
+    "hablante_id": "narrador",
+    "texto": "Cartas sin firma encontradas en los pasillos acusan a barones de planear un complot contra la corona.",
+    "imagen": null,
+    "es_final": false,
+    "opciones": [
+     {
+      "id": "op_a",
+      "texto": "Apostar centinelas de confianza y registrar carruajes nobles",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_suministros_asegurados",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_comandante_marcus",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 35.0,
+          "explicacion": "+35% por lealtad de la guardia de Marcus"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_traicion_corte",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_b",
+      "texto": "Auditar los tributos nobiliarios para asfixiar a los rebeldes",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_grano_comprado_justo",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_canciller_elena",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 30.0,
+          "explicacion": "+30% por agudeza contable de Elena"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_traicion_corte",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_c",
+      "texto": "[Secreto] Infiltrar informantes en las tabernas de los conjurados",
+      "siguiente_nodo": "fin_res_red_espias_exito",
+      "desenlaces": [],
+      "condiciones": [
+       {
+        "tipo": "tiene_tag",
+        "clave": null,
+        "operador": null,
+        "valor": null,
+        "personaje_id": null,
+        "carta_id": null,
+        "tag": "red_espias"
+       }
+      ],
+      "bloqueo_modo": "oculta"
+     }
+    ],
+    "resultado_texto": "",
+    "impactos_recursos": [],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": null,
+    "efectos": []
+   },
+   "fin_res_suministros_asegurados": {
+    "id": "fin_res_suministros_asegurados",
+    "hablante_id": "narrador",
+    "texto": "Graneros Protegidos con Disciplina",
+    "imagen": "/assets/narrative/results/guardia_victoria.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "La guardia custodió los silos y evitó saqueos, manteniendo las raciones estables.",
+    "impactos_recursos": [
+     {
+      "recurso": "ejercito",
+      "delta": 10
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_traicion_corte": {
+    "id": "fin_res_traicion_corte",
+    "hablante_id": "narrador",
+    "texto": "Puñalada en los Pasillos de Palacio",
+    "imagen": "/assets/narrative/results/traicion.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Los conspiradores atacaron por sorpresa antes de ser reducidos, sembrando desconfianza.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": -15
+     },
+     {
+      "recurso": "pueblo",
+      "delta": -10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_grano_comprado_justo": {
+    "id": "fin_res_grano_comprado_justo",
+    "hablante_id": "narrador",
+    "texto": "Cargamentos de Trigo en Palacio",
+    "imagen": "/assets/narrative/results/grano_exito.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Los mercaderes entregaron el grano prometido. Las familias tienen pan caliente en sus mesas.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": -15
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 20
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_red_espias_exito": {
+    "id": "fin_res_red_espias_exito",
+    "hablante_id": "narrador",
+    "texto": "Conspiración Desmantelada en las Sombras",
+    "imagen": "/assets/narrative/results/espias_exito.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Los informantes clandestinos interceptaron a los cabecillas traidores en plena noche.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": 20
+     },
+     {
+      "recurso": "ejercito",
+      "delta": 15
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   }
+  },
+  "peso_base": 90.0,
+  "requisitos_eventos_previos": [],
+  "requisitos_personajes": [],
+  "tags_tematicos": [
+   "intriga",
+   "orden",
+   "noble"
+  ],
+  "titulo": "Susurros de Conspiración en la Corte",
+  "universo_id": "corte_medieval",
+  "descripcion": "Susurros en los pasillos apuntan a una conjura contra el trono.",
+  "categoria": "Intriga",
+  "tono": "negativo"
+ },
+ {
+  "_id": "evt_coronacion_aniversario_v2c",
+  "condiciones_disparo": [],
+  "imagen": "/assets/narrative/eventos/default.webp",
+  "nodo_raiz": "nodo_inicio",
+  "nodos": {
+   "nodo_inicio": {
+    "id": "nodo_inicio",
+    "hablante_id": "narrador",
+    "texto": "El reino celebra el gran aniversario de la dinastía. Nobles y plebeyos esperan un gran gesto.",
+    "imagen": null,
+    "es_final": false,
+    "opciones": [
+     {
+      "id": "op_a",
+      "texto": "Celebrar un torneo de caballeros y banquetes en las murallas",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_victoria_militar_frontera",
+        "peso": 60.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_comandante_marcus",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 35.0,
+          "explicacion": "+35% por pompa marcial de Marcus"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_disturbios_populares",
+        "peso": 40.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_b",
+      "texto": "Gran misa pontifical de acción de gracias en la catedral",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_bendicion_catedral",
+        "peso": 60.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_obispo_tomas",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 35.0,
+          "explicacion": "+35% por liturgia de Tomás"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_disturbios_populares",
+        "peso": 40.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_c",
+      "texto": "[Secreto] Emitir edicto de amnistía y condonación bajo el Sello Real",
+      "siguiente_nodo": "fin_res_cosecha_salvada_decreto",
+      "desenlaces": [],
+      "condiciones": [
+       {
+        "tipo": "tiene_tag",
+        "clave": null,
+        "operador": null,
+        "valor": null,
+        "personaje_id": null,
+        "carta_id": null,
+        "tag": "sello_real"
+       }
+      ],
+      "bloqueo_modo": "oculta"
+     }
+    ],
+    "resultado_texto": "",
+    "impactos_recursos": [],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": null,
+    "efectos": []
+   },
+   "fin_res_victoria_militar_frontera": {
+    "id": "fin_res_victoria_militar_frontera",
+    "hablante_id": "narrador",
+    "texto": "Victoria Aplastante en la Frontera",
+    "imagen": "/assets/narrative/results/victoria_militar.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Las legiones de la guardia barrieron a los invasores, afianzando la paz del reino.",
+    "impactos_recursos": [
+     {
+      "recurso": "ejercito",
+      "delta": 20
+     },
+     {
+      "recurso": "oro",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_disturbios_populares": {
+    "id": "fin_res_disturbios_populares",
+    "hablante_id": "narrador",
+    "texto": "Clamor y Protestas en las Calles",
+    "imagen": "/assets/narrative/results/disturbios.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "La multitud marchó frente a las puertas del castillo arrojando piedras e insultos.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": -20
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_bendicion_catedral": {
+    "id": "fin_res_bendicion_catedral",
+    "hablante_id": "narrador",
+    "texto": "Canto Solemne en la Catedral",
+    "imagen": "/assets/narrative/results/catedral.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Las campanas repicaron en bendición del reinado, devolviendo la esperanza a los fieles.",
+    "impactos_recursos": [
+     {
+      "recurso": "fe",
+      "delta": 20
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_cosecha_salvada_decreto": {
+    "id": "fin_res_cosecha_salvada_decreto",
+    "hablante_id": "narrador",
+    "texto": "Decreto Real Acatado sin Resistencia",
+    "imagen": "/assets/narrative/results/decreto.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Nadie osó contradecir el Sello Real. Los señores feudales cedieron sus silos a la corona.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": 25
+     },
+     {
+      "recurso": "fe",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   }
+  },
+  "peso_base": 80.0,
+  "requisitos_eventos_previos": [],
+  "requisitos_personajes": [],
+  "tags_tematicos": [
+   "moral",
+   "sociedad",
+   "corona"
+  ],
+  "titulo": "El Jubileo Real",
+  "universo_id": "corte_medieval",
+  "descripcion": "El jubileo real reúne a la nobleza y pone a prueba la legitimidad del rey.",
+  "categoria": "Nobleza",
+  "tono": "positivo"
+ },
+ {
+  "_id": "evt_descubrimiento_mina_v2c",
+  "condiciones_disparo": [],
+  "imagen": "/assets/narrative/eventos/default.webp",
+  "nodo_raiz": "nodo_inicio",
+  "nodos": {
+   "nodo_inicio": {
+    "id": "nodo_inicio",
+    "hablante_id": "narrador",
+    "texto": "Exploradores descubren una rica veta argentífera en las montañas del norte.",
+    "imagen": null,
+    "es_final": false,
+    "opciones": [
+     {
+      "id": "op_a",
+      "texto": "Subastar la concesión de extracción a gremios privados",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_embajador_satisfecho",
+        "peso": 60.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_canciller_elena",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 30.0,
+          "explicacion": "+30% por subasta competitiva de Elena"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_estafa_mercaderes",
+        "peso": 40.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_b",
+      "texto": "Militarizar el yacimiento y extraer con batallones de trabajo",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_victoria_militar_frontera",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_comandante_marcus",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 35.0,
+          "explicacion": "+35% por logística militar de Marcus"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_disturbios_populares",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_c",
+      "texto": "[Secreto] Refinar el mineral con reactivos de lixiviación alquímica",
+      "siguiente_nodo": "fin_res_oro_minas_masivo",
+      "desenlaces": [],
+      "condiciones": [
+       {
+        "tipo": "tiene_personaje",
+        "clave": null,
+        "operador": null,
+        "valor": null,
+        "personaje_id": "pj_alquimista_vera",
+        "carta_id": null,
+        "tag": null
+       }
+      ],
+      "bloqueo_modo": "oculta"
+     }
+    ],
+    "resultado_texto": "",
+    "impactos_recursos": [],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": null,
+    "efectos": []
+   },
+   "fin_res_embajador_satisfecho": {
+    "id": "fin_res_embajador_satisfecho",
+    "hablante_id": "narrador",
+    "texto": "Alianza Fronteriza Sellada",
+    "imagen": "/assets/narrative/results/diplomacia_exito.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "El banquete y las palabras diplomáticas lograron un acuerdo comercial muy ventajoso.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": 20
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_estafa_mercaderes": {
+    "id": "fin_res_estafa_mercaderes",
+    "hablante_id": "narrador",
+    "texto": "Sacos de Arena y Grano Rancio",
+    "imagen": "/assets/narrative/results/estafa.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Los comerciantes cobraron por adelantado y huyeron dejando sacos de grano podrido.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": -15
+     },
+     {
+      "recurso": "pueblo",
+      "delta": -10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_victoria_militar_frontera": {
+    "id": "fin_res_victoria_militar_frontera",
+    "hablante_id": "narrador",
+    "texto": "Victoria Aplastante en la Frontera",
+    "imagen": "/assets/narrative/results/victoria_militar.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Las legiones de la guardia barrieron a los invasores, afianzando la paz del reino.",
+    "impactos_recursos": [
+     {
+      "recurso": "ejercito",
+      "delta": 20
+     },
+     {
+      "recurso": "oro",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_disturbios_populares": {
+    "id": "fin_res_disturbios_populares",
+    "hablante_id": "narrador",
+    "texto": "Clamor y Protestas en las Calles",
+    "imagen": "/assets/narrative/results/disturbios.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "La multitud marchó frente a las puertas del castillo arrojando piedras e insultos.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": -20
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_oro_minas_masivo": {
+    "id": "fin_res_oro_minas_masivo",
+    "hablante_id": "narrador",
+    "texto": "El Filón Supremo de la Corona",
+    "imagen": "/assets/narrative/results/minas.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Nuevos métodos multiplicaron el rendimiento de las vetas de plata y oro de las arcas.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": 30
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   }
+  },
+  "peso_base": 80.0,
+  "requisitos_eventos_previos": [],
+  "requisitos_personajes": [],
+  "tags_tematicos": [
+   "oro",
+   "economia",
+   "riqueza"
+  ],
+  "titulo": "El Filón de Plata en las Quebradas",
+  "universo_id": "corte_medieval",
+  "descripcion": "Un filón de plata aparece en las quebradas y promete riqueza y disputas.",
+  "categoria": "Oro",
+  "tono": "positivo"
+ },
+ {
+  "_id": "evt_feria_comercial_v2c",
+  "condiciones_disparo": [],
+  "imagen": "/assets/narrative/eventos/default.webp",
+  "nodo_raiz": "nodo_inicio",
+  "nodos": {
+   "nodo_inicio": {
+    "id": "nodo_inicio",
+    "hablante_id": "narrador",
+    "texto": "Mercaderes de cinco reinos llenan la plaza central con especias, telas y metales preciosos.",
+    "imagen": null,
+    "es_final": false,
+    "opciones": [
+     {
+      "id": "op_a",
+      "texto": "Cobrar el arancel aduanero completo a mercaderes",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_embajador_satisfecho",
+        "peso": 60.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_canciller_elena",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 30.0,
+          "explicacion": "+30% por control aduanero de Elena"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_estafa_mercaderes",
+        "peso": 40.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_b",
+      "texto": "Eximir de impuestos para atraer más gremios al reino",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_grano_comprado_justo",
+        "peso": 60.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_obispo_tomas",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 25.0,
+          "explicacion": "+25% por bendición a los gremios"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_disturbios_populares",
+        "peso": 40.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_c",
+      "texto": "[Secreto] Decretar monopolio de la corona sobre metales y especias",
+      "siguiente_nodo": "fin_res_oro_minas_masivo",
+      "desenlaces": [],
+      "condiciones": [
+       {
+        "tipo": "tiene_tag",
+        "clave": null,
+        "operador": null,
+        "valor": null,
+        "personaje_id": null,
+        "carta_id": null,
+        "tag": "sello_real"
+       }
+      ],
+      "bloqueo_modo": "oculta"
+     }
+    ],
+    "resultado_texto": "",
+    "impactos_recursos": [],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": null,
+    "efectos": []
+   },
+   "fin_res_embajador_satisfecho": {
+    "id": "fin_res_embajador_satisfecho",
+    "hablante_id": "narrador",
+    "texto": "Alianza Fronteriza Sellada",
+    "imagen": "/assets/narrative/results/diplomacia_exito.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "El banquete y las palabras diplomáticas lograron un acuerdo comercial muy ventajoso.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": 20
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_estafa_mercaderes": {
+    "id": "fin_res_estafa_mercaderes",
+    "hablante_id": "narrador",
+    "texto": "Sacos de Arena y Grano Rancio",
+    "imagen": "/assets/narrative/results/estafa.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Los comerciantes cobraron por adelantado y huyeron dejando sacos de grano podrido.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": -15
+     },
+     {
+      "recurso": "pueblo",
+      "delta": -10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_grano_comprado_justo": {
+    "id": "fin_res_grano_comprado_justo",
+    "hablante_id": "narrador",
+    "texto": "Cargamentos de Trigo en Palacio",
+    "imagen": "/assets/narrative/results/grano_exito.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Los mercaderes entregaron el grano prometido. Las familias tienen pan caliente en sus mesas.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": -15
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 20
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_disturbios_populares": {
+    "id": "fin_res_disturbios_populares",
+    "hablante_id": "narrador",
+    "texto": "Clamor y Protestas en las Calles",
+    "imagen": "/assets/narrative/results/disturbios.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "La multitud marchó frente a las puertas del castillo arrojando piedras e insultos.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": -20
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_oro_minas_masivo": {
+    "id": "fin_res_oro_minas_masivo",
+    "hablante_id": "narrador",
+    "texto": "El Filón Supremo de la Corona",
+    "imagen": "/assets/narrative/results/minas.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Nuevos métodos multiplicaron el rendimiento de las vetas de plata y oro de las arcas.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": 30
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   }
+  },
+  "peso_base": 85.0,
+  "requisitos_eventos_previos": [],
+  "requisitos_personajes": [],
+  "tags_tematicos": [
+   "comercio",
+   "oro",
+   "sociedad"
+  ],
+  "titulo": "La Gran Feria de San Lucas",
+  "universo_id": "corte_medieval",
+  "descripcion": "La gran feria de San Lucas atrae mercaderes, impuestos y tensiones gremiales.",
+  "categoria": "Comercio",
+  "tono": "positivo"
+ },
+ {
+  "_id": "evt_helada_cosechas_v2c",
+  "universo_id": "corte_medieval",
+  "titulo": "La Gran Helada en el Valle",
+  "imagen": "/assets/narrative/eventos/default.webp",
+  "peso_base": 100.0,
+  "tags_tematicos": [
+   "clima",
+   "comida",
+   "crisis",
+   "pueblo"
+  ],
+  "requisitos_eventos_previos": [],
+  "requisitos_personajes": [],
+  "condiciones_disparo": [],
+  "nodo_raiz": "nodo_inicio",
+  "nodos": {
+   "nodo_inicio": {
+    "id": "nodo_inicio",
+    "hablante_id": "narrador",
+    "texto": "Una ola de frío polar congeló los campos de trigo. Los silos campesinos amenazan con quedar vacíos.",
+    "imagen": null,
+    "es_final": false,
+    "opciones": [
+     {
+      "id": "op_a",
+      "texto": "Enviar patrullas a custodiar y racionar graneros",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_suministros_asegurados",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_comandante_marcus",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 35.0,
+          "explicacion": "+35% por liderazgo del Comandante Marcus"
+         },
+         {
+          "condicion": {
+           "tipo": "tiene_tag",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": null,
+           "carta_id": null,
+           "tag": "logistica_militar"
+          },
+          "delta_peso": 15.0,
+          "explicacion": "+15% por carretas organizadas"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_emboscada_y_perdida",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_b",
+      "texto": "Comprar grano de emergencia a mercaderes extranjeros",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_grano_comprado_justo",
+        "peso": 60.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_canciller_elena",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 30.0,
+          "explicacion": "+30% por negociación de la Canciller Elena"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_estafa_mercaderes",
+        "peso": 40.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_c",
+      "texto": "[Secreto] Decretar requisa general amparado en el Sello Real",
+      "siguiente_nodo": "fin_res_cosecha_salvada_decreto",
+      "desenlaces": [],
+      "condiciones": [
+       {
+        "tipo": "tiene_tag",
+        "clave": null,
+        "operador": null,
+        "valor": null,
+        "personaje_id": null,
+        "carta_id": null,
+        "tag": "sello_real"
+       }
+      ],
+      "bloqueo_modo": "oculta"
+     }
+    ],
+    "resultado_texto": "",
+    "impactos_recursos": [],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": null,
+    "efectos": []
+   },
+   "fin_res_suministros_asegurados": {
+    "id": "fin_res_suministros_asegurados",
+    "hablante_id": "narrador",
+    "texto": "Graneros Protegidos con Disciplina",
+    "imagen": "/assets/narrative/results/guardia_victoria.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "La guardia custodió los silos y evitó saqueos, manteniendo las raciones estables.",
+    "impactos_recursos": [
+     {
+      "recurso": "ejercito",
+      "delta": 10
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_emboscada_y_perdida": {
+    "id": "fin_res_emboscada_y_perdida",
+    "hablante_id": "narrador",
+    "texto": "Patrulla Derrotada en el Camino",
+    "imagen": "/assets/narrative/results/emboscada.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Bandidos y rebeldes emboscaron a la comitiva, robando los suministros y armas.",
+    "impactos_recursos": [
+     {
+      "recurso": "ejercito",
+      "delta": -15
+     },
+     {
+      "recurso": "oro",
+      "delta": -10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_grano_comprado_justo": {
+    "id": "fin_res_grano_comprado_justo",
+    "hablante_id": "narrador",
+    "texto": "Cargamentos de Trigo en Palacio",
+    "imagen": "/assets/narrative/results/grano_exito.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Los mercaderes entregaron el grano prometido. Las familias tienen pan caliente en sus mesas.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": -15
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 20
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_estafa_mercaderes": {
+    "id": "fin_res_estafa_mercaderes",
+    "hablante_id": "narrador",
+    "texto": "Sacos de Arena y Grano Rancio",
+    "imagen": "/assets/narrative/results/estafa.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Los comerciantes cobraron por adelantado y huyeron dejando sacos de grano podrido.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": -15
+     },
+     {
+      "recurso": "pueblo",
+      "delta": -10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_cosecha_salvada_decreto": {
+    "id": "fin_res_cosecha_salvada_decreto",
+    "hablante_id": "narrador",
+    "texto": "Decreto Real Acatado sin Resistencia",
+    "imagen": "/assets/narrative/results/decreto.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Nadie osó contradecir el Sello Real. Los señores feudales cedieron sus silos a la corona.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": 25
+     },
+     {
+      "recurso": "fe",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   }
+  },
+  "descripcion": "Una helada tardía quema los sembrados del valle antes de la cosecha.",
+  "categoria": "Pueblo",
+  "tono": "negativo"
+ },
+ {
+  "_id": "evt_motin_campesino_v2c",
+  "condiciones_disparo": [],
+  "imagen": "/assets/narrative/eventos/default.webp",
+  "nodo_raiz": "nodo_inicio",
+  "nodos": {
+   "nodo_inicio": {
+    "id": "nodo_inicio",
+    "hablante_id": "narrador",
+    "texto": "Gremialistas y campesinos se congregan frente al palacio exigiendo abaratar los alimentos.",
+    "imagen": null,
+    "es_final": false,
+    "opciones": [
+     {
+      "id": "op_a",
+      "texto": "Desplegar a la guardia para disolver los desórdenes",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_suministros_asegurados",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_comandante_marcus",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 35.0,
+          "explicacion": "+35% por contención de Marcus"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_disturbios_populares",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_b",
+      "texto": "Pactar subsidio temporal con los gremios de panaderos",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_grano_comprado_justo",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_canciller_elena",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 30.0,
+          "explicacion": "+30% por concertación de Elena"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_disturbios_populares",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_c",
+      "texto": "[Secreto] Repartir sacos de grano de emergencia y saciar a la multitud",
+      "siguiente_nodo": "fin_res_cosecha_salvada_decreto",
+      "desenlaces": [],
+      "condiciones": [
+       {
+        "tipo": "tiene_tag",
+        "clave": null,
+        "operador": null,
+        "valor": null,
+        "personaje_id": null,
+        "carta_id": null,
+        "tag": "abastecimiento"
+       }
+      ],
+      "bloqueo_modo": "oculta"
+     }
+    ],
+    "resultado_texto": "",
+    "impactos_recursos": [],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": null,
+    "efectos": []
+   },
+   "fin_res_suministros_asegurados": {
+    "id": "fin_res_suministros_asegurados",
+    "hablante_id": "narrador",
+    "texto": "Graneros Protegidos con Disciplina",
+    "imagen": "/assets/narrative/results/guardia_victoria.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "La guardia custodió los silos y evitó saqueos, manteniendo las raciones estables.",
+    "impactos_recursos": [
+     {
+      "recurso": "ejercito",
+      "delta": 10
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_disturbios_populares": {
+    "id": "fin_res_disturbios_populares",
+    "hablante_id": "narrador",
+    "texto": "Clamor y Protestas en las Calles",
+    "imagen": "/assets/narrative/results/disturbios.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "La multitud marchó frente a las puertas del castillo arrojando piedras e insultos.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": -20
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_grano_comprado_justo": {
+    "id": "fin_res_grano_comprado_justo",
+    "hablante_id": "narrador",
+    "texto": "Cargamentos de Trigo en Palacio",
+    "imagen": "/assets/narrative/results/grano_exito.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Los mercaderes entregaron el grano prometido. Las familias tienen pan caliente en sus mesas.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": -15
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 20
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_cosecha_salvada_decreto": {
+    "id": "fin_res_cosecha_salvada_decreto",
+    "hablante_id": "narrador",
+    "texto": "Decreto Real Acatado sin Resistencia",
+    "imagen": "/assets/narrative/results/decreto.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Nadie osó contradecir el Sello Real. Los señores feudales cedieron sus silos a la corona.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": 25
+     },
+     {
+      "recurso": "fe",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   }
+  },
+  "peso_base": 85.0,
+  "requisitos_eventos_previos": [],
+  "requisitos_personajes": [],
+  "tags_tematicos": [
+   "pueblo",
+   "crisis",
+   "orden"
+  ],
+  "titulo": "El Motín del Pan",
+  "universo_id": "corte_medieval",
+  "descripcion": "El precio del pan desata una revuelta en los barrios bajos.",
+  "categoria": "Pueblo",
+  "tono": "negativo"
+ },
+ {
+  "_id": "evt_sequia_estival_v2c",
+  "condiciones_disparo": [],
+  "imagen": "/assets/narrative/eventos/default.webp",
+  "nodo_raiz": "nodo_inicio",
+  "nodos": {
+   "nodo_inicio": {
+    "id": "nodo_inicio",
+    "hablante_id": "narrador",
+    "texto": "El río principal bajó a niveles mínimos. Los molinos no giran y el ganado languidece.",
+    "imagen": null,
+    "es_final": false,
+    "opciones": [
+     {
+      "id": "op_a",
+      "texto": "Racionar pozos y transportar agua con carretas militares",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_suministros_asegurados",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_comandante_marcus",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 30.0,
+          "explicacion": "+30% por orden de Marcus"
+         },
+         {
+          "condicion": {
+           "tipo": "tiene_tag",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": null,
+           "carta_id": null,
+           "tag": "logistica_militar"
+          },
+          "delta_peso": 20.0,
+          "explicacion": "+20% por carretas logísticas"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_disturbios_populares",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_b",
+      "texto": "Rogativas solemnes y procesión por la lluvia",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_bendicion_catedral",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_obispo_tomas",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 35.0,
+          "explicacion": "+35% por rogativas de Tomás"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_disturbios_populares",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_c",
+      "texto": "[Secreto] Abrir reservas estratégicas de grano y silos subterráneos",
+      "siguiente_nodo": "fin_res_cosecha_salvada_decreto",
+      "desenlaces": [],
+      "condiciones": [
+       {
+        "tipo": "tiene_tag",
+        "clave": null,
+        "operador": null,
+        "valor": null,
+        "personaje_id": null,
+        "carta_id": null,
+        "tag": "abastecimiento"
+       }
+      ],
+      "bloqueo_modo": "oculta"
+     }
+    ],
+    "resultado_texto": "",
+    "impactos_recursos": [],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": null,
+    "efectos": []
+   },
+   "fin_res_suministros_asegurados": {
+    "id": "fin_res_suministros_asegurados",
+    "hablante_id": "narrador",
+    "texto": "Graneros Protegidos con Disciplina",
+    "imagen": "/assets/narrative/results/guardia_victoria.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "La guardia custodió los silos y evitó saqueos, manteniendo las raciones estables.",
+    "impactos_recursos": [
+     {
+      "recurso": "ejercito",
+      "delta": 10
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_disturbios_populares": {
+    "id": "fin_res_disturbios_populares",
+    "hablante_id": "narrador",
+    "texto": "Clamor y Protestas en las Calles",
+    "imagen": "/assets/narrative/results/disturbios.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "La multitud marchó frente a las puertas del castillo arrojando piedras e insultos.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": -20
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_bendicion_catedral": {
+    "id": "fin_res_bendicion_catedral",
+    "hablante_id": "narrador",
+    "texto": "Canto Solemne en la Catedral",
+    "imagen": "/assets/narrative/results/catedral.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Las campanas repicaron en bendición del reinado, devolviendo la esperanza a los fieles.",
+    "impactos_recursos": [
+     {
+      "recurso": "fe",
+      "delta": 20
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_cosecha_salvada_decreto": {
+    "id": "fin_res_cosecha_salvada_decreto",
+    "hablante_id": "narrador",
+    "texto": "Decreto Real Acatado sin Resistencia",
+    "imagen": "/assets/narrative/results/decreto.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Nadie osó contradecir el Sello Real. Los señores feudales cedieron sus silos a la corona.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": 25
+     },
+     {
+      "recurso": "fe",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   }
+  },
+  "peso_base": 85.0,
+  "requisitos_eventos_previos": [],
+  "requisitos_personajes": [],
+  "tags_tematicos": [
+   "clima",
+   "comida",
+   "crisis"
+  ],
+  "titulo": "La Gran Sequía del Estío",
+  "universo_id": "corte_medieval",
+  "descripcion": "La sequía del estío agota pozos y pasturas en el interior del reino.",
+  "categoria": "Pueblo",
+  "tono": "negativo"
+ },
+ {
+  "_id": "evt_visita_embajador_v2c",
+  "condiciones_disparo": [],
+  "imagen": "/assets/narrative/eventos/default.webp",
+  "nodo_raiz": "nodo_inicio",
+  "nodos": {
+   "nodo_inicio": {
+    "id": "nodo_inicio",
+    "hablante_id": "narrador",
+    "texto": "Un noble extranjero arriba con escolta armada proponiendo un pacto arancelario muy exigente.",
+    "imagen": null,
+    "es_final": false,
+    "opciones": [
+     {
+      "id": "op_a",
+      "texto": "Organizar una recepción fastuosa y firmar el acuerdo",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_embajador_satisfecho",
+        "peso": 60.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_canciller_elena",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 30.0,
+          "explicacion": "+30% por carisma de la Canciller Elena"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_disturbios_populares",
+        "peso": 40.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_b",
+      "texto": "Desfile marcial disuasorio e imponer condiciones estrictas",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_embajador_satisfecho",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_comandante_marcus",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 35.0,
+          "explicacion": "+35% por presencia del Comandante Marcus"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_disturbios_populares",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_c",
+      "texto": "[Secreto] Chantajear a la delegación con cartas interceptadas por espías",
+      "siguiente_nodo": "fin_res_embajador_satisfecho",
+      "desenlaces": [],
+      "condiciones": [
+       {
+        "tipo": "tiene_personaje",
+        "clave": null,
+        "operador": null,
+        "valor": null,
+        "personaje_id": "pj_ladrona_sylvia",
+        "carta_id": null,
+        "tag": null
+       }
+      ],
+      "bloqueo_modo": "oculta"
+     }
+    ],
+    "resultado_texto": "",
+    "impactos_recursos": [],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": null,
+    "efectos": []
+   },
+   "fin_res_embajador_satisfecho": {
+    "id": "fin_res_embajador_satisfecho",
+    "hablante_id": "narrador",
+    "texto": "Alianza Fronteriza Sellada",
+    "imagen": "/assets/narrative/results/diplomacia_exito.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "El banquete y las palabras diplomáticas lograron un acuerdo comercial muy ventajoso.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": 20
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_disturbios_populares": {
+    "id": "fin_res_disturbios_populares",
+    "hablante_id": "narrador",
+    "texto": "Clamor y Protestas en las Calles",
+    "imagen": "/assets/narrative/results/disturbios.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "La multitud marchó frente a las puertas del castillo arrojando piedras e insultos.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": -20
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   }
+  },
+  "peso_base": 100.0,
+  "requisitos_eventos_previos": [],
+  "requisitos_personajes": [],
+  "tags_tematicos": [
+   "diplomacia",
+   "comercio",
+   "noble",
+   "oro"
+  ],
+  "titulo": "El Embajador del Reino del Norte",
+  "universo_id": "corte_medieval",
+  "descripcion": "El embajador del Norte llega con una oferta de alianza y viejas sospechas.",
+  "categoria": "Diplomacia",
+  "tono": "positivo"
+ },
+ {
+  "_id": "evt_visita_inquisidor_v2c",
+  "condiciones_disparo": [],
+  "imagen": "/assets/narrative/eventos/default.webp",
+  "nodo_raiz": "nodo_inicio",
+  "nodos": {
+   "nodo_inicio": {
+    "id": "nodo_inicio",
+    "hablante_id": "narrador",
+    "texto": "Legados papales exigen investigar prácticas sospechosas entre los sabios del reino.",
+    "imagen": null,
+    "es_final": false,
+    "opciones": [
+     {
+      "id": "op_a",
+      "texto": "Facilitar la investigación de la curia en la capital",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_inquisicion_controlada",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_obispo_tomas",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 40.0,
+          "explicacion": "+40% por mediación moderada de Tomás"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_disturbios_populares",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_b",
+      "texto": "Limitar las atribuciones del tribunal con leyes civiles",
+      "siguiente_nodo": null,
+      "desenlaces": [
+       {
+        "nodo": "fin_res_embajador_satisfecho",
+        "peso": 50.0,
+        "modificadores_probabilidad": [
+         {
+          "condicion": {
+           "tipo": "tiene_personaje",
+           "clave": null,
+           "operador": null,
+           "valor": null,
+           "personaje_id": "pj_canciller_elena",
+           "carta_id": null,
+           "tag": null
+          },
+          "delta_peso": 30.0,
+          "explicacion": "+30% por jurisprudencia de Elena"
+         }
+        ]
+       },
+       {
+        "nodo": "fin_res_traicion_corte",
+        "peso": 50.0,
+        "modificadores_probabilidad": []
+       }
+      ],
+      "condiciones": [],
+      "bloqueo_modo": "deshabilitada"
+     },
+     {
+      "id": "op_c",
+      "texto": "[Secreto] Sembrar pistas falsas para salvar a los eruditos del patíbulo",
+      "siguiente_nodo": "fin_res_red_espias_exito",
+      "desenlaces": [],
+      "condiciones": [
+       {
+        "tipo": "tiene_personaje",
+        "clave": null,
+        "operador": null,
+        "valor": null,
+        "personaje_id": "pj_ladrona_sylvia",
+        "carta_id": null,
+        "tag": null
+       }
+      ],
+      "bloqueo_modo": "oculta"
+     }
+    ],
+    "resultado_texto": "",
+    "impactos_recursos": [],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": null,
+    "efectos": []
+   },
+   "fin_res_inquisicion_controlada": {
+    "id": "fin_res_inquisicion_controlada",
+    "hablante_id": "narrador",
+    "texto": "Paz Eclesiástica y Doctrina Firme",
+    "imagen": "/assets/narrative/results/inquisicion.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "El juicio se condujo con mesura y caridad, fortaleciendo la fe y la armonía popular.",
+    "impactos_recursos": [
+     {
+      "recurso": "fe",
+      "delta": 25
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_disturbios_populares": {
+    "id": "fin_res_disturbios_populares",
+    "hablante_id": "narrador",
+    "texto": "Clamor y Protestas en las Calles",
+    "imagen": "/assets/narrative/results/disturbios.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "La multitud marchó frente a las puertas del castillo arrojando piedras e insultos.",
+    "impactos_recursos": [
+     {
+      "recurso": "pueblo",
+      "delta": -20
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_embajador_satisfecho": {
+    "id": "fin_res_embajador_satisfecho",
+    "hablante_id": "narrador",
+    "texto": "Alianza Fronteriza Sellada",
+    "imagen": "/assets/narrative/results/diplomacia_exito.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "El banquete y las palabras diplomáticas lograron un acuerdo comercial muy ventajoso.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": 20
+     },
+     {
+      "recurso": "pueblo",
+      "delta": 10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   },
+   "fin_res_traicion_corte": {
+    "id": "fin_res_traicion_corte",
+    "hablante_id": "narrador",
+    "texto": "Puñalada en los Pasillos de Palacio",
+    "imagen": "/assets/narrative/results/traicion.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Los conspiradores atacaron por sorpresa antes de ser reducidos, sembrando desconfianza.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": -15
+     },
+     {
+      "recurso": "pueblo",
+      "delta": -10
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "negativo",
+    "efectos": []
+   },
+   "fin_res_red_espias_exito": {
+    "id": "fin_res_red_espias_exito",
+    "hablante_id": "narrador",
+    "texto": "Conspiración Desmantelada en las Sombras",
+    "imagen": "/assets/narrative/results/espias_exito.webp",
+    "es_final": true,
+    "opciones": [],
+    "resultado_texto": "Los informantes clandestinos interceptaron a los cabecillas traidores en plena noche.",
+    "impactos_recursos": [
+     {
+      "recurso": "oro",
+      "delta": 20
+     },
+     {
+      "recurso": "ejercito",
+      "delta": 15
+     }
+    ],
+    "impactos_afinidad": [],
+    "impactos_tags": [],
+    "tipo_desenlace": "positivo",
+    "efectos": []
+   }
+  },
+  "peso_base": 80.0,
+  "requisitos_eventos_previos": [],
+  "requisitos_personajes": [],
+  "tags_tematicos": [
+   "fe",
+   "religion",
+   "ley"
+  ],
+  "titulo": "El Tribunal del Gran Inquisidor",
+  "universo_id": "corte_medieval",
+  "descripcion": "El Gran Inquisidor exige cuentas por herejías que la corona toleró.",
+  "categoria": "Fe",
+  "tono": "negativo"
+ }
+]
